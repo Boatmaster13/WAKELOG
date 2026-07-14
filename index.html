@@ -282,12 +282,13 @@ input:disabled, select:disabled{
 }
 .admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
 .admin-readonly{ opacity:0.5; pointer-events:none; filter:grayscale(0.4); user-select:none; }
-.party-code-actions{ display:flex; gap:0.4rem; flex-wrap:wrap; }
+.party-code-actions{ display:flex; gap:0.35rem; flex-wrap:nowrap; }
 .icon-btn{
   font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
-  padding:0.42rem 0.75rem; border-radius:20px; border:1px solid var(--line-strong);
+  padding:0.42rem 0.5rem; border-radius:20px; border:1px solid var(--line-strong);
   background:#fff; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
-  display:inline-flex; align-items:center; gap:0.35rem; transition:background 0.15s ease;
+  display:inline-flex; align-items:center; justify-content:center; gap:0.3rem; transition:background 0.15s ease;
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
 }
 .icon-btn:hover{ background:var(--foam); }
 .hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
@@ -469,6 +470,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 }
 @media (max-width: 420px){
   #panel-settlement h2{ font-size:1.1rem; }
+  .icon-btn{ font-size:0.66rem; padding:0.38rem 0.35rem; gap:0.2rem; }
 }
 @media (orientation: landscape) and (max-height: 480px){
   .hero-container{ padding:1rem 1.4rem 0.9rem; }
@@ -2854,7 +2856,7 @@ function renderPartyCodeList(){
       '<div class="party-code-actions">' +
         '<button class="icon-btn" data-action="copy" data-id="' + p.id + '">📋 Kopieren</button>' +
         '<button class="icon-btn" data-action="whatsapp" data-id="' + p.id + '">💬 WhatsApp</button>' +
-        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '">🔄 Neu erzeugen</button>' +
+        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '">🔄 Neuer Code</button>' +
       '</div>' +
       '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
     '</div>'
@@ -2879,6 +2881,7 @@ function renderPartyCodeList(){
         const msg = 'Hier ist der Link zu unserem WakeLog: ' + link + '\nDein persönlicher Code: ' + p.code;
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
+        if(!confirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.')) return;
         p.code = randomCode(6);
         logAudit('Neuer Zugangscode erzeugt für Partei "' + p.name + '" (alter Zugriff widerrufen)');
         await saveShared();
