@@ -931,7 +931,7 @@ function updateHeaderMeta(){
   const strip = document.getElementById('adminStrip');
   if(strip){
     strip.innerHTML = '<div class="admin-strip">' +
-      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : '') +
+      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge">User</span>' : '')) +
       '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
     '</div>';
     const btn = document.getElementById('logoutBtn');
