@@ -1359,7 +1359,7 @@ function renderParties(){
   }
 
   wrap.innerHTML = state.parties.map(p =>
-    '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><input type="text" data-id="' + p.id + '" value="' + escapeHtml(p.name) + '"></div>'
+    '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><input type="text" data-id="' + p.id + '" value="' + escapeHtml(p.name) + '"><button type="button" class="del-btn" data-delete-party="' + p.id + '">löschen</button></div>'
   ).join('');
 
   wrap.querySelectorAll('input').forEach(inp => {
@@ -1370,6 +1370,23 @@ function renderParties(){
         await saveShared();
         populatePartySelect(); renderEntriesTable(); renderSettlement(); renderParties(); renderPriorityRule();
       }
+    });
+  });
+
+  wrap.querySelectorAll('button[data-delete-party]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const p = state.parties.find(p => p.id === btn.dataset.deleteParty);
+      if(!p) return;
+      const entryCount = state.entries.filter(e => {
+        const usage = getEntryUsageSplit(e);
+        const paid = getEntryFlags(e).hasRefuel ? getEntryPaidSplit(e) : { ids: [] };
+        return usage.ids.includes(p.id) || paid.ids.includes(p.id);
+      }).length;
+      const extra = entryCount > 0 ? ' Es gibt ' + entryCount + ' Eintrag/Einträge, die diese Partei betreffen — diese bleiben erhalten, zeigen die Partei aber künftig als "(unbekannt)" an.' : '';
+      if(!confirm('Partei "' + p.name + '" wirklich löschen? Ihr Zugangscode wird ungültig, sie kann sich danach nicht mehr einloggen.' + extra)) return;
+      state.parties = state.parties.filter(x => x.id !== p.id);
+      await saveShared();
+      populatePartySelect(); renderEntriesTable(); renderSettlement(); renderParties(); renderPriorityRule();
     });
   });
 }
