@@ -2423,6 +2423,29 @@ function showRecoveryCodeModal(recoveryCode, onDismiss){
   });
 }
 
+function showTotpSetupModal(totpSecret, onDismiss){
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  const base32 = base32Encode(hexToBytes(totpSecret));
+  overlay.innerHTML =
+    '<div class="gate-card">' +
+      '<h2>Authenticator-App einrichten</h2>' +
+      '<p>Öffne Google Authenticator (oder Authy o. ä.) → "Konto manuell hinzufügen" → gib diesen Schlüssel ein. Er wird <b>nur dieses eine Mal</b> angezeigt.</p>' +
+      '<div class="code-display" style="display:block; text-align:center; font-size:1.05rem; letter-spacing:0.1em; margin-bottom:1.1rem; word-break:break-all;">' + base32 + '</div>' +
+      '<label class="checkbox-item" style="margin-bottom:0.9rem;"><input type="checkbox" id="totpModalCheck"> Ich habe den Schlüssel in meiner Authenticator-App eingerichtet</label>' +
+      '<button class="btn" id="totpModalBtn" disabled>Schliessen</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const checkbox = overlay.querySelector('#totpModalCheck');
+  const btn = overlay.querySelector('#totpModalBtn');
+  checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
+  btn.addEventListener('click', () => {
+    overlay.remove();
+    if(onDismiss) onDismiss();
+  });
+}
+
 function showRecoveryCodeOnce(recoveryCode, totpSecret){
   const card = document.getElementById('gateCard');
   const base32 = totpSecret ? base32Encode(hexToBytes(totpSecret)) : '';
@@ -2705,6 +2728,11 @@ function renderAdminGeneralSection(){
       '<div class="gate-error" id="adminCodeFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
+      '<label>Authenticator-App einrichten</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Richte Google Authenticator (oder eine ähnliche App) als zusätzlichen Weg ein, um den Administrator-Code zurückzusetzen, falls du ihn vergisst — unabhängig vom Wiederherstellungscode. ' + (state.settings.totpSecret ? 'Es ist bereits eine Authenticator-App eingerichtet — ein neuer Schlüssel ersetzt die bisherige Einrichtung.' : 'Aktuell ist noch keine Authenticator-App eingerichtet.') + '</div>' +
+      '<button class="btn secondary" id="setupTotpBtn">Authenticator-App ' + (state.settings.totpSecret ? 'neu ' : '') + 'einrichten</button>' +
+    '</div>' +
+    '<div class="admin-box">' +
       '<label>Freigabe-Link</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Trage hier einmalig den echten Link ein, den du siehst, wenn du oben in Claude auf "Veröffentlichen" klickst und die Adresse aus der Adresszeile/dem Teilen-Dialog kopierst. Die App kann diesen Link technisch nicht selbst erkennen — er muss von Hand eingetragen werden.</div>' +
       '<input id="shareLinkField" type="text" placeholder="https://claude.ai/public/artifacts/..." value="' + escapeHtml(state.settings.shareLink || '') + '" style="margin-bottom:0.7rem;">' +
@@ -2777,6 +2805,15 @@ function renderAdminGeneralSection(){
     await saveSession();
     field.value = '';
     showRecoveryCodeModal(newRecoveryCode, () => renderAdminGeneralSection());
+  });
+
+  document.getElementById('setupTotpBtn').addEventListener('click', async () => {
+    const hadExisting = !!state.settings.totpSecret;
+    const newTotpSecret = generateTotpSecretHex();
+    state.settings.totpSecret = newTotpSecret;
+    logAudit('Authenticator-App ' + (hadExisting ? 'neu ' : '') + 'eingerichtet');
+    await saveShared();
+    showTotpSetupModal(newTotpSecret, () => renderAdminGeneralSection());
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
