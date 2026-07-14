@@ -49,15 +49,21 @@ body{
   font-family:'Inter', sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{ max-width:900px; margin:0 auto; padding:0 0 5rem; }
+.wrap{ max-width:900px; margin:0 auto; padding:0 0 11rem; }
 
 /* ---------- Hero ---------- */
 .hero{
   position:relative;
   background:linear-gradient(155deg, var(--hull) 0%, var(--hull2) 65%, #2A2318 100%);
   color:#fff;
-  padding:2.4rem 1.6rem 2rem;
   overflow:hidden;
+}
+.hero-container{
+  position:relative;
+  z-index:1;
+  max-width:900px;
+  margin:0 auto;
+  padding:2.4rem 1.6rem 2rem;
 }
 .hero-mesh{ position:absolute; inset:0; z-index:0; pointer-events:none; }
 .hero-mesh svg{ width:100%; height:100%; display:block; }
@@ -66,7 +72,7 @@ body{
   position:absolute; left:0; right:0; bottom:0; height:4px;
   background:linear-gradient(90deg, transparent 0%, var(--volt) 35%, var(--volt) 65%, transparent 100%);
 }
-.scene-strip{ position:fixed; left:0; right:0; bottom:0; height:150px; z-index:0; pointer-events:none; }
+.scene-strip{ position:fixed; left:0; right:0; bottom:0; height:150px; z-index:5; pointer-events:none; }
 .scene-strip svg{ width:100%; height:100%; display:block; }
 .hero-inner{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
 .hero h1{
@@ -207,15 +213,21 @@ input, select{
   font-size:0.9rem;
   color:var(--ink);
   background:var(--foam);
-  border:1.5px solid transparent;
+  border:1.5px solid var(--line-strong);
   border-radius:var(--radius-sm);
   padding:0.6rem 0.7rem;
   transition:border-color 0.15s ease;
+  box-sizing:border-box;
 }
 input:focus, select:focus{
   outline:none;
   border-color:var(--surf);
   background:#fff;
+}
+input:disabled, select:disabled{
+  color:var(--ink-soft);
+  cursor:not-allowed;
+  opacity:0.85;
 }
 .field{ margin-bottom:0.9rem; }
 .row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.9rem; }
@@ -235,20 +247,29 @@ input:focus, select:focus{
   transition:all 0.15s ease;
 }
 .type-toggle button.active{ background:var(--hull); border-color:var(--hull); color:#fff; }
-.admin-subnav{ display:flex; gap:0.4rem; margin-bottom:1.4rem; flex-wrap:wrap; }
+.admin-subnav{ display:flex; gap:0.35rem; margin-bottom:1.4rem; flex-wrap:nowrap; }
 .admin-subtab-btn{
+  flex:1;
+  min-width:0;
   font-family:'Inter', sans-serif;
-  font-size:0.82rem;
+  font-size:0.78rem;
   font-weight:600;
-  padding:0.6rem 1rem;
+  padding:0.55rem 0.4rem;
   border-radius:999px;
   border:1.5px solid var(--line-strong);
   background:#fff;
   color:var(--ink-soft);
   cursor:pointer;
   transition:all 0.15s ease;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center;
 }
 .admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
+.admin-readonly{ opacity:0.5; pointer-events:none; filter:grayscale(0.4); user-select:none; }
+.party-code-actions{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.5rem; }
+.party-code-actions .btn{ width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
 
 .btn{
@@ -271,6 +292,14 @@ input:focus, select:focus{
 table{ width:100%; border-collapse:collapse; font-size:0.83rem; }
 #entriesTableWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
 #entriesTableWrap table{ min-width:720px; }
+#entriesTableWrap td, #entriesTableWrap th{ white-space:nowrap; }
+#entriesTableWrap td.name-cell, #entriesTableWrap td.type-cell{ white-space:normal; }
+#entriesTableWrap th.name-cell, #entriesTableWrap td.name-cell{ min-width:150px; }
+#entriesTableWrap th.type-cell, #entriesTableWrap td.type-cell{ min-width:90px; }
+#entriesTableWrap .tag{ display:inline-block; margin-bottom:0.2rem; }
+@media (min-width: 860px){
+  #entriesTableWrap table{ width:100%; min-width:0; }
+}
 th{
   text-align:left; font-family:'Inter', sans-serif; font-weight:600; font-size:0.68rem;
   text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint);
@@ -314,7 +343,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .balance-head .amt{ font-family:'JetBrains Mono', monospace; font-weight:700; font-size:1rem; }
 .amt.pos{ color:#1C9A64; }
 .amt.neg{ color:var(--flare); }
-.balance-meta{ font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:var(--ink-faint); margin-bottom:0.6rem; display:flex; gap:1rem; flex-wrap:wrap; }
+.balance-meta{ display:grid; grid-template-columns:repeat(auto-fit, minmax(105px,1fr)); gap:0.5rem; margin-bottom:0.7rem; }
+.meta-chip{ background:var(--foam); border-radius:var(--radius-sm); padding:0.45rem 0.6rem; }
+.meta-chip .lbl{ display:block; font-family:'Inter', sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-faint); margin-bottom:0.15rem; }
+.meta-chip .val{ display:block; font-family:'JetBrains Mono', monospace; font-size:0.86rem; color:var(--ink); font-weight:600; }
 .gauge{ height:12px; border-radius:8px; background:var(--foam); position:relative; overflow:hidden; border:1px solid var(--line); }
 .gauge .center-line{ position:absolute; left:50%; top:-2px; bottom:-2px; width:2px; background:var(--ink-faint); z-index:2; }
 .gauge .fill{ position:absolute; top:0; bottom:0; transition:width 0.7s cubic-bezier(.65,0,.35,1); width:0; }
@@ -347,8 +379,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .party-row:last-child{ border-bottom:none; }
 .avatar{ width:34px; height:34px; border-radius:50%; flex-shrink:0; background:var(--hull); color:var(--volt); display:flex; align-items:center; justify-content:center; font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:0.9rem; }
 .party-row input{ flex:1; font-family:'Inter', sans-serif; }
-.add-party-form{ display:flex; gap:0.6rem; margin-top:1rem; }
-.add-party-form input{ flex:1; font-family:'Inter', sans-serif; }
+.add-party-form{ display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:1rem; }
+.add-party-form input{ flex:1 1 200px; min-width:0; font-family:'Inter', sans-serif; }
+.add-party-form button{ flex-shrink:0; }
 .checkbox-list{ display:flex; flex-direction:column; gap:0.5rem; }
 .checkbox-item{ display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.7rem; background:var(--foam); border-radius:var(--radius-sm); }
 .checkbox-item input{ width:auto; flex:none; }
@@ -372,7 +405,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .admin-box .code-display{
   font-family:'JetBrains Mono', monospace; font-size:1.2rem; letter-spacing:0.08em;
   background:var(--hull); color:var(--volt); border-radius:var(--radius-sm);
-  padding:0.55rem 0.85rem; display:inline-block; margin:0.3rem 0 0.8rem;
+  padding:0.55rem 0.85rem; display:inline-block;
 }
 .toggle-row{ display:flex; align-items:center; gap:0.7rem; margin:0.6rem 0; }
 .toggle-row label{ margin:0; text-transform:none; font-size:0.86rem; color:var(--ink); letter-spacing:0; font-weight:500; }
@@ -384,17 +417,21 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .switch input:checked + .slider::before{ transform:translateX(18px); }
 
 @media (max-width: 560px){
-  .hero{ padding:1.9rem 1.1rem 1.6rem; }
+  .hero-container{ padding:1.9rem 1.1rem 1.6rem; }
   .hero h1{ font-size:2.1rem; }
   .scene-strip{ height:85px; }
+  .wrap{ padding-bottom:7rem; }
   .navwrap, .content{ padding-left:1.1rem; padding-right:1.1rem; }
   .card{ padding:1.2rem; }
+  .admin-subtab-btn{ font-size:0.68rem; padding:0.5rem 0.25rem; }
+  .tab{ font-size:0.68rem; padding:0.6rem 0.3rem; }
 }
 @media (orientation: landscape) and (max-height: 480px){
-  .hero{ padding:1rem 1.4rem 0.9rem; }
+  .hero-container{ padding:1rem 1.4rem 0.9rem; }
   .hero h1{ font-size:1.6rem; }
   .hero p{ display:none; }
   .scene-strip{ height:44px; }
+  .wrap{ padding-bottom:4.5rem; }
   .navwrap{ padding-top:0.5rem; }
   .card{ padding:1rem 1.2rem; }
   .gate-card{ max-height:88vh; overflow-y:auto; }
@@ -428,7 +465,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   </svg>
 </div>
 
-<div class="wrap" id="appWrap" style="display:none;">
+<div id="appWrap" style="display:none;">
 
   <div class="hero">
     <div class="hero-mesh" aria-hidden="true">
@@ -454,30 +491,34 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
               stroke="var(--volt)" stroke-width="0.22" fill="none" opacity="0.14"/>
       </svg>
     </div>
-    <div class="hero-inner">
-      <div style="display:flex; align-items:center; gap:0.9rem;">
-        <img src="header-logo.png" alt="WakeLog Logo" style="width:56px; height:56px; flex-shrink:0;">
-        <div>
-          <h1>WakeLog</h1>
-          <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+    <div class="hero-container">
+      <div class="hero-inner">
+        <div style="display:flex; align-items:center; gap:0.9rem;">
+          <img src="header-logo.png" alt="WakeLog Logo" style="width:56px; height:56px; flex-shrink:0;">
+          <div>
+            <h1>WakeLog</h1>
+            <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+          </div>
         </div>
+        <div class="meta" id="headerMeta">wird geladen …</div>
       </div>
-      <div class="meta" id="headerMeta">wird geladen …</div>
-    </div>
-    <div id="adminStrip"></div>
-    <div class="instruments" id="instruments"></div>
-  </div>
-
-  <div class="navwrap">
-    <div class="nav" id="tabNav">
-      <div class="nav-indicator" id="navIndicator"></div>
-      <button class="tab active" data-tab="log">Logbuch</button>
-      <button class="tab" data-tab="settlement">Abrechnung</button>
-      <button class="tab" data-tab="admin" style="display:none;">Verwaltung</button>
+      <div id="adminStrip"></div>
+      <div class="instruments" id="instruments"></div>
     </div>
   </div>
 
-  <div class="content">
+  <div class="wrap">
+    <div class="navwrap">
+      <div class="nav" id="tabNav">
+        <div class="nav-indicator" id="navIndicator"></div>
+        <button class="tab active" data-tab="log">Logbuch</button>
+        <button class="tab" data-tab="adjustment">Ausgleich</button>
+        <button class="tab" data-tab="settlement">Abrechnung</button>
+        <button class="tab" data-tab="admin">Verwaltung</button>
+      </div>
+    </div>
+
+    <div class="content">
 
     <div class="panel active" id="panel-log">
       <div class="notice">Diese Daten sind geteilt gespeichert — alle Parteien mit gültigem Zugangscode sehen dasselbe Logbuch. Änderungen erscheinen in Echtzeit bei allen.</div>
@@ -542,6 +583,23 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       </div>
     </div>
 
+    <div class="panel" id="panel-adjustment">
+      <div class="card">
+        <h2>Ausgleichszahlung erfassen</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Wenn ihr zwischendurch schon eine Ausgleichszahlung gemacht habt (z. B. weil eine Partei stark im Rückstand war), trag sie hier ein — sie wird sofort in den Saldo in der Abrechnung eingerechnet.</div>
+        <div class="year-select"><label>Jahr</label><select id="adjustmentYear"></select></div>
+        <div id="settlementPaymentList"></div>
+        <div class="row" style="margin-top:0.9rem;">
+          <div class="field"><label for="spFrom">Von (hat bezahlt) *</label><select id="spFrom"></select><div class="gate-error" id="err-sp-from">Bitte eine Partei wählen.</div></div>
+          <div class="field"><label for="spTo">An (hat erhalten) *</label><select id="spTo"></select><div class="gate-error" id="err-sp-to">Bitte eine andere Partei als "Von" wählen.</div></div>
+          <div class="field"><label for="spAmount">Betrag (CHF) *</label><input id="spAmount" type="number" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-sp-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>
+          <div class="field"><label for="spDate">Datum *</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
+        </div>
+        <button class="btn secondary" id="addSettlementPaymentBtn">Zahlung erfassen</button>
+        <div class="gate-error" id="err-sp-general" style="color:#1C9A64;"></div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-settlement">
       <div class="card">
         <h2>Jahresabrechnung</h2>
@@ -554,6 +612,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card" id="adminCard"></div>
     </div>
 
+    </div>
   </div>
 </div>
 
@@ -573,7 +632,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const dataRef = ref(db, 'bootslogbuch/data');
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -594,7 +653,7 @@ function randomCode(len){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {} };
 }
 
 async function loadShared(){
@@ -607,6 +666,7 @@ async function loadShared(){
       state.settings = loaded.settings || null;
       state.priorityRules = loaded.priorityRules || {};
       state.annualCosts = loaded.annualCosts || {};
+      state.settlementPayments = loaded.settlementPayments || {};
     } else {
       state = defaultData();
     }
@@ -621,7 +681,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {} });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -634,6 +694,7 @@ function subscribeRealtime(){
     state.settings = loaded.settings || null;
     state.priorityRules = loaded.priorityRules || {};
       state.annualCosts = loaded.annualCosts || {};
+      state.settlementPayments = loaded.settlementPayments || {};
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -828,21 +889,40 @@ function renderPaidSplitArea(){
   const ids = Array.from(wrap.querySelectorAll('.payer-check:checked')).map(cb => cb.value);
   if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
   area.style.display = 'block';
-  const equal = Math.round((100/ids.length)*10)/10;
-  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Aufteilung der Ausgaben zwischen den zahlenden Parteien (muss 100% ergeben):</div>' +
-    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="paid-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
-    '<div class="split-total" id="paidSplitTotal"></div>';
+  const totalExpense = parseFloat(document.getElementById('f-expense').value) || 0;
+  const equal = ids.length ? Math.round((totalExpense/ids.length)*100)/100 : 0;
+  area.innerHTML =
+    '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="paidUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
+    '<div id="paidAmountsBody" style="display:none;">' +
+      '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
+      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="paid-split-input" data-id="' + id + '" step="0.01" min="0" value="' + equal + '"><span>CHF</span><span class="split-pct" id="paid-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      '<div class="split-total" id="paidSplitTotal"></div>' +
+    '</div>';
+  document.getElementById('paidUnequalToggle').addEventListener('change', (ev) => {
+    document.getElementById('paidAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
+  });
   area.querySelectorAll('.paid-split-input').forEach(inp => inp.addEventListener('input', updatePaidSplitTotal));
   updatePaidSplitTotal();
 }
 
 function updatePaidSplitTotal(){
   const area = document.getElementById('paidSplitArea');
+  if(!area) return;
+  const totalExpense = parseFloat(document.getElementById('f-expense').value) || 0;
   const inputs = Array.from(area.querySelectorAll('.paid-split-input'));
-  const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  if(!inputs.length) return;
+  const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  inputs.forEach(i => {
+    const pctEl = document.getElementById('paid-pct-' + i.dataset.id);
+    if(pctEl){
+      const val = parseFloat(i.value) || 0;
+      const pct = totalExpense > 0 ? (val/totalExpense*100) : 0;
+      pctEl.textContent = fmtNum(pct,1) + ' %';
+    }
+  });
   const el = document.getElementById('paidSplitTotal');
-  el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
-  el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
+  el.textContent = 'Summe: ' + fmtNum(sum,2) + ' von ' + fmtNum(totalExpense,2) + ' CHF';
+  el.className = 'split-total ' + (Math.abs(sum-totalExpense) < 0.02 ? 'ok' : 'bad');
 }
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -936,15 +1016,20 @@ async function addEntry(){
     const payerIds = Array.from(document.querySelectorAll('#payerCheckboxes .payer-check:checked')).map(cb => cb.value);
     if(!payerIds.length){ showErr('err-payer'); }
     data.payerIds = payerIds;
-    if(payerIds.length > 1){
+    const unequalToggle = document.getElementById('paidUnequalToggle');
+    if(payerIds.length > 1 && unequalToggle && unequalToggle.checked && data.expense > 0){
       const pInputs = Array.from(document.querySelectorAll('#paidSplitArea .paid-split-input'));
-      const pTotal = pInputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-      if(Math.abs(pTotal - 100) > 0.15){
-        showErr('err-payer', 'Die Aufteilung der Ausgaben muss in Summe 100% ergeben (aktuell ' + fmtNum(pTotal,1) + '%).');
+      const pSum = pInputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      if(Math.abs(pSum - data.expense) > 0.02){
+        showErr('err-payer', 'Die Aufteilung muss in Summe dem Betrag entsprechen (aktuell ' + fmtNum(pSum,2) + ' von ' + fmtNum(data.expense,2) + ' CHF).');
       } else {
         data.paidSplit = {};
-        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = parseFloat(i.value) || 0; });
+        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = (parseFloat(i.value)||0) / data.expense * 100; });
       }
+    } else if(payerIds.length > 1){
+      const equalPct = 100 / payerIds.length;
+      data.paidSplit = {};
+      payerIds.forEach(id => { data.paidSplit[id] = equalPct; });
     } else if(payerIds.length === 1){
       data.paidSplit = { [payerIds[0]]: 100 };
     }
@@ -1144,8 +1229,8 @@ function renderEntriesTable(){
   if(!rows.length){ wrap.innerHTML = '<div class="empty">Noch keine Einträge für ' + year + '.</div>'; return; }
 
   let html = '<table><thead><tr>' +
-    '<th>Datum</th><th class="name-cell">Partei</th><th>Typ</th>' +
-    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">l/h</th><th class="num">Gesch. l</th><th class="num">Getankt l</th><th class="num">CHF/l</th><th class="num">Ausgaben</th><th>Foto</th><th></th>' +
+    '<th>Datum</th><th class="name-cell">Partei</th><th class="type-cell">Typ</th>' +
+    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">l/h</th><th class="num">Gesch. Verbrauch (l)</th><th class="num">Getankt l</th><th class="num">CHF/l</th><th class="num">Ausgaben</th><th>Foto</th><th></th>' +
     '</tr></thead><tbody>';
 
   rows.forEach(e => {
@@ -1167,13 +1252,13 @@ function renderEntriesTable(){
     html += '<tr>';
     html += '<td>' + e.date + '</td>';
     html += '<td class="name-cell">' + partyCell + '</td>';
-    html += '<td>' + tags + '</td>';
+    html += '<td class="type-cell">' + tags + '</td>';
     html += '<td class="num">' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading, 1) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasUsage ? fmtNum(hours, 1) : '—') + '</td>';
     html += '<td class="num">' + (hasConsumption ? fmtNum(e.consumption, 1) : (flags.hasUsage ? '<span class="amt neg">fehlt</span>' : '—')) + '</td>';
     html += '<td class="num">' + (estLiters !== null ? fmtNum(estLiters, 1) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasRefuel && e.liters ? fmtNum(e.liters, 1) : '—') + '</td>';
-    html += '<td class="num">' + (flags.hasRefuel && e.liters > 0 ? fmtNum(e.expense / e.liters, 3) : '—') + '</td>';
+    html += '<td class="num">' + (flags.hasRefuel && e.liters > 0 ? fmtNum(e.expense / e.liters, 2) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasRefuel ? fmtCHF(e.expense) : '—') + '</td>';
     html += '<td>' + (flags.hasUsage && e.photo ? '<img class="thumb" data-photo-id="' + e.id + '" src="' + e.photo + '" alt="Beweisfoto">' : '—') + '</td>';
     if(locked){ html += '<td><span class="locked-note">nur Admin</span></td>'; }
@@ -1247,19 +1332,29 @@ function computeSettlement(year){
 
   const usedEqualFallback = totalHours === 0 && state.parties.length > 0;
 
+  const settlements = (state.settlementPayments && state.settlementPayments[year]) || [];
+  const settledOut = {}, settledIn = {};
+  state.parties.forEach(p => { settledOut[p.id] = 0; settledIn[p.id] = 0; });
+  settlements.forEach(s => {
+    if(s.from in settledOut) settledOut[s.from] += s.amount || 0;
+    if(s.to in settledIn) settledIn[s.to] += s.amount || 0;
+  });
+
   const rows = state.parties.map(p => {
     const usageSharePct = totalHours > 0 ? (partyHoursMap[p.id] / totalHours) : (state.parties.length ? 1/state.parties.length : 0);
     const fuelFairShare = totalConsumed > 0 ? totalFuelExpense * (consumed[p.id] / totalConsumed) : 0;
     const annualFairShare = totalAnnual * usageSharePct;
     const totalPaid = paid[p.id] + annualPaid[p.id];
     const totalFairShare = fuelFairShare + annualFairShare;
+    const settledBalance = settledOut[p.id] - settledIn[p.id];
     return {
       id: p.id, name: p.name, hours: partyHoursMap[p.id], liters: consumed[p.id],
       pct: totalConsumed > 0 ? (consumed[p.id] / totalConsumed) * 100 : 0,
       usageSharePct: usageSharePct * 100,
       paid: totalPaid, fuelPaid: paid[p.id], annualPaid: annualPaid[p.id],
       fairShare: totalFairShare, fuelFairShare, annualFairShare,
-      balance: totalPaid - totalFairShare
+      settledOut: settledOut[p.id], settledIn: settledIn[p.id],
+      balance: (totalPaid - totalFairShare) + settledBalance
     };
   });
 
@@ -1318,8 +1413,20 @@ function renderSettlement(){
     html += '<div class="balance-card">' +
       '<div class="balance-head"><span class="name">' + escapeHtml(r.name) + '</span>' +
         '<span class="amt ' + (isPos?'pos':(isNeg?'neg':'')) + '">' + (r.balance >= 0 ? '+' : '') + fmtCHF(r.balance) + '</span></div>' +
-      '<div class="balance-meta"><span>' + fmtNum(r.hours,1) + ' Std. (' + fmtNum(r.usageSharePct,1) + ' % Nutzung)</span><span>' + fmtNum(r.liters,1) + ' l Benzin</span><span>bezahlt ' + fmtCHF(r.paid) + '</span><span>fairer Anteil ' + fmtCHF(r.fairShare) + '</span></div>' +
-      '<div class="balance-meta"><span>davon Benzin: ' + fmtCHF(r.fuelFairShare) + '</span><span>davon Fixkosten: ' + fmtCHF(r.annualFairShare) + '</span></div>' +
+      '<div class="balance-meta">' +
+        '<div class="meta-chip"><span class="lbl">Nutzung</span><span class="val" style="display:flex; flex-wrap:wrap; gap:0.3rem; align-items:baseline;"><span>' + fmtNum(r.hours,1) + ' Std.</span><span style="white-space:nowrap;">(' + fmtNum(r.usageSharePct,1) + ' %)</span></span></div>' +
+        '<div class="meta-chip"><span class="lbl">Benzin (geschätzt)</span><span class="val">' + fmtNum(r.liters,1) + ' l</span></div>' +
+        '<div class="meta-chip"><span class="lbl">Bezahlt</span><span class="val">' + fmtCHF(r.paid) + '</span></div>' +
+        '<div class="meta-chip"><span class="lbl">Fairer Anteil</span><span class="val">' + fmtCHF(r.fairShare) + '</span></div>' +
+      '</div>' +
+      '<div class="balance-meta">' +
+        '<div class="meta-chip"><span class="lbl">davon Benzin</span><span class="val">' + fmtCHF(r.fuelFairShare) + '</span></div>' +
+        '<div class="meta-chip"><span class="lbl">davon Fixkosten</span><span class="val">' + fmtCHF(r.annualFairShare) + '</span></div>' +
+      '</div>' +
+      (r.settledOut > 0 || r.settledIn > 0 ? '<div class="balance-meta">' +
+        (r.settledOut > 0 ? '<div class="meta-chip"><span class="lbl">Bereits bezahlt</span><span class="val">−' + fmtCHF(r.settledOut) + '</span></div>' : '') +
+        (r.settledIn > 0 ? '<div class="meta-chip"><span class="lbl">Bereits erhalten</span><span class="val">+' + fmtCHF(r.settledIn) + '</span></div>' : '') +
+      '</div>' : '') +
       '<div class="gauge"><div class="center-line"></div><div class="fill ' + (isPos?'pos':'neg') + '" style="width:' + (pct/2) + '%"></div></div>' +
       '<div class="gauge-scale"><span>Schuld</span><span>0</span><span>Guthaben</span></div>' +
     '</div>';
@@ -1328,7 +1435,7 @@ function renderSettlement(){
   html += '<div class="foot-total"><span>Total</span><span>' + fmtCHF(totalExpense) + '</span></div>';
 
   const tx = settlementTransactions(rows);
-  html += '<h3>Ausgleichszahlung</h3>';
+  html += '<h3>Empfohlener Ausgleich (aktueller Rest-Saldo)</h3>';
   if(!tx.length){
     html += '<div class="settled-note">Die Kosten sind bereits ausgeglichen — keine Zahlung nötig.</div>';
   } else {
@@ -1340,6 +1447,111 @@ function renderSettlement(){
   }
 
   container.innerHTML = html;
+}
+
+function renderAdjustmentTab(){
+  const yearSel = document.getElementById('adjustmentYear');
+  if(!yearSel) return;
+  const years = priorityYears();
+  const prev = yearSel.value;
+  yearSel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+  yearSel.value = years.includes(parseInt(prev)) ? prev : String(new Date().getFullYear());
+  yearSel.addEventListener('change', () => {
+    renderSettlementPaymentList(parseInt(yearSel.value));
+  });
+  setupSettlementPaymentUI(parseInt(yearSel.value));
+}
+
+function renderSettlementPaymentList(year){
+  const wrap = document.getElementById('settlementPaymentList');
+  if(!wrap) return;
+  const items = (state.settlementPayments && state.settlementPayments[year]) || [];
+  if(!items.length){ wrap.innerHTML = '<div class="empty">Noch keine Ausgleichszahlungen für ' + year + ' erfasst.</div>'; return; }
+  wrap.innerHTML = items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(s => {
+    const canDelete = isAdminUser || (session.partyId && (s.from === session.partyId || s.to === session.partyId));
+    return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
+      '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(partyName(s.from)) + ' → ' + escapeHtml(partyName(s.to)) + '</b><span>' + fmtCHF(s.amount) + '</span></div>' +
+      '<div class="hint" style="margin:0;">' + (s.date || '') + '</div>' +
+      (canDelete ? '<button class="del-btn" data-sp-id="' + s.id + '" data-sp-year="' + year + '">löschen</button>' : '') +
+    '</div>';
+  }).join('');
+  wrap.querySelectorAll('.del-btn[data-sp-id]').forEach(btn => btn.addEventListener('click', async () => {
+    const y = btn.dataset.spYear;
+    state.settlementPayments[y] = (state.settlementPayments[y] || []).filter(s => s.id !== btn.dataset.spId);
+    await saveShared();
+    renderSettlementPaymentList(y); renderSettlement();
+  }));
+}
+
+function setupSettlementPaymentUI(year){
+  const fromSel = document.getElementById('spFrom');
+  const toSel = document.getElementById('spTo');
+  if(!fromSel || !toSel) return;
+  const opts = state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
+  fromSel.innerHTML = opts;
+  toSel.innerHTML = opts;
+  if(state.parties.length > 1) toSel.value = state.parties[1].id;
+
+  const dateField = document.getElementById('spDate');
+  if(dateField && !dateField.value) dateField.value = new Date().toISOString().slice(0,10);
+
+  renderSettlementPaymentList(year);
+
+  const clearSpErrors = () => {
+    ['err-sp-from','err-sp-to','err-sp-amount','err-sp-date'].forEach(id => document.getElementById(id).classList.remove('show'));
+  };
+  fromSel.addEventListener('change', () => document.getElementById('err-sp-from').classList.remove('show'));
+  toSel.addEventListener('change', () => document.getElementById('err-sp-to').classList.remove('show'));
+  document.getElementById('spAmount').addEventListener('input', () => {
+    const v = parseFloat(document.getElementById('spAmount').value);
+    if(!isNaN(v) && v > 0) document.getElementById('err-sp-amount').classList.remove('show');
+  });
+  document.getElementById('spAmount').addEventListener('blur', () => {
+    const v = parseFloat(document.getElementById('spAmount').value);
+    if(isNaN(v) || v <= 0) document.getElementById('err-sp-amount').classList.add('show');
+  });
+  document.getElementById('spDate').addEventListener('input', () => {
+    if(document.getElementById('spDate').value) document.getElementById('err-sp-date').classList.remove('show');
+  });
+  document.getElementById('spDate').addEventListener('blur', () => {
+    if(!document.getElementById('spDate').value) document.getElementById('err-sp-date').classList.add('show');
+  });
+
+  document.getElementById('addSettlementPaymentBtn').addEventListener('click', async () => {
+    clearSpErrors();
+    let hasError = false;
+    const showSpErr = (id) => { document.getElementById(id).classList.add('show'); hasError = true; };
+
+    const from = fromSel.value;
+    const to = toSel.value;
+    const amount = parseFloat(document.getElementById('spAmount').value);
+    const date = document.getElementById('spDate').value;
+
+    if(!from) showSpErr('err-sp-from');
+    if(!to || to === from) showSpErr('err-sp-to');
+    if(isNaN(amount) || amount <= 0) showSpErr('err-sp-amount');
+    if(!date) showSpErr('err-sp-date');
+
+    if(!isAdminUser && session.partyId && from !== session.partyId && to !== session.partyId){
+      const fb = document.getElementById('err-sp-general');
+      fb.style.color = '#C0392B'; fb.textContent = 'Du kannst nur Zahlungen erfassen, an denen deine eigene Partei beteiligt ist.'; fb.classList.add('show');
+      setTimeout(() => fb.classList.remove('show'), 3500);
+      return;
+    }
+
+    if(hasError) return;
+
+    const currentYear = parseInt(document.getElementById('adjustmentYear').value);
+    if(!state.settlementPayments) state.settlementPayments = {};
+    if(!state.settlementPayments[currentYear]) state.settlementPayments[currentYear] = [];
+    state.settlementPayments[currentYear].push({ id: uid(), from, to, amount, date, createdAt: Date.now() });
+    await saveShared();
+
+    document.getElementById('spAmount').value = '';
+    const fb = document.getElementById('err-sp-general');
+    fb.style.color = '#1C9A64'; fb.textContent = 'Zahlung erfasst.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    renderSettlementPaymentList(currentYear); renderSettlement();
+  });
 }
 
 function renderParties(){
@@ -1434,14 +1646,14 @@ function renderPriorityRuleBody(){
           '<select id="prioEven"><option value="">— wählen —</option>' +
           state.parties.map(p => '<option value="' + p.id + '"' + (evenSel === p.id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') +
           '</select></div>' +
-        '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><div class="code-display" id="prioOddDisplay" style="font-size:0.95rem;">' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '</div></div>' +
+        '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><input type="text" id="prioOddDisplay" value="' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '" disabled></div>' +
       '</div>' +
       '<button class="btn secondary" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
       '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
 
     document.getElementById('prioEven').addEventListener('change', (ev) => {
       const other = state.parties.find(p => p.id !== ev.target.value);
-      document.getElementById('prioOddDisplay').textContent = ev.target.value && other ? partyName(other.id) : '—';
+      document.getElementById('prioOddDisplay').value = ev.target.value && other ? partyName(other.id) : '—';
     });
     document.getElementById('savePrioBtn').addEventListener('click', async () => {
       const evenId = document.getElementById('prioEven').value;
@@ -1553,31 +1765,16 @@ let adminSubTab = 'parties';
 
 function renderAdminPanel(){
   const card = document.getElementById('adminCard');
-  if(!isAdminUser){
-    card.innerHTML =
-      '<h2>Verwaltung</h2>' +
-      '<p class="hint">Diese Einstellungen sind nur für den Administrator sichtbar. Gib deinen Administrator-Code ein (nicht den Zugangscode der Parteien).</p>' +
-      '<div class="field"><label for="admin-elevate">Administrator-Code</label><input id="admin-elevate" type="text"></div>' +
-      '<button class="btn secondary" id="elevateBtn">Bestätigen</button>' +
-      '<div class="gate-error" id="elevateError">Code ungültig.</div>';
-    document.getElementById('elevateBtn').addEventListener('click', async () => {
-      const code = document.getElementById('admin-elevate').value.trim();
-      if(code && state.settings.adminCode === code){
-        session.adminCode = code; await saveSession(); evaluateAccess();
-        renderAdminPanel(); updateHeaderMeta(); renderEntriesTable();
-      } else { document.getElementById('elevateError').classList.add('show'); }
-    });
-    return;
-  }
 
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
+    (!isAdminUser ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
-      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allgemeine Einstellungen</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
     '</div>' +
-    '<div id="adminSubContent"></div>';
+    '<div id="adminSubContent" class="' + (!isAdminUser ? 'admin-readonly' : '') + '"></div>';
 
   card.querySelectorAll('.admin-subtab-btn').forEach(btn => {
     btn.addEventListener('click', () => { adminSubTab = btn.dataset.subtab; renderAdminPanel(); });
@@ -1628,14 +1825,15 @@ function renderAdminCostsSection(){
       '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
       '<div id="annualCostList"></div>' +
       '<div class="row" style="margin-top:0.9rem;">' +
-        '<div class="field"><label for="acType">Kostenart</label><select id="acType">' +
-          '<option>Verkehrssteuer</option><option>Winterlager</option><option>Versicherung</option><option>Service</option><option>Rückstellung / Abschreibung</option><option>Sonstiges</option>' +
+        '<div class="field"><label for="acType">Kostenart *</label><select id="acType">' +
+          '<option>Anschaffung Neuboot</option><option>Bootsequipment</option><option>Rückstellung / Abschreibung</option><option>Service</option><option>Verkehrssteuer</option><option>Versicherung</option><option>Winterlager</option><option>Sonstiges</option>' +
         '</select></div>' +
-        '<div class="field"><label for="acDesc">Beschreibung</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"></div>' +
-        '<div class="field"><label for="acAmount">Betrag (CHF)</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>' +
-        '<div class="field"><label for="acDate">Datum</label><input id="acDate" type="date"></div>' +
+        '<div class="field" id="acCustomTypeField" style="display:none;"><label for="acCustomType">Kostenart benennen *</label><input id="acCustomType" type="text" placeholder="z. B. Reparatur Steg"><div class="gate-error" id="err-ac-customtype">Bitte einen Titel für die Kostenart angeben.</div></div>' +
+        '<div class="field"><label for="acDesc">Beschreibung *</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"><div class="gate-error" id="err-ac-desc">Bitte eine Beschreibung angeben.</div></div>' +
+        '<div class="field"><label for="acAmount">Betrag (CHF) *</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-ac-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>' +
+        '<div class="field"><label for="acDate">Datum *</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
       '</div>' +
-      '<div class="field"><label>Wer hat bezahlt / vorgeschossen?</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div></div>' +
+      '<div class="field"><label>Wer hat bezahlt / vorgeschossen? *</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
       '<button class="btn secondary" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
       '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
@@ -1747,11 +1945,11 @@ function renderPartyCodeList(){
   if(!state.parties.length){ wrap.innerHTML = '<div class="empty">Noch keine Parteien angelegt.</div>'; return; }
   wrap.innerHTML = state.parties.map(p =>
     '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">' +
-      '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + escapeHtml(p.code || '') + '</span></div>' +
-      '<div style="display:flex; gap:0.5rem; flex-wrap:wrap;">' +
+      '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + (isAdminUser ? escapeHtml(p.code || '') : '••••••') + '</span></div>' +
+      '<div class="party-code-actions">' +
         '<button class="btn secondary" data-action="copy" data-id="' + p.id + '">Code kopieren</button>' +
         '<button class="btn secondary" data-action="whatsapp" data-id="' + p.id + '">Per WhatsApp teilen</button>' +
-        '<button class="btn secondary" data-action="kick" data-id="' + p.id + '">Neuen Code erzeugen (Zugriff entziehen)</button>' +
+        '<button class="btn secondary" data-action="kick" data-id="' + p.id + '">Neuen Code erzeugen</button>' +
       '</div>' +
       '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
     '</div>'
@@ -1801,27 +1999,94 @@ function setupAnnualCostUI(){
   renderAcPayerCheckboxes();
   renderAnnualCostList();
 
+  const acTypeSel = document.getElementById('acType');
+  const customTypeField = document.getElementById('acCustomTypeField');
+  const customTypeInput = document.getElementById('acCustomType');
+  const syncCustomTypeVisibility = () => {
+    customTypeField.style.display = acTypeSel.value === 'Sonstiges' ? 'block' : 'none';
+  };
+  syncCustomTypeVisibility();
+  acTypeSel.addEventListener('change', syncCustomTypeVisibility);
+  customTypeInput.addEventListener('blur', () => {
+    document.getElementById('err-ac-customtype').classList.toggle('show', acTypeSel.value === 'Sonstiges' && !customTypeInput.value.trim());
+  });
+  customTypeInput.addEventListener('input', () => {
+    if(customTypeInput.value.trim()) document.getElementById('err-ac-customtype').classList.remove('show');
+  });
+
+  const clearAcErrors = () => {
+    ['err-ac-desc','err-ac-amount','err-ac-date','err-ac-payer','err-ac-customtype'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.classList.remove('show');
+    });
+    document.getElementById('err-ac-payer').textContent = 'Bitte mindestens eine zahlende Partei wählen.';
+  };
+
+  document.getElementById('acDesc').addEventListener('blur', () => {
+    document.getElementById('err-ac-desc').classList.toggle('show', !document.getElementById('acDesc').value.trim());
+  });
+  document.getElementById('acDesc').addEventListener('input', () => {
+    if(document.getElementById('acDesc').value.trim()) document.getElementById('err-ac-desc').classList.remove('show');
+  });
+  document.getElementById('acAmount').addEventListener('blur', () => {
+    const v = parseFloat(document.getElementById('acAmount').value);
+    document.getElementById('err-ac-amount').classList.toggle('show', isNaN(v) || v <= 0);
+  });
+  document.getElementById('acAmount').addEventListener('input', () => {
+    const v = parseFloat(document.getElementById('acAmount').value);
+    if(!isNaN(v) && v > 0) document.getElementById('err-ac-amount').classList.remove('show');
+    updateAcSplitTotal();
+  });
+  document.getElementById('acDate').addEventListener('blur', () => {
+    document.getElementById('err-ac-date').classList.toggle('show', !document.getElementById('acDate').value);
+  });
+  document.getElementById('acDate').addEventListener('input', () => {
+    if(document.getElementById('acDate').value) document.getElementById('err-ac-date').classList.remove('show');
+  });
+
   document.getElementById('addAnnualCostBtn').addEventListener('click', async () => {
-    const fb = document.getElementById('acFeedback');
-    const type = document.getElementById('acType').value;
+    clearAcErrors();
+    let hasError = false;
+    const showAcErr = (id) => { document.getElementById(id).classList.add('show'); hasError = true; };
+
+    let type = document.getElementById('acType').value;
+    const customTypeRaw = document.getElementById('acCustomType').value.trim();
     const desc = document.getElementById('acDesc').value.trim();
-    const amount = parseFloat(document.getElementById('acAmount').value);
+    const amountRaw = document.getElementById('acAmount').value;
+    const amount = parseFloat(amountRaw);
     const date = document.getElementById('acDate').value;
     const year = yearSel.value;
     const payerIds = Array.from(document.querySelectorAll('#acPayerCheckboxes .ac-payer-check:checked')).map(cb => cb.value);
 
-    if(isNaN(amount) || amount <= 0){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte einen Betrag grösser als 0 angeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
-    if(!payerIds.length){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte mindestens eine zahlende Partei wählen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+    if(type === 'Sonstiges'){
+      if(!customTypeRaw) showAcErr('err-ac-customtype');
+      else type = customTypeRaw;
+    }
+    if(!desc) showAcErr('err-ac-desc');
+    const amountValid = !(amountRaw === '' || isNaN(amount) || amount <= 0);
+    if(!amountValid) showAcErr('err-ac-amount');
+    if(!date) showAcErr('err-ac-date');
+    if(!payerIds.length) showAcErr('err-ac-payer');
 
     let paidBy = {};
-    if(payerIds.length > 1){
+    const acUnequalToggle = document.getElementById('acUnequalToggle');
+    if(payerIds.length > 1 && acUnequalToggle && acUnequalToggle.checked && amountValid){
       const inputs = Array.from(document.querySelectorAll('#acPaidSplitArea .ac-split-input'));
-      const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-      if(Math.abs(total - 100) > 0.15){ fb.style.color = '#C0392B'; fb.textContent = 'Die Aufteilung muss in Summe 100% ergeben (aktuell ' + fmtNum(total,1) + '%).'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500); return; }
-      inputs.forEach(i => { paidBy[i.dataset.id] = parseFloat(i.value) || 0; });
-    } else {
+      const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      if(Math.abs(sum - amount) > 0.02){
+        document.getElementById('err-ac-payer').textContent = 'Die Aufteilung muss in Summe dem Betrag entsprechen (aktuell ' + fmtNum(sum,2) + ' von ' + fmtNum(amount,2) + ' CHF).';
+        showAcErr('err-ac-payer');
+      } else {
+        inputs.forEach(i => { paidBy[i.dataset.id] = (parseFloat(i.value)||0) / amount * 100; });
+      }
+    } else if(payerIds.length > 1){
+      const equalPct = 100 / payerIds.length;
+      payerIds.forEach(id => { paidBy[id] = equalPct; });
+    } else if(payerIds.length === 1){
       paidBy = { [payerIds[0]]: 100 };
     }
+
+    if(hasError) return;
 
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
@@ -1830,6 +2095,8 @@ function setupAnnualCostUI(){
 
     document.getElementById('acDesc').value = '';
     document.getElementById('acAmount').value = '';
+    document.getElementById('acCustomType').value = '';
+    const fb = document.getElementById('acFeedback');
     fb.style.color = '#1C9A64'; fb.textContent = 'Kostenposten gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     renderAnnualCostList(); renderSettlement();
   });
@@ -1841,7 +2108,11 @@ function renderAcPayerCheckboxes(){
   wrap.innerHTML = state.parties.map(p =>
     '<label class="checkbox-item"><input type="checkbox" class="ac-payer-check" value="' + p.id + '"> ' + escapeHtml(p.name) + '</label>'
   ).join('');
-  wrap.querySelectorAll('.ac-payer-check').forEach(cb => cb.addEventListener('change', renderAcPaidSplitArea));
+  wrap.querySelectorAll('.ac-payer-check').forEach(cb => cb.addEventListener('change', () => {
+    renderAcPaidSplitArea();
+    const anyChecked = Array.from(wrap.querySelectorAll('.ac-payer-check:checked')).length > 0;
+    document.getElementById('err-ac-payer').classList.toggle('show', !anyChecked);
+  }));
   renderAcPaidSplitArea();
 }
 
@@ -1851,17 +2122,40 @@ function renderAcPaidSplitArea(){
   if(!wrap || !area) return;
   const ids = Array.from(wrap.querySelectorAll('.ac-payer-check:checked')).map(cb => cb.value);
   if(ids.length <= 1){ area.innerHTML = ''; return; }
-  const equal = Math.round((100/ids.length)*10)/10;
-  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Aufteilung der Vorschusszahlung (muss 100% ergeben):</div>' +
-    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="ac-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
-    '<div class="split-total" id="acSplitTotal"></div>';
-  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', () => {
-    const inputs = Array.from(area.querySelectorAll('.ac-split-input'));
-    const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-    const el = document.getElementById('acSplitTotal');
-    el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
-    el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
-  }));
+  const totalAmount = parseFloat(document.getElementById('acAmount').value) || 0;
+  const equal = ids.length ? Math.round((totalAmount/ids.length)*100)/100 : 0;
+  area.innerHTML =
+    '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="acUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
+    '<div id="acAmountsBody" style="display:none;">' +
+      '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
+      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="ac-split-input" data-id="' + id + '" step="0.01" min="0" value="' + equal + '"><span>CHF</span><span class="split-pct" id="ac-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      '<div class="split-total" id="acSplitTotal"></div>' +
+    '</div>';
+  document.getElementById('acUnequalToggle').addEventListener('change', (ev) => {
+    document.getElementById('acAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
+  });
+  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', updateAcSplitTotal));
+  updateAcSplitTotal();
+}
+
+function updateAcSplitTotal(){
+  const area = document.getElementById('acPaidSplitArea');
+  if(!area) return;
+  const totalAmount = parseFloat(document.getElementById('acAmount').value) || 0;
+  const inputs = Array.from(area.querySelectorAll('.ac-split-input'));
+  if(!inputs.length) return;
+  const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  inputs.forEach(i => {
+    const pctEl = document.getElementById('ac-pct-' + i.dataset.id);
+    if(pctEl){
+      const val = parseFloat(i.value) || 0;
+      const pct = totalAmount > 0 ? (val/totalAmount*100) : 0;
+      pctEl.textContent = fmtNum(pct,1) + ' %';
+    }
+  });
+  const el = document.getElementById('acSplitTotal');
+  el.textContent = 'Summe: ' + fmtNum(sum,2) + ' von ' + fmtNum(totalAmount,2) + ' CHF';
+  el.className = 'split-total ' + (Math.abs(sum-totalAmount) < 0.02 ? 'ok' : 'bad');
 }
 
 function annualCostItemsHtml(year, withDelete){
@@ -1941,18 +2235,7 @@ function setupTabs(){
 function updateTabVisibility(){
   const adminTab = document.querySelector('.tab[data-tab="admin"]');
   if(!adminTab) return;
-  if(isAdminUser){
-    adminTab.style.display = '';
-  } else {
-    adminTab.style.display = 'none';
-    if(adminTab.classList.contains('active')){
-      adminTab.classList.remove('active');
-      document.getElementById('panel-admin').classList.remove('active');
-      const logTab = document.querySelector('.tab[data-tab="log"]');
-      logTab.classList.add('active');
-      document.getElementById('panel-log').classList.add('active');
-    }
-  }
+  adminTab.style.display = '';
   requestAnimationFrame(() => {
     const indicator = document.getElementById('navIndicator');
     const active = document.querySelector('.tab.active');
@@ -1969,6 +2252,7 @@ function renderAll(){
   renderYearFilters();
   renderEntriesTable();
   renderSettlement();
+  renderAdjustmentTab();
   renderAdminPanel();
   updateHeaderMeta();
   renderInstruments();
@@ -2021,6 +2305,24 @@ async function init(){
     el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
     el.addEventListener('change', () => document.getElementById(errId).classList.remove('show'));
   });
+  document.getElementById('f-date').addEventListener('blur', () => {
+    const v = document.getElementById('f-date').value;
+    const today = new Date().toISOString().slice(0,10);
+    if(!v){ document.getElementById('err-date').textContent = 'Bitte ein Datum angeben.'; document.getElementById('err-date').classList.add('show'); }
+    else if(v > today){ document.getElementById('err-date').textContent = 'Das Datum darf nicht in der Zukunft liegen.'; document.getElementById('err-date').classList.add('show'); }
+  });
+  document.getElementById('f-reading').addEventListener('blur', () => {
+    if(!document.getElementById('f-reading').value){ document.getElementById('err-reading').textContent = 'Bitte den aktuellen Motorenstundenstand angeben.'; document.getElementById('err-reading').classList.add('show'); }
+  });
+  document.getElementById('f-consumption').addEventListener('blur', () => {
+    const v = parseFloat(document.getElementById('f-consumption').value);
+    if(isNaN(v) || v <= 0) document.getElementById('err-consumption').classList.add('show');
+  });
+  document.getElementById('f-expense').addEventListener('blur', () => {
+    const v = parseFloat(document.getElementById('f-expense').value);
+    if(isNaN(v) || v <= 0) document.getElementById('err-expense').classList.add('show');
+  });
+  document.getElementById('f-expense').addEventListener('input', updatePaidSplitTotal);
 
   if(!state.settings || !accessGranted){ showGate(); }
   else { hideGate(); renderAll(); }
