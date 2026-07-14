@@ -371,11 +371,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
 
 /* ---------- Rundstempel Ausgleich ---------- */
-.stamps{ display:flex; flex-wrap:wrap; gap:1.3rem; margin-top:1.4rem; }
+.stamps{ display:flex; flex-wrap:wrap; justify-content:center; gap:1.3rem; margin-top:1.4rem; }
 .stamp{
   border:3px solid var(--hull);
   border-radius:50%;
-  width:172px; height:172px;
+  width:min(172px, calc(50% - 0.65rem)); aspect-ratio:1/1; height:auto;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; padding:0.8rem; position:relative; flex-shrink:0;
   background:var(--panel);
@@ -449,10 +449,12 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   .navwrap{ padding-top:0.5rem; }
   .card{ padding:1rem 1.2rem; }
   .gate-card{ max-height:88vh; overflow-y:auto; }
+  .stamp{ width:172px; }
 }
 @media (min-width: 720px){
   .row{ grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
   .stat-row{ grid-template-columns:repeat(3, 1fr); }
+  .stamp{ width:172px; }
 }
 @media (min-width: 1200px){
   .wrap{ max-width:1180px; }
@@ -647,9 +649,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
     <div class="panel" id="panel-settlement">
       <div class="card">
-        <h2>Jahresabrechnung</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.8rem; margin-bottom:1.1rem; flex-wrap:wrap;">
+          <h2 style="margin:0;">Jahresabrechnung</h2>
+          <button class="btn secondary" id="exportPdfBtn">📄 Als PDF exportieren</button>
+        </div>
         <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
-        <button class="btn secondary" id="exportPdfBtn" style="margin-bottom:1.2rem;">📄 Als PDF exportieren</button>
         <div id="settlementContent"></div>
       </div>
     </div>
@@ -856,10 +860,10 @@ function getEntryPaidSplit(e){
   const usage = getEntryUsageSplit(e);
   return usage;
 }
-function partyNames(ids){ return ids.map(id => partyName(id)).join(' + '); }
+function partyNames(ids){ return ids.map(id => escapeHtml(partyName(id))).join(' + '); }
 function splitLabel(ids, split){
   if(ids.length <= 1) return partyNames(ids);
-  return ids.map(id => partyName(id) + ' ' + fmtNum(split[id] || 0, 0) + '%').join(', ');
+  return ids.map(id => '<span style="white-space:nowrap;">' + escapeHtml(partyName(id)) + ' ' + fmtNum(split[id] || 0, 0) + '%</span>').join(', ');
 }
 
 function getEntryFlags(e){
@@ -968,9 +972,9 @@ function renderPayerCheckboxes(){
   const myPartyId = (!isAdminUser && session.partyId) ? session.partyId : null;
   const prevChecked = Array.from(wrap.querySelectorAll('input:checked')).map(i => i.value);
   wrap.innerHTML = state.parties.map(p => {
-    const locked = (p.id === myPartyId);
-    const checked = locked || prevChecked.includes(p.id);
-    return '<label class="checkbox-item' + (locked ? ' disabled' : '') + '"><input type="checkbox" class="payer-check" value="' + p.id + '"' + (checked ? ' checked' : '') + (locked ? ' disabled' : '') + '> ' + escapeHtml(p.name) + (locked ? ' (du)' : '') + '</label>';
+    const isMe = (p.id === myPartyId);
+    const checked = prevChecked.includes(p.id);
+    return '<label class="checkbox-item"><input type="checkbox" class="payer-check" value="' + p.id + '"' + (checked ? ' checked' : '') + '> ' + escapeHtml(p.name) + (isMe ? ' (du)' : '') + '</label>';
   }).join('');
   wrap.querySelectorAll('.payer-check').forEach(cb => cb.addEventListener('change', () => {
     document.getElementById('err-payer').classList.remove('show');
@@ -1379,9 +1383,9 @@ function renderEntriesTable(){
                  (flags.hasUsage && flags.hasRefuel ? ' ' : '') +
                  (flags.hasRefuel ? '<span class="tag refuel">Tanken</span>' : '') +
                  (locked ? ' <span class="tag locked">gesperrt</span>' : '');
-    let partyCell = escapeHtml(splitLabel(usage.ids, usage.split));
+    let partyCell = splitLabel(usage.ids, usage.split);
     if(flags.hasRefuel && paid && paid.ids.length && (paid.ids.length !== usage.ids.length || !paid.ids.every(id => usage.ids.includes(id)))){
-      partyCell += '<div class="hint" style="margin:0.2rem 0 0;">Bezahlt: ' + escapeHtml(splitLabel(paid.ids, paid.split)) + '</div>';
+      partyCell += '<div class="hint" style="margin:0.2rem 0 0;">Bezahlt: ' + splitLabel(paid.ids, paid.split) + '</div>';
     }
     if(flags.hasRefuel && typeof e.giftAmount === 'number' && e.giftAmount > 0){
       partyCell += '<div class="hint" style="margin:0.2rem 0 0;">🎁 Geschenk von ' + escapeHtml(e.giftName || '') + ': ' + fmtCHF(e.giftAmount) + '</div>';
@@ -1545,7 +1549,7 @@ function exportYearOverviewPdf(year){
     html += '<h2>Fixkosten im Detail</h2><table><tr><th>Art</th><th>Beschreibung</th><th>Datum</th><th>Betrag</th><th>Bezahlt von</th></tr>';
     annualItems.forEach(c => {
       const payerIds = Object.keys(c.paidBy || {});
-      const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : partyName(payerIds[0]);
+      const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : escapeHtml(partyName(payerIds[0]));
       html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date||'') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + escapeHtml(payerLabel) + '</td></tr>';
     });
     html += '</table>';
@@ -1560,7 +1564,7 @@ function exportYearOverviewPdf(year){
       const flags = getEntryFlags(e);
       const usage = getEntryUsageSplit(e);
       const type = (flags.hasUsage?'Nutzung':'') + (flags.hasUsage&&flags.hasRefuel?' + ':'') + (flags.hasRefuel?'Tanken':'');
-      html += '<tr><td>' + e.date + '</td><td>' + escapeHtml(splitLabel(usage.ids, usage.split)) + '</td><td>' + type + '</td>' +
+      html += '<tr><td>' + e.date + '</td><td>' + splitLabel(usage.ids, usage.split) + '</td><td>' + type + '</td>' +
         '<td>' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading,1) : '—') + '</td>' +
         '<td>' + (flags.hasUsage ? fmtNum(hoursMap[e.id]||0,1) : '—') + '</td>' +
         '<td>' + (flags.hasRefuel && e.liters ? fmtNum(e.liters,1) : '—') + '</td>' +
@@ -1645,7 +1649,7 @@ function renderSettlement(){
   html += '<div class="foot-total"><span>Total</span><span>' + fmtCHF(totalExpense) + '</span></div>';
 
   const tx = settlementTransactions(rows);
-  html += '<h3>Empfohlener Ausgleich (aktueller Rest-Saldo)</h3>';
+  html += '<h3 style="text-align:center;">Empfohlener Ausgleich (aktueller Rest-Saldo)</h3>';
   if(!tx.length){
     html += '<div class="settled-note">Die Kosten sind bereits ausgeglichen — keine Zahlung nötig.</div>';
   } else {
@@ -2435,7 +2439,7 @@ function annualCostItemsHtml(year, withDelete){
   if(!items.length){ return '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; }
   return items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
     const payerIds = Object.keys(c.paidBy || {});
-    const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : partyName(payerIds[0]);
+    const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : escapeHtml(partyName(payerIds[0]));
     return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
       '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(c.type) + '</b><span>' + fmtCHF(c.amount) + '</span></div>' +
       '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + (c.date ? ' · ' + c.date : '') + '</div>' +
