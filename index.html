@@ -299,6 +299,8 @@ input:disabled, select:disabled{
   transition:background 0.15s ease, transform 0.1s ease;
 }
 .btn:hover{ background:var(--volt-dark); }
+.btn:disabled{ opacity:0.4; cursor:not-allowed; }
+.btn:disabled:hover{ background:var(--volt); }
 .btn:active{ transform:scale(0.98); }
 .btn.secondary{ background:transparent; color:var(--hull); border:1.5px solid var(--line-strong); }
 .btn.secondary:hover{ background:var(--foam); }
@@ -718,6 +720,14 @@ function randomCode(len){
   for(let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
   return out;
 }
+function randomRecoveryCode(){
+  return randomCode(4) + '-' + randomCode(4) + '-' + randomCode(4);
+}
+async function sha256(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
 
 function defaultData(){
   return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [] };
@@ -830,14 +840,36 @@ function setupInactivityTracking(){
   resetInactivityTimer();
 }
 
+function currentPriorityLabel(){
+  if(state.parties.length < 2) return null;
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const rule = state.priorityRules ? state.priorityRules[year] : null;
+  if(!rule) return null;
+  const todayStr = now.toISOString().slice(0,10);
+  if(rule.mode === 'evenodd' && rule.evenPartyId && rule.oddPartyId){
+    const dayNum = now.getDate();
+    const isEven = dayNum % 2 === 0;
+    return { label: (isEven ? 'Gerader Tag' : 'Ungerader Tag'), party: partyName(isEven ? rule.evenPartyId : rule.oddPartyId) };
+  }
+  if(rule.mode === 'rotation' && rule.order && rule.order.length){
+    const weekNum = isoWeekNumber(todayStr);
+    const partyId = rotationPartyId(rule.order, year, todayStr);
+    return { label: 'KW ' + weekNum, party: partyName(partyId) };
+  }
+  return null;
+}
+
 function renderInstruments(){
   const year = new Date().getFullYear();
   const hoursMap = computeHoursMap();
   const hoursThisYear = state.entries.filter(e => yearOf(e.date) === year).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+  const prio = currentPriorityLabel();
   document.getElementById('instruments').innerHTML =
     '<div class="instrument"><div class="num">' + state.entries.length + '</div><div class="lbl">Einträge</div></div>' +
     '<div class="instrument"><div class="num">' + fmtNum(hoursThisYear,1) + '</div><div class="lbl">Std. ' + year + '</div></div>' +
-    '<div class="instrument"><div class="num">' + state.parties.length + '</div><div class="lbl">Parteien</div></div>';
+    '<div class="instrument"><div class="num">' + state.parties.length + '</div><div class="lbl">Parteien</div></div>' +
+    (prio ? '<div class="instrument"><div class="num" style="font-size:1.05rem; line-height:1.2;">' + escapeHtml(prio.party) + '</div><div class="lbl">' + escapeHtml(prio.label) + ' — Vorrecht</div></div>' : '');
 }
 
 function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currency:'CHF', minimumFractionDigits:2, maximumFractionDigits:2 }); }
@@ -1981,6 +2013,81 @@ async function addParty(){
 }
 
 /* ---------- Zugriffscode / Admin ---------- */
+function showRecoveryCodeModal(recoveryCode, onDismiss){
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML =
+    '<div class="gate-card">' +
+      '<h2>Neuer Wiederherstellungscode</h2>' +
+      '<p>Der bisherige Wiederherstellungscode ist ab sofort ungültig. Notiere dir diesen neuen Code sicher — er wird <b>nur dieses eine Mal</b> angezeigt.</p>' +
+      '<div class="code-display" style="display:block; text-align:center; font-size:1.3rem; margin-bottom:1.1rem;">' + escapeHtml(recoveryCode) + '</div>' +
+      '<label class="checkbox-item" style="margin-bottom:0.9rem;"><input type="checkbox" id="recoveryModalCheck"> Ich habe den Code notiert und sicher aufbewahrt</label>' +
+      '<button class="btn" id="recoveryModalBtn" disabled>Schliessen</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const checkbox = overlay.querySelector('#recoveryModalCheck');
+  const btn = overlay.querySelector('#recoveryModalBtn');
+  checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
+  btn.addEventListener('click', () => {
+    overlay.remove();
+    if(onDismiss) onDismiss();
+  });
+}
+
+function showRecoveryCodeOnce(recoveryCode){
+  const card = document.getElementById('gateCard');
+  card.innerHTML =
+    '<h2>Wiederherstellungscode notieren</h2>' +
+    '<p>Falls du deinen Administrator-Code je vergisst, kommst du damit wieder rein. Er wird <b>nur dieses eine Mal</b> angezeigt und nirgends im Klartext gespeichert — schreib ihn dir jetzt an einem sicheren Ort auf (nicht im gleichen Ordner wie dein Handy-Passwort, z. B. separat notiert oder in einem Passwort-Manager).</p>' +
+    '<div class="code-display" style="display:block; text-align:center; font-size:1.3rem; margin-bottom:1.1rem;">' + escapeHtml(recoveryCode) + '</div>' +
+    '<label class="checkbox-item" style="margin-bottom:0.9rem;"><input type="checkbox" id="recoveryConfirmCheck"> Ich habe den Code notiert und sicher aufbewahrt</label>' +
+    '<button class="btn" id="recoveryConfirmBtn" disabled>Weiter zu WakeLog</button>';
+  const checkbox = document.getElementById('recoveryConfirmCheck');
+  const btn = document.getElementById('recoveryConfirmBtn');
+  checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
+  btn.addEventListener('click', () => {
+    hideGate(); renderAll(); resetInactivityTimer();
+  });
+}
+
+function renderRecoveryFlow(){
+  const card = document.getElementById('gateCard');
+  card.innerHTML =
+    '<h2>Administrator-Code zurücksetzen</h2>' +
+    '<p>Gib deinen Wiederherstellungscode ein (den du bei der Ersteinrichtung notiert hast) sowie deinen neuen gewünschten Administrator-Code.</p>' +
+    '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"></div>' +
+    '<div class="field"><label for="newAdminInput">Neuer Administrator-Code</label><input id="newAdminInput" type="text" placeholder="z. B. AB3F7K2P"></div>' +
+    '<button class="btn" id="recoverySubmitBtn">Code zurücksetzen</button>' +
+    '<div class="gate-error" id="recoveryError">Wiederherstellungscode ungültig oder kein Backup-Code vorhanden — bitte an alle Parteien wenden, ob jemand noch Zugriff hat.</div>' +
+    '<div style="text-align:center; margin-top:1rem;"><a href="#" id="backToLoginLink" style="font-size:0.78rem; color:var(--ink-faint);">Zurück zum Login</a></div>';
+
+  document.getElementById('backToLoginLink').addEventListener('click', (ev) => { ev.preventDefault(); renderGate(); });
+
+  document.getElementById('recoverySubmitBtn').addEventListener('click', async () => {
+    const errEl = document.getElementById('recoveryError');
+    errEl.classList.remove('show');
+    const enteredCode = document.getElementById('recoveryInput').value.trim().toUpperCase();
+    const newAdmin = document.getElementById('newAdminInput').value.trim();
+    if(!enteredCode || !newAdmin){ errEl.textContent = 'Bitte beide Felder ausfüllen.'; errEl.classList.add('show'); return; }
+    if(!state.settings || !state.settings.recoveryHash){ errEl.textContent = 'Für dieses Bootslogbuch existiert kein Wiederherstellungscode.'; errEl.classList.add('show'); return; }
+    const enteredHash = await sha256(enteredCode);
+    if(enteredHash !== state.settings.recoveryHash){ errEl.classList.add('show'); return; }
+
+    const newRecoveryCode = randomRecoveryCode();
+    const newRecoveryHash = await sha256(newRecoveryCode);
+    state.settings.adminCode = newAdmin;
+    state.settings.recoveryHash = newRecoveryHash;
+    if(!state.auditLog) state.auditLog = [];
+    state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Administrator-Code über Wiederherstellungscode zurückgesetzt' });
+    await saveShared();
+    session = { adminCode: newAdmin, partyCode: null, partyId: null };
+    await saveSession();
+    evaluateAccess();
+    showRecoveryCodeOnce(newRecoveryCode);
+  });
+}
+
 function renderGate(){
   const card = document.getElementById('gateCard');
   if(!state.settings){
@@ -1993,13 +2100,16 @@ function renderGate(){
     document.getElementById('setupBtn').addEventListener('click', async () => {
       const admin = document.getElementById('setup-admin').value.trim();
       if(!admin){ document.getElementById('gateError').classList.add('show'); return; }
-      state.settings = { adminCode: admin, unlockAll: false };
+      const recoveryCode = randomRecoveryCode();
+      const recoveryHash = await sha256(recoveryCode);
+      state.settings = { adminCode: admin, unlockAll: false, recoveryHash };
       state.parties.forEach(p => { if(!p.code) p.code = randomCode(6); });
       state.auditLog = [{ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'WakeLog eingerichtet' }];
       await saveShared();
       session = { adminCode: admin };
       await saveSession();
-      evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer();
+      evaluateAccess();
+      showRecoveryCodeOnce(recoveryCode);
     });
   } else {
     card.innerHTML =
@@ -2011,7 +2121,13 @@ function renderGate(){
       '</div>' +
       '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><input id="gate-code" type="text" placeholder="z. B. AB3F7K"></div>' +
       '<button class="btn" id="gateBtn">Bestätigen</button>' +
-      '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>';
+      '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>' +
+      '<div style="text-align:center; margin-top:1rem;"><a href="#" id="forgotAdminLink" style="font-size:0.78rem; color:var(--ink-faint);">Administrator-Code vergessen?</a></div>';
+
+    document.getElementById('forgotAdminLink').addEventListener('click', (ev) => {
+      ev.preventDefault();
+      renderRecoveryFlow();
+    });
 
     let role = 'party';
     document.querySelectorAll('#roleToggle button').forEach(btn => {
@@ -2153,6 +2269,13 @@ function renderAdminGeneralSection(){
   const content = document.getElementById('adminSubContent');
   content.innerHTML =
     '<div class="admin-box">' +
+      '<label>Administrator-Code ändern</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Aus Sicherheitsgründen wird dein aktueller Code hier nirgends angezeigt. Beim Ändern wird ausserdem ein neuer Wiederherstellungscode erzeugt (der alte wird ungültig) — notiere ihn dir danach wieder sicher.</div>' +
+      '<input id="newAdminCodeField" type="text" placeholder="Neuer Administrator-Code" style="margin-bottom:0.7rem;">' +
+      '<button class="btn secondary" id="changeAdminCodeBtn">Code ändern</button>' +
+      '<div class="gate-error" id="adminCodeFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
       '<label>Freigabe-Link</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Trage hier einmalig den echten Link ein, den du siehst, wenn du oben in Claude auf "Veröffentlichen" klickst und die Adresse aus der Adresszeile/dem Teilen-Dialog kopierst. Die App kann diesen Link technisch nicht selbst erkennen — er muss von Hand eingetragen werden.</div>' +
       '<input id="shareLinkField" type="text" placeholder="https://claude.ai/public/artifacts/..." value="' + escapeHtml(state.settings.shareLink || '') + '" style="margin-bottom:0.7rem;">' +
@@ -2208,6 +2331,23 @@ function renderAdminGeneralSection(){
     } catch(e){
       fb.style.color = '#C0392B'; fb.textContent = 'Download fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
     }
+  });
+
+  document.getElementById('changeAdminCodeBtn').addEventListener('click', async () => {
+    const field = document.getElementById('newAdminCodeField');
+    const fb = document.getElementById('adminCodeFeedback');
+    const newCode = field.value.trim();
+    if(!newCode){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte einen neuen Code eingeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+    const newRecoveryCode = randomRecoveryCode();
+    const newRecoveryHash = await sha256(newRecoveryCode);
+    state.settings.adminCode = newCode;
+    state.settings.recoveryHash = newRecoveryHash;
+    logAudit('Administrator-Code geändert');
+    await saveShared();
+    session.adminCode = newCode;
+    await saveSession();
+    field.value = '';
+    showRecoveryCodeModal(newRecoveryCode, () => renderAdminGeneralSection());
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
