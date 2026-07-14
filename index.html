@@ -282,8 +282,14 @@ input:disabled, select:disabled{
 }
 .admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
 .admin-readonly{ opacity:0.5; pointer-events:none; filter:grayscale(0.4); user-select:none; }
-.party-code-actions{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.5rem; }
-.party-code-actions .btn{ width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.party-code-actions{ display:flex; gap:0.4rem; flex-wrap:wrap; }
+.icon-btn{
+  font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
+  padding:0.42rem 0.75rem; border-radius:20px; border:1px solid var(--line-strong);
+  background:#fff; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
+  display:inline-flex; align-items:center; gap:0.35rem; transition:background 0.15s ease;
+}
+.icon-btn:hover{ background:var(--foam); }
 .hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
 
 .btn{
@@ -589,6 +595,17 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div id="calendarGrid" class="cal-grid"></div>
         <div id="calendarDayPanel" style="margin-top:1.1rem;"></div>
+        <div class="admin-box" style="margin-top:1.1rem;">
+          <label>Mehrere Tage auf einmal abgeben</label>
+          <div class="hint" style="margin-bottom:0.7rem;">Praktisch z. B. für Ferien: gib einen ganzen Zeitraum ab, statt jeden Tag einzeln.</div>
+          <div class="row">
+            <div class="field" id="calRangePartyField" style="display:none;"><label for="calRangeParty">Für welche Partei</label><select id="calRangeParty"></select></div>
+            <div class="field"><label for="calRangeStart">Von</label><input type="date" id="calRangeStart"></div>
+            <div class="field"><label for="calRangeEnd">Bis</label><input type="date" id="calRangeEnd"></div>
+          </div>
+          <button class="btn secondary" id="calRangeSubmitBtn">Zeitraum abgeben</button>
+          <div class="gate-error" id="calRangeFeedback" style="color:#1C9A64;"></div>
+        </div>
       </div>
     </div>
 
@@ -1007,13 +1024,19 @@ function renderCalendarLegend(){
   if(!el) return;
   el.innerHTML = '<div class="cal-legend">' +
     state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
-    '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Frei (abgegeben, noch nicht übernommen)</div>' +
+    (state.parties.length > 2 ? '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Frei (abgegeben, noch nicht übernommen)</div>' : '') +
   '</div>';
 }
 
 function renderCalendarTab(){
   if(!document.getElementById('calendarGrid')) return;
   renderCalendarLegend();
+  const rangePartySel = document.getElementById('calRangeParty');
+  if(rangePartySel && isAdminUser){
+    const prevVal = rangePartySel.value;
+    rangePartySel.innerHTML = state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
+    if(state.parties.some(p => p.id === prevVal)) rangePartySel.value = prevVal;
+  }
   const label = document.getElementById('calMonthLabel');
   const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
   label.textContent = monthNames[calendarViewMonth] + ' ' + calendarViewYear;
@@ -1065,10 +1088,11 @@ function renderCalendarDayPanel(){
   const myId = session.partyId;
 
   if(calendarPendingAction && calendarPendingAction.dateStr === dateStr){
+    const actingId = calendarPendingAction.actingId;
     const pendingLabels = {
-      giveup: 'Möchtest du den Vorrechtstag am ' + dateLabel + ' wirklich abgeben?',
-      undo: 'Möchtest du die Abgabe des Vorrechtstags am ' + dateLabel + ' wirklich rückgängig machen?',
-      claim: 'Möchtest du den freien Vorrechtstag am ' + dateLabel + ' wirklich übernehmen?'
+      giveup: 'Soll ' + escapeHtml(partyName(actingId)) + ' den Vorrechtstag am ' + dateLabel + ' wirklich abgeben?',
+      undo: 'Soll die Abgabe von ' + escapeHtml(partyName(actingId)) + ' am ' + dateLabel + ' wirklich rückgängig gemacht werden?',
+      claim: 'Soll ' + escapeHtml(partyName(actingId)) + ' den freien Vorrechtstag am ' + dateLabel + ' wirklich übernehmen?'
     };
     panel.innerHTML =
       '<div class="admin-box">' +
@@ -1091,11 +1115,11 @@ function renderCalendarDayPanel(){
       const action = calendarPendingAction.type;
       if(action === 'giveup'){
         if(!state.priorityOverrides) state.priorityOverrides = {};
-        state.priorityOverrides[dateStr] = { givenUpBy: myId, claimedBy: null };
-        logAudit(partyName(myId) + ' hat Vorrecht am ' + dateStr + ' abgegeben');
+        state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null };
+        logAudit(partyName(actingId) + ' hat Vorrecht am ' + dateStr + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
       } else if(action === 'undo'){
         if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
-        logAudit(partyName(myId) + ' hat die Abgabe des Vorrechts am ' + dateStr + ' rückgängig gemacht');
+        logAudit('Abgabe des Vorrechts von ' + partyName(actingId) + ' am ' + dateStr + ' rückgängig gemacht' + (isAdminUser ? ' (durch Administrator)' : ''));
       } else if(action === 'claim'){
         const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
         if(!ov || ov.claimedBy){
@@ -1104,8 +1128,8 @@ function renderCalendarDayPanel(){
           renderCalendarTab();
           return;
         }
-        state.priorityOverrides[dateStr].claimedBy = myId;
-        logAudit(partyName(myId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen');
+        state.priorityOverrides[dateStr].claimedBy = actingId;
+        logAudit(partyName(actingId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen' + (isAdminUser ? ' (durch Administrator)' : ''));
       }
       calendarPendingAction = null;
       await saveShared();
@@ -1118,16 +1142,20 @@ function renderCalendarDayPanel(){
 
   if(eff.open){
     statusLine = 'Dieser Tag wurde abgegeben und ist aktuell frei — first come, first served.';
-    if(!isAdminUser && myId){
+    if(isAdminUser){
+      actions += '<div class="field"><label for="calClaimPartySelect">Übernehmen als</label><select id="calClaimPartySelect">' +
+        state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('') + '</select></div>';
+      actions += '<button class="btn secondary" id="calClaimBtn">Diesen Tag übernehmen</button>';
+    } else if(myId){
       actions += '<button class="btn secondary" id="calClaimBtn">Diesen Tag übernehmen</button>';
     }
   } else {
     statusLine = '<b>' + escapeHtml(partyName(eff.partyId)) + '</b> hat an diesem Tag Vorrecht.';
     const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
-    if(!isAdminUser && myId && eff.base === myId && !ov){
+    if((isAdminUser || myId === eff.base) && !ov){
       actions += '<button class="btn secondary" id="calGiveUpBtn">Diesen Tag abgeben</button>';
     }
-    if(!isAdminUser && myId && ov && ov.givenUpBy === myId && !ov.claimedBy){
+    if(ov && !ov.claimedBy && (isAdminUser || ov.givenUpBy === myId)){
       actions += '<button class="btn secondary" id="calUndoBtn">Abgabe rückgängig machen</button>';
     }
   }
@@ -1142,19 +1170,21 @@ function renderCalendarDayPanel(){
 
   const giveUpBtn = document.getElementById('calGiveUpBtn');
   if(giveUpBtn) giveUpBtn.addEventListener('click', () => {
-    calendarPendingAction = { type: 'giveup', dateStr };
+    calendarPendingAction = { type: 'giveup', dateStr, actingId: eff.base };
     renderCalendarDayPanel();
   });
 
   const undoBtn = document.getElementById('calUndoBtn');
   if(undoBtn) undoBtn.addEventListener('click', () => {
-    calendarPendingAction = { type: 'undo', dateStr };
+    const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+    calendarPendingAction = { type: 'undo', dateStr, actingId: ov ? ov.givenUpBy : myId };
     renderCalendarDayPanel();
   });
 
   const claimBtn = document.getElementById('calClaimBtn');
   if(claimBtn) claimBtn.addEventListener('click', () => {
-    calendarPendingAction = { type: 'claim', dateStr };
+    const partySelect = document.getElementById('calClaimPartySelect');
+    calendarPendingAction = { type: 'claim', dateStr, actingId: partySelect ? partySelect.value : myId };
     renderCalendarDayPanel();
   });
 }
@@ -2765,9 +2795,9 @@ function renderPartyCodeList(){
     '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">' +
       '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + (isAdminUser ? escapeHtml(p.code || '') : '••••••') + '</span></div>' +
       '<div class="party-code-actions">' +
-        '<button class="btn secondary" data-action="copy" data-id="' + p.id + '">Code kopieren</button>' +
-        '<button class="btn secondary" data-action="whatsapp" data-id="' + p.id + '">Per WhatsApp teilen</button>' +
-        '<button class="btn secondary" data-action="kick" data-id="' + p.id + '">Neuen Code erzeugen</button>' +
+        '<button class="icon-btn" data-action="copy" data-id="' + p.id + '">📋 Kopieren</button>' +
+        '<button class="icon-btn" data-action="whatsapp" data-id="' + p.id + '">💬 WhatsApp</button>' +
+        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '">🔄 Neu erzeugen</button>' +
       '</div>' +
       '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
     '</div>'
@@ -3122,6 +3152,64 @@ async function init(){
     calendarSelectedDate = null;
     calendarPendingAction = null;
     renderCalendarTab();
+  });
+
+  const calRangePartyField = document.getElementById('calRangePartyField');
+  const calRangeParty = document.getElementById('calRangeParty');
+  if(isAdminUser){
+    calRangePartyField.style.display = 'block';
+  }
+  let rangePendingDates = null;
+  document.getElementById('calRangeSubmitBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('calRangeFeedback');
+    fb.classList.remove('show');
+    const startVal = document.getElementById('calRangeStart').value;
+    const endVal = document.getElementById('calRangeEnd').value;
+    const targetParty = isAdminUser ? calRangeParty.value : session.partyId;
+    if(!startVal || !endVal || startVal > endVal){
+      fb.style.color = '#C0392B'; fb.textContent = 'Bitte ein gültiges Von-Bis-Datum wählen.'; fb.classList.add('show'); return;
+    }
+    if(!targetParty){
+      fb.style.color = '#C0392B'; fb.textContent = 'Keine Partei ausgewählt.'; fb.classList.add('show'); return;
+    }
+    const btn = document.getElementById('calRangeSubmitBtn');
+    if(rangePendingDates && rangePendingDates.confirming){
+      if(!state.priorityOverrides) state.priorityOverrides = {};
+      rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null }; });
+      logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + startVal + ' bis ' + endVal + ')');
+      await saveShared();
+      fb.style.color = '#1C9A64'; fb.textContent = rangePendingDates.dates.length + ' Tag(e) abgegeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
+      btn.textContent = 'Zeitraum abgeben';
+      rangePendingDates = null;
+      renderCalendarTab(); renderInstruments();
+      return;
+    }
+    const dates = [];
+    let d = new Date(startVal + 'T00:00:00');
+    const endD = new Date(endVal + 'T00:00:00');
+    while(d <= endD){
+      const dStr = d.toISOString().slice(0,10);
+      const eff = effectivePriority(dStr);
+      if(!eff.open && eff.base === targetParty && eff.partyId === targetParty){
+        const ov = state.priorityOverrides ? state.priorityOverrides[dStr] : null;
+        if(!ov) dates.push(dStr);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    if(!dates.length){
+      fb.style.color = '#C0392B'; fb.textContent = 'In diesem Zeitraum gibt es keine eigenen Vorrechtstage zum Abgeben.'; fb.classList.add('show'); return;
+    }
+    rangePendingDates = { dates, confirming: true };
+    fb.style.color = '#1C9A64'; fb.textContent = dates.length + ' Tag(e) betroffen — nochmals klicken zum Bestätigen.'; fb.classList.add('show');
+    btn.textContent = 'Bestätigen und speichern (' + dates.length + ' Tage)';
+  });
+  ['calRangeStart','calRangeEnd','calRangeParty'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', () => {
+      rangePendingDates = null;
+      document.getElementById('calRangeSubmitBtn').textContent = 'Zeitraum abgeben';
+      document.getElementById('calRangeFeedback').classList.remove('show');
+    });
   });
   document.getElementById('exportPdfBtn').addEventListener('click', () => {
     const year = parseInt(document.getElementById('settlementYear').value);
