@@ -571,8 +571,13 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label for="f-photo" id="photoLabel">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
-            <input type="file" id="f-photo" accept="image/*">
+            <label id="photoLabel">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
+            <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+              <button type="button" class="btn secondary" id="photoCameraBtn">📷 Foto aufnehmen</button>
+              <button type="button" class="btn secondary" id="photoGalleryBtn">🖼️ Aus Galerie auswählen</button>
+            </div>
+            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" style="display:none;">
+            <input type="file" id="f-photo-gallery" accept="image/*" style="display:none;">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Beweisfoto auswählen — dieses Feld ist Pflicht.</div>
@@ -582,7 +587,17 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div class="field"><label for="f-liters">Liter Benzin</label><input type="number" id="f-liters" step="0.1" min="0" placeholder="0.0"></div>
           <div class="field"><label for="f-expense">Ausgaben Tankfüllung (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
           <div class="field" style="grid-column:1 / -1;">
-            <label>Wer hat das Benzin bezahlt? *</label>
+            <label class="checkbox-item" style="display:inline-flex;"><input type="checkbox" id="giftToggle"> Ein Teil (oder alles) wurde von einer externen Person geschenkt</label>
+            <div id="giftBody" style="display:none; margin-top:0.7rem;">
+              <div class="row">
+                <div class="field"><label for="giftName">Name der Person</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben.</div></div>
+                <div class="field"><label for="giftAmount">Geschenkter Betrag (CHF)</label><input type="number" id="giftAmount" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
+              </div>
+              <div class="hint">Dieser Betrag wird von den Ausgaben abgezogen, bevor sie auf die Parteien aufgeteilt werden — die Bootsgemeinschaft profitiert direkt davon.</div>
+            </div>
+          </div>
+          <div class="field" style="grid-column:1 / -1;">
+            <label id="payerLabel">Wer hat das Benzin bezahlt? *</label>
             <div id="payerCheckboxes" class="checkbox-list"></div>
             <div class="gate-error" id="err-payer">Bitte mindestens eine zahlende Partei wählen.</div>
             <div id="paidSplitArea" style="display:none; margin-top:0.6rem;"></div>
@@ -928,6 +943,13 @@ function renderPayerCheckboxes(){
   renderPaidSplitArea();
 }
 
+function getPayableExpense(){
+  const total = parseFloat(document.getElementById('f-expense').value) || 0;
+  const giftToggle = document.getElementById('giftToggle');
+  const giftAmount = (giftToggle && giftToggle.checked) ? (parseFloat(document.getElementById('giftAmount').value) || 0) : 0;
+  return Math.max(0, total - giftAmount);
+}
+
 function renderPaidSplitArea(){
   const wrap = document.getElementById('payerCheckboxes');
   const area = document.getElementById('paidSplitArea');
@@ -935,7 +957,7 @@ function renderPaidSplitArea(){
   const ids = Array.from(wrap.querySelectorAll('.payer-check:checked')).map(cb => cb.value);
   if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
   area.style.display = 'block';
-  const totalExpense = parseFloat(document.getElementById('f-expense').value) || 0;
+  const totalExpense = getPayableExpense();
   const equal = ids.length ? Math.round((totalExpense/ids.length)*100)/100 : 0;
   area.innerHTML =
     '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="paidUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
@@ -954,7 +976,7 @@ function renderPaidSplitArea(){
 function updatePaidSplitTotal(){
   const area = document.getElementById('paidSplitArea');
   if(!area) return;
-  const totalExpense = parseFloat(document.getElementById('f-expense').value) || 0;
+  const totalExpense = getPayableExpense();
   const inputs = Array.from(area.querySelectorAll('.paid-split-input'));
   if(!inputs.length) return;
   const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
@@ -1059,18 +1081,30 @@ async function addEntry(){
     data.expense = parseFloat(document.getElementById('f-expense').value) || 0;
     if(data.expense <= 0){ showErr('err-expense'); }
 
+    const giftToggle = document.getElementById('giftToggle');
+    let giftAmount = 0;
+    if(giftToggle && giftToggle.checked){
+      const giftName = document.getElementById('giftName').value.trim();
+      giftAmount = parseFloat(document.getElementById('giftAmount').value) || 0;
+      if(!giftName){ showErr('err-gift-name'); }
+      if(giftAmount <= 0 || giftAmount > data.expense){ showErr('err-gift-amount'); }
+      else { data.giftName = giftName; data.giftAmount = giftAmount; }
+      if(!giftName || giftAmount <= 0 || giftAmount > data.expense){ giftAmount = 0; }
+    }
+    const payableAmount = Math.max(0, data.expense - giftAmount);
+
     const payerIds = Array.from(document.querySelectorAll('#payerCheckboxes .payer-check:checked')).map(cb => cb.value);
-    if(!payerIds.length){ showErr('err-payer'); }
+    if(!payerIds.length && payableAmount > 0.005){ showErr('err-payer'); }
     data.payerIds = payerIds;
     const unequalToggle = document.getElementById('paidUnequalToggle');
-    if(payerIds.length > 1 && unequalToggle && unequalToggle.checked && data.expense > 0){
+    if(payerIds.length > 1 && unequalToggle && unequalToggle.checked && payableAmount > 0){
       const pInputs = Array.from(document.querySelectorAll('#paidSplitArea .paid-split-input'));
       const pSum = pInputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-      if(Math.abs(pSum - data.expense) > 0.02){
-        showErr('err-payer', 'Die Aufteilung muss in Summe dem Betrag entsprechen (aktuell ' + fmtNum(pSum,2) + ' von ' + fmtNum(data.expense,2) + ' CHF).');
+      if(Math.abs(pSum - payableAmount) > 0.02){
+        showErr('err-payer', 'Die Aufteilung muss in Summe dem verbleibenden Betrag entsprechen (aktuell ' + fmtNum(pSum,2) + ' von ' + fmtNum(payableAmount,2) + ' CHF).');
       } else {
         data.paidSplit = {};
-        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = (parseFloat(i.value)||0) / data.expense * 100; });
+        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = (parseFloat(i.value)||0) / payableAmount * 100; });
       }
     } else if(payerIds.length > 1){
       const equalPct = 100 / payerIds.length;
@@ -1104,13 +1138,17 @@ async function addEntry(){
   document.getElementById('f-consumption').value = '';
   document.getElementById('f-liters').value = '';
   document.getElementById('f-expense').value = '';
+  document.getElementById('giftToggle').checked = false;
+  document.getElementById('giftBody').style.display = 'none';
+  document.getElementById('giftName').value = '';
+  document.getElementById('giftAmount').value = '';
   resetPhotoField();
   populatePartySelect();
   renderYearFilters(); renderEntriesTable(); renderSettlement();
 }
 
 function clearEntryErrors(){
-  ['err-party','err-date','err-reading','err-consumption','err-photo','err-expense','err-payer'].forEach(id => {
+  ['err-party','err-date','err-reading','err-consumption','err-photo','err-expense','err-payer','err-gift-name','err-gift-amount'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.classList.remove('show');
   });
@@ -1157,8 +1195,10 @@ function pruneOldPhotos(){
 function resetPhotoField(){
   pendingPhotoDataUrl = null;
   existingPhotoDataUrl = null;
-  const input = document.getElementById('f-photo');
-  if(input) input.value = '';
+  const camInput = document.getElementById('f-photo-camera');
+  if(camInput) camInput.value = '';
+  const galInput = document.getElementById('f-photo-gallery');
+  if(galInput) galInput.value = '';
   const preview = document.getElementById('photoPreview');
   if(preview){ preview.style.display = 'none'; preview.src = ''; }
   const status = document.getElementById('photoStatus');
@@ -1200,6 +1240,11 @@ function startEdit(id){
   document.getElementById('f-liters').value = flags.hasRefuel ? (e.liters || '') : '';
   document.getElementById('f-expense').value = flags.hasRefuel ? (e.expense || '') : '';
   if(flags.hasRefuel){
+    const hasGift = typeof e.giftAmount === 'number' && e.giftAmount > 0;
+    document.getElementById('giftToggle').checked = hasGift;
+    document.getElementById('giftBody').style.display = hasGift ? 'block' : 'none';
+    document.getElementById('giftName').value = hasGift ? (e.giftName || '') : '';
+    document.getElementById('giftAmount').value = hasGift ? e.giftAmount : '';
     const paid = getEntryPaidSplit(e);
     document.querySelectorAll('#payerCheckboxes .payer-check').forEach(cb => { cb.checked = paid.ids.includes(cb.value); });
     renderPaidSplitArea();
@@ -1232,6 +1277,10 @@ function stopEdit(){
   resetPhotoField();
   document.querySelectorAll('#partyCheckboxes .party-check').forEach(cb => { if(!cb.disabled) cb.checked = false; });
   document.querySelectorAll('#payerCheckboxes .payer-check').forEach(cb => { if(!cb.disabled) cb.checked = false; });
+  document.getElementById('giftToggle').checked = false;
+  document.getElementById('giftBody').style.display = 'none';
+  document.getElementById('giftName').value = '';
+  document.getElementById('giftAmount').value = '';
   renderUsageSplitArea();
   renderPaidSplitArea();
 }
@@ -1292,8 +1341,11 @@ function renderEntriesTable(){
                  (flags.hasRefuel ? '<span class="tag refuel">Tanken</span>' : '') +
                  (locked ? ' <span class="tag locked">gesperrt</span>' : '');
     let partyCell = escapeHtml(splitLabel(usage.ids, usage.split));
-    if(flags.hasRefuel && paid && (paid.ids.length !== usage.ids.length || !paid.ids.every(id => usage.ids.includes(id)))){
+    if(flags.hasRefuel && paid && paid.ids.length && (paid.ids.length !== usage.ids.length || !paid.ids.every(id => usage.ids.includes(id)))){
       partyCell += '<div class="hint" style="margin:0.2rem 0 0;">Bezahlt: ' + escapeHtml(splitLabel(paid.ids, paid.split)) + '</div>';
+    }
+    if(flags.hasRefuel && typeof e.giftAmount === 'number' && e.giftAmount > 0){
+      partyCell += '<div class="hint" style="margin:0.2rem 0 0;">🎁 Geschenk von ' + escapeHtml(e.giftName || '') + ': ' + fmtCHF(e.giftAmount) + '</div>';
     }
     html += '<tr>';
     html += '<td>' + e.date + '</td>';
@@ -1338,6 +1390,7 @@ function computeSettlement(year){
   const consumed = {}, partyHoursMap = {}, paid = {};
   state.parties.forEach(p => { consumed[p.id] = 0; partyHoursMap[p.id] = 0; paid[p.id] = 0; });
   const entryHours = computeHoursMap();
+  let totalGifts = 0;
 
   state.entries.filter(e => yearOf(e.date) === year).forEach(e => {
     const flags = getEntryFlags(e);
@@ -1353,11 +1406,14 @@ function computeSettlement(year){
       });
     }
     if(flags.hasRefuel){
+      const giftAmt = (typeof e.giftAmount === 'number' && e.giftAmount > 0) ? e.giftAmount : 0;
+      totalGifts += giftAmt;
+      const effectiveExpense = Math.max(0, (e.expense || 0) - giftAmt);
       const payer = getEntryPaidSplit(e);
       payer.ids.forEach(id => {
         if(!(id in paid)) return;
         const pct = (payer.split[id] || 0) / 100;
-        paid[id] += (e.expense || 0) * pct;
+        paid[id] += effectiveExpense * pct;
       });
     }
   });
@@ -1404,7 +1460,7 @@ function computeSettlement(year){
     };
   });
 
-  return { rows, totalConsumed, totalExpense: totalFuelExpense + totalAnnual, totalFuelExpense, totalAnnual, usedEqualFallback };
+  return { rows, totalConsumed, totalExpense: totalFuelExpense + totalAnnual, totalFuelExpense, totalAnnual, usedEqualFallback, totalGifts };
 }
 
 function settlementTransactions(rows){
@@ -1427,7 +1483,7 @@ function renderSettlement(){
   const year = parseInt(yearSel.value);
   const container = document.getElementById('settlementContent');
 
-  const { rows, totalConsumed, totalExpense, totalFuelExpense, totalAnnual, usedEqualFallback } = computeSettlement(year);
+  const { rows, totalConsumed, totalExpense, totalFuelExpense, totalAnnual, usedEqualFallback, totalGifts } = computeSettlement(year);
 
   if(totalConsumed === 0 && totalExpense === 0){
     container.innerHTML = '<div class="empty">Für ' + year + ' liegen noch keine Einträge oder Fixkosten vor.</div>';
@@ -1441,6 +1497,9 @@ function renderSettlement(){
   }
   if(usedEqualFallback && totalAnnual > 0){
     html += '<div class="notice warn">Für ' + year + ' liegen keine Nutzungsstunden vor — die jährlichen Fixkosten wurden daher gleichmässig auf alle Parteien aufgeteilt, nicht nach Nutzungsanteil.</div>';
+  }
+  if(totalGifts > 0){
+    html += '<div class="notice">🎁 ' + fmtCHF(totalGifts) + ' wurden ' + year + ' von externen Personen geschenkt und sind bereits von den Benzinkosten abgezogen — die Parteien teilen sich nur den Rest.</div>';
   }
 
   html += '<div class="stat-row">' +
@@ -2331,7 +2390,28 @@ async function init(){
   });
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
-  document.getElementById('f-photo').addEventListener('change', async (ev) => {
+  document.getElementById('giftToggle').addEventListener('change', (ev) => {
+    document.getElementById('giftBody').style.display = ev.target.checked ? 'block' : 'none';
+    if(!ev.target.checked){
+      document.getElementById('err-gift-name').classList.remove('show');
+      document.getElementById('err-gift-amount').classList.remove('show');
+    }
+    renderPaidSplitArea();
+  });
+  document.getElementById('giftAmount').addEventListener('input', () => {
+    document.getElementById('err-gift-amount').classList.remove('show');
+    renderPaidSplitArea();
+  });
+  document.getElementById('giftName').addEventListener('input', () => {
+    if(document.getElementById('giftName').value.trim()) document.getElementById('err-gift-name').classList.remove('show');
+  });
+  document.getElementById('photoCameraBtn').addEventListener('click', () => {
+    document.getElementById('f-photo-camera').click();
+  });
+  document.getElementById('photoGalleryBtn').addEventListener('click', () => {
+    document.getElementById('f-photo-gallery').click();
+  });
+  const handlePhotoFile = async (ev) => {
     const file = ev.target.files[0];
     if(!file) return;
     const status = document.getElementById('photoStatus');
@@ -2345,7 +2425,9 @@ async function init(){
     } catch(e){
       status.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
     }
-  });
+  };
+  document.getElementById('f-photo-camera').addEventListener('change', handlePhotoFile);
+  document.getElementById('f-photo-gallery').addEventListener('change', handlePhotoFile);
   [['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
     const el = document.getElementById(fieldId);
     el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
