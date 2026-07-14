@@ -112,8 +112,22 @@ body{
 .admin-strip{
   position:relative; z-index:1;
   margin-top:0.9rem;
-  display:flex; justify-content:flex-end;
+  display:flex; justify-content:flex-end; align-items:center; gap:0.6rem;
 }
+.logout-btn{
+  font-family:'Inter', sans-serif;
+  font-size:0.68rem;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:rgba(255,255,255,0.75);
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.25);
+  border-radius:20px;
+  padding:0.28rem 0.7rem;
+  cursor:pointer;
+  transition:background 0.15s ease;
+}
+.logout-btn:hover{ background:rgba(255,255,255,0.22); }
 .instruments{ display:flex; gap:0.6rem; margin-top:1.5rem; position:relative; z-index:1; flex-wrap:wrap; }
 .instrument{
   background:rgba(255,255,255,0.14);
@@ -297,7 +311,7 @@ table{ width:100%; border-collapse:collapse; font-size:0.83rem; }
 #entriesTableWrap th.name-cell, #entriesTableWrap td.name-cell{ min-width:150px; }
 #entriesTableWrap th.type-cell, #entriesTableWrap td.type-cell{ min-width:90px; }
 #entriesTableWrap .tag{ display:inline-block; margin-bottom:0.2rem; }
-@media (min-width: 860px){
+@media (min-width: 1200px){
   #entriesTableWrap table{ width:100%; min-width:0; }
 }
 th{
@@ -439,6 +453,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 @media (min-width: 720px){
   .row{ grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
   .stat-row{ grid-template-columns:repeat(3, 1fr); }
+}
+@media (min-width: 1200px){
+  .wrap{ max-width:1180px; }
+  .hero-container{ max-width:1180px; }
 }
 </style>
 </head>
@@ -729,8 +747,36 @@ function updateHeaderMeta(){
   el.innerHTML = 'Parteien: ' + state.parties.length + ' · Einträge: ' + state.entries.length;
   const strip = document.getElementById('adminStrip');
   if(strip){
-    strip.innerHTML = isAdminUser ? '<div class="admin-strip"><span class="admin-badge">Administrator</span></div>' : '';
+    strip.innerHTML = '<div class="admin-strip">' +
+      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : '') +
+      '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
+    '</div>';
+    const btn = document.getElementById('logoutBtn');
+    if(btn) btn.addEventListener('click', logout);
   }
+}
+
+async function logout(){
+  session = { partyCode: null, partyId: null, adminCode: null };
+  await saveSession();
+  evaluateAccess();
+  showGate();
+}
+
+let inactivityTimer = null;
+const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+
+function resetInactivityTimer(){
+  if(inactivityTimer) clearTimeout(inactivityTimer);
+  if(!accessGranted) return;
+  inactivityTimer = setTimeout(() => { logout(); }, INACTIVITY_LIMIT_MS);
+}
+
+function setupInactivityTracking(){
+  ['mousemove','mousedown','touchstart','keydown','scroll'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+  resetInactivityTimer();
 }
 
 function renderInstruments(){
@@ -1711,7 +1757,7 @@ function renderGate(){
       await saveShared();
       session = { adminCode: admin };
       await saveSession();
-      evaluateAccess(); hideGate(); renderAll();
+      evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer();
     });
   } else {
     card.innerHTML =
@@ -1752,7 +1798,7 @@ function renderGate(){
           errEl.textContent = 'Zugangscode ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.'; errEl.classList.add('show'); return;
         }
       }
-      await saveSession(); evaluateAccess(); hideGate(); renderAll();
+      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer();
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
     document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
@@ -2327,6 +2373,7 @@ async function init(){
   if(!state.settings || !accessGranted){ showGate(); }
   else { hideGate(); renderAll(); }
   startPolling();
+  setupInactivityTracking();
 }
 
 init();
