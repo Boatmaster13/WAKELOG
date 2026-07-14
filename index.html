@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>WakeLog</title>
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
@@ -373,6 +373,21 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
 
 /* ---------- Rundstempel Ausgleich ---------- */
+.cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0.35rem; }
+.cal-weekday{ text-align:center; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint); padding-bottom:0.3rem; }
+.cal-day{
+  aspect-ratio:1/1; border-radius:var(--radius-sm); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; cursor:pointer; font-family:'JetBrains Mono', monospace;
+  font-size:0.82rem; color:var(--ink); background:var(--foam); border:1.5px solid transparent; position:relative;
+  transition:transform 0.1s ease;
+}
+.cal-day:hover{ transform:scale(1.05); }
+.cal-day.empty{ background:transparent; cursor:default; visibility:hidden; }
+.cal-day.today{ border-color:var(--hull); border-width:2px; font-weight:700; }
+.cal-day.open{ background:repeating-linear-gradient(45deg, #e3e1db, #e3e1db 4px, #d3d1cb 4px, #d3d1cb 8px); color:var(--ink-faint); }
+.cal-legend{ display:flex; flex-wrap:wrap; gap:0.6rem; }
+.cal-legend-item{ display:flex; align-items:center; gap:0.4rem; font-size:0.76rem; color:var(--ink-soft); }
+.cal-legend-swatch{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
 .stamps{ display:flex; flex-wrap:wrap; justify-content:center; gap:1.3rem; margin-top:1.4rem; }
 .stamp{
   border:3px solid var(--hull);
@@ -548,6 +563,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
     <div class="navwrap">
       <div class="nav" id="tabNav">
         <div class="nav-indicator" id="navIndicator"></div>
+        <button class="tab" data-tab="calendar">Kalender</button>
         <button class="tab active" data-tab="log">Logbuch</button>
         <button class="tab" data-tab="adjustment">Ausgleich</button>
         <button class="tab" data-tab="settlement">Abrechnung</button>
@@ -556,6 +572,20 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
     </div>
 
     <div class="content">
+
+    <div class="panel" id="panel-calendar">
+      <div class="card">
+        <h2>Vorrechts-Kalender</h2>
+        <div id="calendarLegend" style="margin-bottom:1rem;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
+          <button class="btn secondary" id="calPrevBtn">‹</button>
+          <div id="calMonthLabel" style="font-family:'Big Shoulders Display', sans-serif; font-size:1.2rem; font-weight:700;"></div>
+          <button class="btn secondary" id="calNextBtn">›</button>
+        </div>
+        <div id="calendarGrid"></div>
+        <div id="calendarDayPanel" style="margin-top:1.1rem;"></div>
+      </div>
+    </div>
 
     <div class="panel active" id="panel-log">
       <div class="notice">Diese Daten sind geteilt gespeichert — alle Parteien mit gültigem Zugangscode sehen dasselbe Logbuch. Änderungen erscheinen in Echtzeit bei allen.</div>
@@ -701,7 +731,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [] };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -729,8 +759,45 @@ async function sha256(text){
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
+function bytesToHex(bytes){ return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(''); }
+function hexToBytes(hex){
+  const bytes = new Uint8Array(hex.length/2);
+  for(let i=0;i<bytes.length;i++) bytes[i] = parseInt(hex.substr(i*2,2),16);
+  return bytes;
+}
+function base32Encode(bytes){
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '', output = '';
+  for(const b of bytes) bits += b.toString(2).padStart(8,'0');
+  for(let i=0;i+5<=bits.length;i+=5) output += alphabet[parseInt(bits.substr(i,5),2)];
+  const rem = bits.length % 5;
+  if(rem) output += alphabet[parseInt(bits.substr(bits.length-rem).padEnd(5,'0'),2)];
+  return output;
+}
+function generateTotpSecretHex(){
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(20)));
+}
+async function computeTotp(hexSecret, stepOffset){
+  const keyBytes = hexToBytes(hexSecret);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const counter = Math.floor(Date.now() / 1000 / 30) + (stepOffset || 0);
+  const counterBuf = new ArrayBuffer(8);
+  new DataView(counterBuf).setUint32(4, counter, false);
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counterBuf));
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const binCode = ((hmac[offset] & 0x7f) << 24) | ((hmac[offset+1] & 0xff) << 16) | ((hmac[offset+2] & 0xff) << 8) | (hmac[offset+3] & 0xff);
+  return String(binCode % 1000000).padStart(6, '0');
+}
+async function verifyTotp(hexSecret, enteredCode){
+  const clean = (enteredCode || '').replace(/\s/g,'');
+  for(let offset = -1; offset <= 1; offset++){
+    if((await computeTotp(hexSecret, offset)) === clean) return true;
+  }
+  return false;
+}
+
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [] };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {} };
 }
 
 async function loadShared(){
@@ -745,6 +812,7 @@ async function loadShared(){
       state.annualCosts = loaded.annualCosts || {};
       state.settlementPayments = loaded.settlementPayments || {};
       state.auditLog = loaded.auditLog || [];
+      state.priorityOverrides = loaded.priorityOverrides || {};
     } else {
       state = defaultData();
     }
@@ -759,7 +827,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [] });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {} });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -774,6 +842,9 @@ function subscribeRealtime(){
       state.annualCosts = loaded.annualCosts || {};
       state.settlementPayments = loaded.settlementPayments || {};
       state.auditLog = loaded.auditLog || [];
+      const newOverrides = loaded.priorityOverrides || {};
+      notifyNewGiveUps(state.priorityOverrides || {}, newOverrides);
+      state.priorityOverrides = newOverrides;
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -781,6 +852,33 @@ function subscribeRealtime(){
     if(isTyping) return;
     hideGate();
     renderAll();
+  });
+}
+
+function requestNotificationPermission(){
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission === 'default'){
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+function notifyNewGiveUps(oldOverrides, newOverrides){
+  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if(!accessGranted) return;
+  Object.keys(newOverrides).forEach(dateStr => {
+    const ov = newOverrides[dateStr];
+    const prev = oldOverrides[dateStr];
+    if(!ov || !ov.givenUpBy) return;
+    const isNew = !prev || prev.givenUpBy !== ov.givenUpBy;
+    if(!isNew) return;
+    if(!isAdminUser && session.partyId === ov.givenUpBy) return;
+    const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' });
+    try{
+      new Notification('WakeLog — Vorrechtstag abgegeben', {
+        body: partyName(ov.givenUpBy) + ' hat den Vorrechtstag am ' + dateLabel + ' abgegeben.' + (state.parties.length > 2 ? ' Frei zum Übernehmen!' : ''),
+        icon: 'icon-192.png'
+      });
+    } catch(e){}
   });
 }
 
@@ -805,7 +903,8 @@ function evaluateAccess(){
 function updateHeaderMeta(){
   const el = document.getElementById('headerMeta');
   if(!el) return;
-  el.innerHTML = 'Parteien: ' + state.parties.length + ' · Einträge: ' + state.entries.length;
+  const now = new Date();
+  el.innerHTML = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
   const strip = document.getElementById('adminStrip');
   if(strip){
     strip.innerHTML = '<div class="admin-strip">' +
@@ -816,6 +915,7 @@ function updateHeaderMeta(){
     if(btn) btn.addEventListener('click', logout);
   }
 }
+setInterval(() => { if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); }, 30000);
 
 async function logout(){
   session = { partyCode: null, partyId: null, adminCode: null };
@@ -840,6 +940,39 @@ function setupInactivityTracking(){
   resetInactivityTimer();
 }
 
+const PARTY_COLORS = ['#B8823B', '#5B8C7E', '#6E85A8', '#A8738C', '#7C9A5C', '#9C8256', '#7A7AA8', '#B87A5B'];
+function partyColor(id){
+  const idx = state.parties.findIndex(p => p.id === id);
+  return PARTY_COLORS[idx >= 0 ? (idx % PARTY_COLORS.length) : 0];
+}
+
+function basePriorityPartyId(dateStr){
+  const year = String(parseInt(dateStr.slice(0,4)));
+  const rule = state.priorityRules ? state.priorityRules[year] : null;
+  if(!rule) return null;
+  if(rule.mode === 'evenodd' && rule.evenPartyId && rule.oddPartyId){
+    const dayNum = parseInt(dateStr.slice(8,10));
+    return (dayNum % 2 === 0) ? rule.evenPartyId : rule.oddPartyId;
+  }
+  if(rule.mode === 'rotation' && rule.order && rule.order.length){
+    return rotationPartyId(rule.order, year, dateStr);
+  }
+  return null;
+}
+
+function effectivePriority(dateStr){
+  const base = basePriorityPartyId(dateStr);
+  if(!base) return { partyId: null, open: false, base: null };
+  const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+  if(!ov || ov.givenUpBy !== base) return { partyId: base, open: false, base };
+  if(state.parties.length === 2){
+    const other = state.parties.find(p => p.id !== base);
+    return { partyId: other ? other.id : null, open: false, base };
+  }
+  if(ov.claimedBy) return { partyId: ov.claimedBy, open: false, base };
+  return { partyId: null, open: true, base };
+}
+
 function currentPriorityLabel(){
   if(state.parties.length < 2) return null;
   const now = new Date();
@@ -847,29 +980,146 @@ function currentPriorityLabel(){
   const rule = state.priorityRules ? state.priorityRules[year] : null;
   if(!rule) return null;
   const todayStr = now.toISOString().slice(0,10);
-  if(rule.mode === 'evenodd' && rule.evenPartyId && rule.oddPartyId){
+  const eff = effectivePriority(todayStr);
+  if(!eff.base) return null;
+  let label;
+  if(rule.mode === 'evenodd'){
     const dayNum = now.getDate();
-    const isEven = dayNum % 2 === 0;
-    return { label: (isEven ? 'Gerader Tag' : 'Ungerader Tag'), party: partyName(isEven ? rule.evenPartyId : rule.oddPartyId) };
+    label = (dayNum % 2 === 0 ? 'Gerader Tag' : 'Ungerader Tag');
+  } else {
+    label = 'KW ' + isoWeekNumber(todayStr);
   }
-  if(rule.mode === 'rotation' && rule.order && rule.order.length){
-    const weekNum = isoWeekNumber(todayStr);
-    const partyId = rotationPartyId(rule.order, year, todayStr);
-    return { label: 'KW ' + weekNum, party: partyName(partyId) };
+  if(eff.open) return { label: label, party: 'Frei — noch nicht übernommen', color: '#999' };
+  return { label: label, party: partyName(eff.partyId), color: partyColor(eff.partyId) };
+}
+
+let calendarViewYear = new Date().getFullYear();
+let calendarViewMonth = new Date().getMonth();
+let calendarSelectedDate = null;
+
+function renderCalendarLegend(){
+  const el = document.getElementById('calendarLegend');
+  if(!el) return;
+  el.innerHTML = '<div class="cal-legend">' +
+    state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
+    '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Frei (abgegeben, noch nicht übernommen)</div>' +
+  '</div>';
+}
+
+function renderCalendarTab(){
+  if(!document.getElementById('calendarGrid')) return;
+  renderCalendarLegend();
+  const label = document.getElementById('calMonthLabel');
+  const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  label.textContent = monthNames[calendarViewMonth] + ' ' + calendarViewYear;
+
+  const grid = document.getElementById('calendarGrid');
+  const firstDay = new Date(calendarViewYear, calendarViewMonth, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let html = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => '<div class="cal-weekday">' + d + '</div>').join('');
+  for(let i=0;i<startOffset;i++) html += '<div class="cal-day empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = calendarViewYear + '-' + String(calendarViewMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const eff = effectivePriority(dateStr);
+    let style = '', cls = 'cal-day';
+    if(dateStr === todayStr) cls += ' today';
+    if(eff.open) cls += ' open';
+    else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
+    html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + '</div>';
   }
-  return null;
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell => {
+    cell.addEventListener('click', () => {
+      calendarSelectedDate = cell.dataset.date;
+      renderCalendarDayPanel();
+    });
+  });
+
+  if(calendarSelectedDate) renderCalendarDayPanel();
+}
+
+function renderCalendarDayPanel(){
+  const panel = document.getElementById('calendarDayPanel');
+  if(!panel || !calendarSelectedDate) return;
+  const dateStr = calendarSelectedDate;
+  const eff = effectivePriority(dateStr);
+  const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+
+  if(!eff.base){
+    panel.innerHTML = '<div class="hint">Für diesen Tag ist keine Vorrangregel hinterlegt.</div>';
+    return;
+  }
+
+  let statusLine, actions = '';
+  const myId = session.partyId;
+
+  if(eff.open){
+    statusLine = 'Dieser Tag wurde abgegeben und ist aktuell frei — first come, first served.';
+    if(!isAdminUser && myId){
+      actions += '<button class="btn secondary" id="calClaimBtn">Diesen Tag übernehmen</button>';
+    }
+  } else {
+    statusLine = '<b>' + escapeHtml(partyName(eff.partyId)) + '</b> hat an diesem Tag Vorrecht.';
+    const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+    if(!isAdminUser && myId && eff.base === myId && !ov){
+      actions += '<button class="btn secondary" id="calGiveUpBtn">Diesen Tag abgeben</button>';
+    }
+    if(!isAdminUser && myId && ov && ov.givenUpBy === myId && !ov.claimedBy){
+      actions += '<button class="btn secondary" id="calUndoBtn">Abgabe rückgängig machen</button>';
+    }
+  }
+
+  panel.innerHTML =
+    '<div class="admin-box">' +
+      '<label>' + dateLabel + '</label>' +
+      '<div style="margin:0.5rem 0 0.9rem;">' + statusLine + '</div>' +
+      (actions || '<div class="hint">Keine Aktion möglich.</div>') +
+      '<div class="gate-error" id="calFeedback" style="color:#1C9A64;"></div>' +
+    '</div>';
+
+  const giveUpBtn = document.getElementById('calGiveUpBtn');
+  if(giveUpBtn) giveUpBtn.addEventListener('click', async () => {
+    if(!state.priorityOverrides) state.priorityOverrides = {};
+    state.priorityOverrides[dateStr] = { givenUpBy: myId, claimedBy: null };
+    logAudit(partyName(myId) + ' hat Vorrecht am ' + dateStr + ' abgegeben');
+    await saveShared();
+    renderCalendarTab(); renderInstruments();
+  });
+
+  const undoBtn = document.getElementById('calUndoBtn');
+  if(undoBtn) undoBtn.addEventListener('click', async () => {
+    if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
+    logAudit(partyName(myId) + ' hat die Abgabe des Vorrechts am ' + dateStr + ' rückgängig gemacht');
+    await saveShared();
+    renderCalendarTab(); renderInstruments();
+  });
+
+  const claimBtn = document.getElementById('calClaimBtn');
+  if(claimBtn) claimBtn.addEventListener('click', async () => {
+    const fb = document.getElementById('calFeedback');
+    const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+    if(!ov || ov.claimedBy){ fb.style.color = '#C0392B'; fb.textContent = 'Dieser Tag wurde inzwischen bereits übernommen.'; fb.classList.add('show'); renderCalendarTab(); return; }
+    state.priorityOverrides[dateStr].claimedBy = myId;
+    logAudit(partyName(myId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen');
+    await saveShared();
+    renderCalendarTab(); renderInstruments();
+  });
 }
 
 function renderInstruments(){
-  const year = new Date().getFullYear();
-  const hoursMap = computeHoursMap();
-  const hoursThisYear = state.entries.filter(e => yearOf(e.date) === year).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
   const prio = currentPriorityLabel();
-  document.getElementById('instruments').innerHTML =
-    '<div class="instrument"><div class="num">' + state.entries.length + '</div><div class="lbl">Einträge</div></div>' +
-    '<div class="instrument"><div class="num">' + fmtNum(hoursThisYear,1) + '</div><div class="lbl">Std. ' + year + '</div></div>' +
-    '<div class="instrument"><div class="num">' + state.parties.length + '</div><div class="lbl">Parteien</div></div>' +
-    (prio ? '<div class="instrument"><div class="num" style="font-size:1.05rem; line-height:1.2;">' + escapeHtml(prio.party) + '</div><div class="lbl">' + escapeHtml(prio.label) + ' — Vorrecht</div></div>' : '');
+  document.getElementById('instruments').innerHTML = prio ?
+    '<div class="instrument" style="border-color:' + prio.color + '66; flex:none; padding:0.7rem 1.1rem;">' +
+      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+        '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:' + prio.color + ';"></span>' +
+        '<span class="num" style="font-size:1.05rem; line-height:1.2;">' + escapeHtml(prio.party) + '</span>' +
+      '</div>' +
+      '<div class="lbl">' + escapeHtml(prio.label) + ' — Vorrecht heute</div>' +
+    '</div>' : '';
 }
 
 function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currency:'CHF', minimumFractionDigits:2, maximumFractionDigits:2 }); }
@@ -2035,34 +2285,63 @@ function showRecoveryCodeModal(recoveryCode, onDismiss){
   });
 }
 
-function showRecoveryCodeOnce(recoveryCode){
+function showRecoveryCodeOnce(recoveryCode, totpSecret){
   const card = document.getElementById('gateCard');
+  const base32 = totpSecret ? base32Encode(hexToBytes(totpSecret)) : '';
   card.innerHTML =
-    '<h2>Wiederherstellungscode notieren</h2>' +
-    '<p>Falls du deinen Administrator-Code je vergisst, kommst du damit wieder rein. Er wird <b>nur dieses eine Mal</b> angezeigt und nirgends im Klartext gespeichert — schreib ihn dir jetzt an einem sicheren Ort auf (nicht im gleichen Ordner wie dein Handy-Passwort, z. B. separat notiert oder in einem Passwort-Manager).</p>' +
+    '<h2>Wiederherstellung einrichten</h2>' +
+    '<p>Falls du deinen Administrator-Code je vergisst, kommst du auf zwei Arten wieder rein. Beides wird <b>nur dieses eine Mal</b> angezeigt.</p>' +
+    '<div class="field"><label>1. Wiederherstellungscode (notieren)</label></div>' +
     '<div class="code-display" style="display:block; text-align:center; font-size:1.3rem; margin-bottom:1.1rem;">' + escapeHtml(recoveryCode) + '</div>' +
-    '<label class="checkbox-item" style="margin-bottom:0.9rem;"><input type="checkbox" id="recoveryConfirmCheck"> Ich habe den Code notiert und sicher aufbewahrt</label>' +
+    (totpSecret ? (
+      '<div class="field"><label>2. Authenticator-App einrichten (optional, empfohlen)</label></div>' +
+      '<div class="hint" style="margin-bottom:0.6rem;">In Google Authenticator, Authy o. ä. → "Konto manuell hinzufügen" → als Schlüssel eingeben:</div>' +
+      '<div class="code-display" style="display:block; text-align:center; font-size:1.05rem; letter-spacing:0.1em; margin-bottom:1.1rem; word-break:break-all;">' + base32 + '</div>'
+    ) : '') +
+    '<label class="checkbox-item" style="margin-bottom:0.9rem;"><input type="checkbox" id="recoveryConfirmCheck"> Ich habe den Wiederherstellungscode notiert (und die Authenticator-App eingerichtet, falls gewünscht)</label>' +
     '<button class="btn" id="recoveryConfirmBtn" disabled>Weiter zu WakeLog</button>';
   const checkbox = document.getElementById('recoveryConfirmCheck');
   const btn = document.getElementById('recoveryConfirmBtn');
   checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
   btn.addEventListener('click', () => {
-    hideGate(); renderAll(); resetInactivityTimer();
+    hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission();
   });
 }
 
 function renderRecoveryFlow(){
   const card = document.getElementById('gateCard');
+  const hasTotp = !!(state.settings && state.settings.totpSecret);
   card.innerHTML =
     '<h2>Administrator-Code zurücksetzen</h2>' +
-    '<p>Gib deinen Wiederherstellungscode ein (den du bei der Ersteinrichtung notiert hast) sowie deinen neuen gewünschten Administrator-Code.</p>' +
-    '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"></div>' +
+    '<p>Bestätige dich mit einer der beiden Methoden und lege einen neuen Administrator-Code fest.</p>' +
+    (hasTotp ? '<div class="type-toggle" id="recoveryMethodToggle" style="margin-bottom:0.9rem;">' +
+      '<button type="button" data-method="recovery" class="active">Wiederherstellungscode</button>' +
+      '<button type="button" data-method="totp">Authenticator-App</button>' +
+    '</div>' : '') +
+    '<div id="recoveryMethodBody">' +
+      '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"></div>' +
+    '</div>' +
     '<div class="field"><label for="newAdminInput">Neuer Administrator-Code</label><input id="newAdminInput" type="text" placeholder="z. B. AB3F7K2P"></div>' +
     '<button class="btn" id="recoverySubmitBtn">Code zurücksetzen</button>' +
-    '<div class="gate-error" id="recoveryError">Wiederherstellungscode ungültig oder kein Backup-Code vorhanden — bitte an alle Parteien wenden, ob jemand noch Zugriff hat.</div>' +
+    '<div class="gate-error" id="recoveryError">Code ungültig — bitte an alle Parteien wenden, ob jemand noch Zugriff hat.</div>' +
     '<div style="text-align:center; margin-top:1rem;"><a href="#" id="backToLoginLink" style="font-size:0.78rem; color:var(--ink-faint);">Zurück zum Login</a></div>';
 
   document.getElementById('backToLoginLink').addEventListener('click', (ev) => { ev.preventDefault(); renderGate(); });
+
+  let method = 'recovery';
+  if(hasTotp){
+    document.querySelectorAll('#recoveryMethodToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        method = btn.dataset.method;
+        document.querySelectorAll('#recoveryMethodToggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const body = document.getElementById('recoveryMethodBody');
+        body.innerHTML = method === 'totp' ?
+          '<div class="field"><label for="recoveryInput">6-stelliger Code aus der Authenticator-App</label><input id="recoveryInput" type="text" inputmode="numeric" placeholder="123456" maxlength="6"></div>' :
+          '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"></div>';
+      });
+    });
+  }
 
   document.getElementById('recoverySubmitBtn').addEventListener('click', async () => {
     const errEl = document.getElementById('recoveryError');
@@ -2070,21 +2349,31 @@ function renderRecoveryFlow(){
     const enteredCode = document.getElementById('recoveryInput').value.trim().toUpperCase();
     const newAdmin = document.getElementById('newAdminInput').value.trim();
     if(!enteredCode || !newAdmin){ errEl.textContent = 'Bitte beide Felder ausfüllen.'; errEl.classList.add('show'); return; }
-    if(!state.settings || !state.settings.recoveryHash){ errEl.textContent = 'Für dieses Bootslogbuch existiert kein Wiederherstellungscode.'; errEl.classList.add('show'); return; }
-    const enteredHash = await sha256(enteredCode);
-    if(enteredHash !== state.settings.recoveryHash){ errEl.classList.add('show'); return; }
+
+    let verified = false;
+    if(method === 'totp'){
+      if(!state.settings || !state.settings.totpSecret){ errEl.textContent = 'Für dieses Bootslogbuch ist keine Authenticator-App eingerichtet.'; errEl.classList.add('show'); return; }
+      verified = await verifyTotp(state.settings.totpSecret, enteredCode);
+    } else {
+      if(!state.settings || !state.settings.recoveryHash){ errEl.textContent = 'Für dieses Bootslogbuch existiert kein Wiederherstellungscode.'; errEl.classList.add('show'); return; }
+      const enteredHash = await sha256(enteredCode);
+      verified = (enteredHash === state.settings.recoveryHash);
+    }
+    if(!verified){ errEl.classList.add('show'); return; }
 
     const newRecoveryCode = randomRecoveryCode();
     const newRecoveryHash = await sha256(newRecoveryCode);
+    const newTotpSecret = generateTotpSecretHex();
     state.settings.adminCode = newAdmin;
     state.settings.recoveryHash = newRecoveryHash;
+    state.settings.totpSecret = newTotpSecret;
     if(!state.auditLog) state.auditLog = [];
-    state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Administrator-Code über Wiederherstellungscode zurückgesetzt' });
+    state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Administrator-Code über ' + (method === 'totp' ? 'Authenticator-App' : 'Wiederherstellungscode') + ' zurückgesetzt' });
     await saveShared();
     session = { adminCode: newAdmin, partyCode: null, partyId: null };
     await saveSession();
     evaluateAccess();
-    showRecoveryCodeOnce(newRecoveryCode);
+    showRecoveryCodeOnce(newRecoveryCode, newTotpSecret);
   });
 }
 
@@ -2102,14 +2391,15 @@ function renderGate(){
       if(!admin){ document.getElementById('gateError').classList.add('show'); return; }
       const recoveryCode = randomRecoveryCode();
       const recoveryHash = await sha256(recoveryCode);
-      state.settings = { adminCode: admin, unlockAll: false, recoveryHash };
+      const totpSecret = generateTotpSecretHex();
+      state.settings = { adminCode: admin, unlockAll: false, recoveryHash, totpSecret };
       state.parties.forEach(p => { if(!p.code) p.code = randomCode(6); });
       state.auditLog = [{ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'WakeLog eingerichtet' }];
       await saveShared();
       session = { adminCode: admin };
       await saveSession();
       evaluateAccess();
-      showRecoveryCodeOnce(recoveryCode);
+      showRecoveryCodeOnce(recoveryCode, totpSecret);
     });
   } else {
     card.innerHTML =
@@ -2156,7 +2446,7 @@ function renderGate(){
           errEl.textContent = 'Zugangscode ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.'; errEl.classList.add('show'); return;
         }
       }
-      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer();
+      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission();
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
     document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
@@ -2169,17 +2459,18 @@ let adminSubTab = 'parties';
 
 function renderAdminPanel(){
   const card = document.getElementById('adminCard');
+  const isReadOnlySubtab = !isAdminUser && adminSubTab !== 'costs';
 
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
-    (!isAdminUser ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
+    (isReadOnlySubtab ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
-    '<div id="adminSubContent" class="' + (!isAdminUser ? 'admin-readonly' : '') + '"></div>';
+    '<div id="adminSubContent" class="' + (isReadOnlySubtab ? 'admin-readonly' : '') + '"></div>';
 
   card.querySelectorAll('.admin-subtab-btn').forEach(btn => {
     btn.addEventListener('click', () => { adminSubTab = btn.dataset.subtab; renderAdminPanel(); });
@@ -2736,6 +3027,7 @@ function renderAll(){
   renderSettlement();
   renderAdjustmentTab();
   renderAdminPanel();
+  renderCalendarTab();
   updateHeaderMeta();
   renderInstruments();
   updateTabVisibility();
@@ -2768,6 +3060,18 @@ async function init(){
   });
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
+  document.getElementById('calPrevBtn').addEventListener('click', () => {
+    calendarViewMonth--;
+    if(calendarViewMonth < 0){ calendarViewMonth = 11; calendarViewYear--; }
+    calendarSelectedDate = null;
+    renderCalendarTab();
+  });
+  document.getElementById('calNextBtn').addEventListener('click', () => {
+    calendarViewMonth++;
+    if(calendarViewMonth > 11){ calendarViewMonth = 0; calendarViewYear++; }
+    calendarSelectedDate = null;
+    renderCalendarTab();
+  });
   document.getElementById('exportPdfBtn').addEventListener('click', () => {
     const year = parseInt(document.getElementById('settlementYear').value);
     exportYearOverviewPdf(year);
@@ -2835,7 +3139,7 @@ async function init(){
   document.getElementById('f-expense').addEventListener('input', updatePaidSplitTotal);
 
   if(!state.settings || !accessGranted){ showGate(); }
-  else { hideGate(); renderAll(); }
+  else { hideGate(); renderAll(); requestNotificationPermission(); }
   startPolling();
   setupInactivityTracking();
 }
