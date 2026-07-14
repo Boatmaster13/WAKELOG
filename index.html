@@ -652,6 +652,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBciyBsE9G38gqPGKHbx5Jru8bD8JiB07I",
@@ -664,7 +665,18 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const auth = getAuth(fbApp);
 const dataRef = ref(db, 'bootslogbuch/data');
+
+function waitForAuth(){
+  return new Promise((resolve, reject) => {
+    signInAnonymously(auth).catch(reject);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if(user){ unsub(); resolve(user); }
+    });
+  });
+}
+
 let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
@@ -2371,6 +2383,7 @@ function startPolling(){
 
 async function init(){
   setupTabs();
+  try{ await waitForAuth(); } catch(e){ console.error('Anmeldung fehlgeschlagen', e); }
   await loadShared();
   await loadSession();
   evaluateAccess();
