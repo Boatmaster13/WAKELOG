@@ -388,12 +388,13 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   aspect-ratio:0.85/1; border-radius:6px; display:flex;
   align-items:center; justify-content:center; cursor:pointer; font-family:'Inter', sans-serif;
   font-size:0.8rem; color:var(--ink); background:var(--foam); border:1.5px solid transparent; position:relative;
-  transition:transform 0.1s ease;
+  transition:transform 0.1s ease; user-select:none; -webkit-user-select:none; touch-action:none;
 }
 .cal-day:hover{ transform:scale(1.08); z-index:1; }
 .cal-day.empty{ background:transparent; cursor:default; visibility:hidden; }
 .cal-day.today{ border-color:var(--hull); border-width:2px; font-weight:700; }
 .cal-day.open{ background:repeating-linear-gradient(45deg, #e3e1db, #e3e1db 4px, #d3d1cb 4px, #d3d1cb 8px); color:var(--ink-faint); }
+.cal-day.drag-selected{ outline:2px solid var(--hull); outline-offset:-2px; }
 .cal-legend{ display:flex; flex-wrap:wrap; gap:0.6rem; }
 .cal-legend-item{ display:flex; align-items:center; gap:0.4rem; font-size:0.76rem; color:var(--ink-soft); }
 .cal-legend-swatch{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
@@ -1018,6 +1019,48 @@ function currentPriorityLabel(){
 let calendarViewYear = new Date().getFullYear();
 let calendarViewMonth = new Date().getMonth();
 let calendarSelectedDate = null;
+let calendarIsDragging = false;
+let calendarDragStart = null;
+let calendarDragCurrent = null;
+
+function updateDragHighlight(){
+  if(!calendarDragStart || !calendarDragCurrent) return;
+  const lo = calendarDragStart <= calendarDragCurrent ? calendarDragStart : calendarDragCurrent;
+  const hi = calendarDragStart <= calendarDragCurrent ? calendarDragCurrent : calendarDragStart;
+  document.querySelectorAll('.cal-day[data-date]').forEach(cell => {
+    const d = cell.dataset.date;
+    cell.classList.toggle('drag-selected', d >= lo && d <= hi);
+  });
+}
+
+function finalizeCalendarDrag(){
+  if(!calendarIsDragging) return;
+  calendarIsDragging = false;
+  if(!calendarDragStart || !calendarDragCurrent) return;
+  const lo = calendarDragStart <= calendarDragCurrent ? calendarDragStart : calendarDragCurrent;
+  const hi = calendarDragStart <= calendarDragCurrent ? calendarDragCurrent : calendarDragStart;
+  if(lo === hi){
+    calendarSelectedDate = lo;
+    calendarPendingAction = null;
+    renderCalendarDayPanel();
+  } else {
+    const startField = document.getElementById('calRangeStart');
+    const endField = document.getElementById('calRangeEnd');
+    if(startField && endField){
+      startField.value = lo;
+      endField.value = hi;
+      startField.dispatchEvent(new Event('change'));
+      const fb = document.getElementById('calRangeFeedback');
+      if(fb){
+        fb.style.color = '#1C9A64';
+        fb.textContent = 'Zeitraum ' + lo + ' bis ' + hi + ' übernommen — unten "Zeitraum abgeben" klicken.';
+        fb.classList.add('show');
+      }
+    }
+  }
+  calendarDragStart = null;
+  calendarDragCurrent = null;
+}
 
 function renderCalendarLegend(){
   const el = document.getElementById('calendarLegend');
@@ -1061,11 +1104,25 @@ function renderCalendarTab(){
   grid.innerHTML = html;
 
   grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell => {
-    cell.addEventListener('click', () => {
-      calendarSelectedDate = cell.dataset.date;
-      calendarPendingAction = null;
-      renderCalendarDayPanel();
+    cell.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      calendarIsDragging = true;
+      calendarDragStart = cell.dataset.date;
+      calendarDragCurrent = cell.dataset.date;
+      updateDragHighlight();
     });
+    cell.addEventListener('mouseenter', () => {
+      if(calendarIsDragging){
+        calendarDragCurrent = cell.dataset.date;
+        updateDragHighlight();
+      }
+    });
+    cell.addEventListener('touchstart', () => {
+      calendarIsDragging = true;
+      calendarDragStart = cell.dataset.date;
+      calendarDragCurrent = cell.dataset.date;
+      updateDragHighlight();
+    }, { passive: true });
   });
 
   if(calendarSelectedDate) renderCalendarDayPanel();
@@ -3139,6 +3196,20 @@ async function init(){
   });
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
+  document.addEventListener('mouseup', finalizeCalendarDrag);
+  document.addEventListener('touchend', finalizeCalendarDrag);
+  document.addEventListener('touchmove', (ev) => {
+    if(!calendarIsDragging) return;
+    const touch = ev.touches[0];
+    if(!touch) return;
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = el ? el.closest('.cal-day[data-date]') : null;
+    if(cell){
+      calendarDragCurrent = cell.dataset.date;
+      updateDragHighlight();
+    }
+  }, { passive: true });
+
   document.getElementById('calPrevBtn').addEventListener('click', () => {
     calendarViewMonth--;
     if(calendarViewMonth < 0){ calendarViewMonth = 11; calendarViewYear--; }
