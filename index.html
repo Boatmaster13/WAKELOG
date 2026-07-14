@@ -235,6 +235,20 @@ input:focus, select:focus{
   transition:all 0.15s ease;
 }
 .type-toggle button.active{ background:var(--hull); border-color:var(--hull); color:#fff; }
+.admin-subnav{ display:flex; gap:0.4rem; margin-bottom:1.4rem; flex-wrap:wrap; }
+.admin-subtab-btn{
+  font-family:'Inter', sans-serif;
+  font-size:0.82rem;
+  font-weight:600;
+  padding:0.6rem 1rem;
+  border-radius:999px;
+  border:1.5px solid var(--line-strong);
+  background:#fff;
+  color:var(--ink-soft);
+  cursor:pointer;
+  transition:all 0.15s ease;
+}
+.admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
 .hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
 
 .btn{
@@ -457,8 +471,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   <div class="navwrap">
     <div class="nav" id="tabNav">
       <div class="nav-indicator" id="navIndicator"></div>
-      <button class="tab active" data-tab="parties">Parteien</button>
-      <button class="tab" data-tab="log">Logbuch</button>
+      <button class="tab active" data-tab="log">Logbuch</button>
       <button class="tab" data-tab="settlement">Abrechnung</button>
       <button class="tab" data-tab="admin" style="display:none;">Verwaltung</button>
     </div>
@@ -466,24 +479,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
   <div class="content">
 
-    <div class="panel active" id="panel-parties">
-      <div class="card">
-        <h2>Parteien verwalten</h2>
-        <div id="partyList"></div>
-        <div class="add-party-form">
-          <input type="text" id="newPartyName" placeholder="Name der neuen Partei">
-          <button class="btn secondary" id="addPartyBtn">Hinzufügen</button>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Vorrangregel</h2>
-        <div class="hint" style="margin-bottom:0.9rem;">Legt fest, welche Partei bei Terminüberschneidungen das Vorrecht hat. Wird jedes Kalenderjahr neu festgelegt.</div>
-        <div class="field"><label for="priorityYear">Jahr</label><select id="priorityYear"></select></div>
-        <div id="priorityRuleBody"></div>
-      </div>
-    </div>
-
-    <div class="panel" id="panel-log">
+    <div class="panel active" id="panel-log">
       <div class="notice">Diese Daten sind geteilt gespeichert — alle Parteien mit gültigem Zugangscode sehen dasselbe Logbuch. Änderungen erscheinen in Echtzeit bei allen.</div>
 
       <div class="card">
@@ -1312,6 +1308,8 @@ function renderSettlement(){
     '<div class="stat"><div class="num">' + fmtCHF(totalAnnual) + '</div><div class="lbl">Fixkosten gesamt</div></div>' +
   '</div>';
 
+  html += '<h3>Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
+
   const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
   html += '<h3>Saldo je Partei</h3>';
   rows.forEach(r => {
@@ -1346,17 +1344,9 @@ function renderSettlement(){
 
 function renderParties(){
   const wrap = document.getElementById('partyList');
-  const addForm = document.querySelector('.add-party-form');
-  if(addForm) addForm.style.display = isAdminUser ? 'flex' : 'none';
+  if(!wrap) return;
 
   if(!state.parties.length){ wrap.innerHTML = '<div class="empty">Noch keine Parteien angelegt.</div>'; return; }
-
-  if(!isAdminUser){
-    wrap.innerHTML = state.parties.map(p =>
-      '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><span>' + escapeHtml(p.name) + '</span></div>'
-    ).join('');
-    return;
-  }
 
   wrap.innerHTML = state.parties.map(p =>
     '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><input type="text" data-id="' + p.id + '" value="' + escapeHtml(p.name) + '"><button type="button" class="del-btn" data-delete-party="' + p.id + '">löschen</button></div>'
@@ -1559,6 +1549,8 @@ function renderGate(){
 function showGate(){ document.getElementById('appWrap').style.display = 'none'; document.getElementById('gateOverlay').style.display = 'flex'; renderGate(); }
 function hideGate(){ document.getElementById('gateOverlay').style.display = 'none'; document.getElementById('appWrap').style.display = 'block'; }
 
+let adminSubTab = 'parties';
+
 function renderAdminPanel(){
   const card = document.getElementById('adminCard');
   if(!isAdminUser){
@@ -1577,13 +1569,83 @@ function renderAdminPanel(){
     });
     return;
   }
+
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
+    '<div class="admin-subnav">' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allgemeine Einstellungen</button>' +
+    '</div>' +
+    '<div id="adminSubContent"></div>';
+
+  card.querySelectorAll('.admin-subtab-btn').forEach(btn => {
+    btn.addEventListener('click', () => { adminSubTab = btn.dataset.subtab; renderAdminPanel(); });
+  });
+
+  if(adminSubTab === 'parties') renderAdminPartiesSection();
+  else if(adminSubTab === 'costs') renderAdminCostsSection();
+  else renderAdminGeneralSection();
+}
+
+function renderAdminPartiesSection(){
+  const content = document.getElementById('adminSubContent');
+  content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Parteien verwalten</label>' +
+      '<div id="partyList"></div>' +
+      '<div class="add-party-form">' +
+        '<input type="text" id="newPartyName" placeholder="Name der neuen Partei">' +
+        '<button class="btn secondary" id="addPartyBtn">Hinzufügen</button>' +
+      '</div>' +
+    '</div>' +
     '<div class="admin-box">' +
       '<label>Zugangscodes der Parteien</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Jede Partei hat ihren eigenen persönlichen Code. Erzeuge für eine Partei einen neuen Code, um genau diese Person auszuschliessen — der alte Code funktioniert praktisch sofort nicht mehr, alle anderen Parteien bleiben unberührt.</div>' +
       '<div id="partyCodeList"></div>' +
     '</div>' +
+    '<div class="admin-box">' +
+      '<label>Vorrangregel</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Legt fest, welche Partei bei Terminüberschneidungen das Vorrecht hat. Wird jedes Kalenderjahr neu festgelegt.</div>' +
+      '<div class="field"><label for="priorityYear">Jahr</label><select id="priorityYear"></select></div>' +
+      '<div id="priorityRuleBody"></div>' +
+    '</div>';
+
+  document.getElementById('addPartyBtn').addEventListener('click', addParty);
+  document.getElementById('priorityYear').addEventListener('change', renderPriorityRuleBody);
+
+  renderParties();
+  renderPartyCodeList();
+  renderPriorityRule();
+}
+
+function renderAdminCostsSection(){
+  const content = document.getElementById('adminSubContent');
+  content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Jährliche Fixkosten</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Verkehrssteuer, Winterlager, Versicherung, Service, Rückstellungen usw. — laufend übers Jahr erfassen, sobald eine Rechnung eintrifft. Wird bei der Jahresabrechnung automatisch nach Nutzungsanteil (gefahrene Stunden) auf die Parteien verteilt, nicht mehr fix 50:50.</div>' +
+      '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
+      '<div id="annualCostList"></div>' +
+      '<div class="row" style="margin-top:0.9rem;">' +
+        '<div class="field"><label for="acType">Kostenart</label><select id="acType">' +
+          '<option>Verkehrssteuer</option><option>Winterlager</option><option>Versicherung</option><option>Service</option><option>Rückstellung / Abschreibung</option><option>Sonstiges</option>' +
+        '</select></div>' +
+        '<div class="field"><label for="acDesc">Beschreibung</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"></div>' +
+        '<div class="field"><label for="acAmount">Betrag (CHF)</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>' +
+        '<div class="field"><label for="acDate">Datum</label><input id="acDate" type="date"></div>' +
+      '</div>' +
+      '<div class="field"><label>Wer hat bezahlt / vorgeschossen?</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div></div>' +
+      '<button class="btn secondary" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
+      '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
+    '</div>';
+
+  setupAnnualCostUI();
+}
+
+function renderAdminGeneralSection(){
+  const content = document.getElementById('adminSubContent');
+  content.innerHTML =
     '<div class="admin-box">' +
       '<label>Freigabe-Link</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Trage hier einmalig den echten Link ein, den du siehst, wenn du oben in Claude auf "Veröffentlichen" klickst und die Adresse aus der Adresszeile/dem Teilen-Dialog kopierst. Die App kann diesen Link technisch nicht selbst erkennen — er muss von Hand eingetragen werden.</div>' +
@@ -1602,23 +1664,6 @@ function renderAdminPanel(){
       '<div class="gate-error" id="initialReadingFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
-      '<label>Jährliche Fixkosten</label>' +
-      '<div class="hint" style="margin-bottom:0.9rem;">Verkehrssteuer, Winterlager, Versicherung, Service, Rückstellungen usw. — laufend übers Jahr erfassen, sobald eine Rechnung eintrifft. Wird bei der Jahresabrechnung automatisch nach Nutzungsanteil (gefahrene Stunden) auf die Parteien verteilt, nicht mehr fix 50:50.</div>' +
-      '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
-      '<div id="annualCostList"></div>' +
-      '<div class="row" style="margin-top:0.9rem;">' +
-        '<div class="field"><label for="acType">Kostenart</label><select id="acType">' +
-          '<option>Verkehrssteuer</option><option>Winterlager</option><option>Versicherung</option><option>Service</option><option>Rückstellung / Abschreibung</option><option>Sonstiges</option>' +
-        '</select></div>' +
-        '<div class="field"><label for="acDesc">Beschreibung</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"></div>' +
-        '<div class="field"><label for="acAmount">Betrag (CHF)</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>' +
-        '<div class="field"><label for="acDate">Datum</label><input id="acDate" type="date"></div>' +
-      '</div>' +
-      '<div class="field"><label>Wer hat bezahlt / vorgeschossen?</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div></div>' +
-      '<button class="btn secondary" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
-      '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
-    '</div>' +
-    '<div class="admin-box">' +
       '<div class="toggle-row">' +
         '<label class="switch"><input type="checkbox" id="unlockToggle"' + (state.settings.unlockAll ? ' checked' : '') + '><span class="slider"></span></label>' +
         '<label for="unlockToggle">Bearbeitung von Einträgen älter als 24 Std. für alle freigeben</label>' +
@@ -1632,9 +1677,6 @@ function renderAdminPanel(){
       '</div>' +
       '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Beweisfoto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
     '</div>';
-
-  renderPartyCodeList();
-  setupAnnualCostUI();
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
     const field = document.getElementById('initialReadingField');
@@ -1822,23 +1864,27 @@ function renderAcPaidSplitArea(){
   }));
 }
 
-function renderAnnualCostList(){
-  const yearSel = document.getElementById('annualCostYear');
-  const wrap = document.getElementById('annualCostList');
-  if(!yearSel || !wrap) return;
-  const year = yearSel.value;
+function annualCostItemsHtml(year, withDelete){
   const items = (state.annualCosts && state.annualCosts[year]) || [];
-  if(!items.length){ wrap.innerHTML = '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; return; }
-  wrap.innerHTML = items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
+  if(!items.length){ return '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; }
+  return items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
     const payerIds = Object.keys(c.paidBy || {});
     const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : partyName(payerIds[0]);
     return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
       '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(c.type) + '</b><span>' + fmtCHF(c.amount) + '</span></div>' +
       '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + (c.date ? ' · ' + c.date : '') + '</div>' +
       '<div class="hint" style="margin:0;">Bezahlt: ' + escapeHtml(payerLabel) + '</div>' +
-      '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' +
+      (withDelete ? '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' : '') +
     '</div>';
   }).join('');
+}
+
+function renderAnnualCostList(){
+  const yearSel = document.getElementById('annualCostYear');
+  const wrap = document.getElementById('annualCostList');
+  if(!yearSel || !wrap) return;
+  const year = yearSel.value;
+  wrap.innerHTML = annualCostItemsHtml(year, true);
   wrap.querySelectorAll('.del-btn[data-ac-id]').forEach(btn => btn.addEventListener('click', async () => {
     const year = btn.dataset.acYear;
     state.annualCosts[year] = (state.annualCosts[year] || []).filter(c => c.id !== btn.dataset.acId);
@@ -1902,9 +1948,9 @@ function updateTabVisibility(){
     if(adminTab.classList.contains('active')){
       adminTab.classList.remove('active');
       document.getElementById('panel-admin').classList.remove('active');
-      const logTab = document.querySelector('.tab[data-tab="parties"]');
+      const logTab = document.querySelector('.tab[data-tab="log"]');
       logTab.classList.add('active');
-      document.getElementById('panel-parties').classList.add('active');
+      document.getElementById('panel-log').classList.add('active');
     }
   }
   requestAnimationFrame(() => {
@@ -1923,8 +1969,6 @@ function renderAll(){
   renderYearFilters();
   renderEntriesTable();
   renderSettlement();
-  renderParties();
-  renderPriorityRule();
   renderAdminPanel();
   updateHeaderMeta();
   renderInstruments();
@@ -1955,10 +1999,8 @@ async function init(){
     document.getElementById('f-liters').value = '';
     document.getElementById('f-expense').value = '';
   });
-  document.getElementById('addPartyBtn').addEventListener('click', addParty);
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
-  document.getElementById('priorityYear').addEventListener('change', renderPriorityRuleBody);
   document.getElementById('f-photo').addEventListener('change', async (ev) => {
     const file = ev.target.files[0];
     if(!file) return;
