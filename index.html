@@ -1631,18 +1631,18 @@ function renderSettlement(){
       '<div class="balance-head"><span class="name">' + escapeHtml(r.name) + '</span>' +
         '<span class="amt ' + (isPos?'pos':(isNeg?'neg':'')) + '">' + (r.balance >= 0 ? '+' : '') + fmtCHF(r.balance) + '</span></div>' +
       '<div class="balance-meta">' +
-        '<div class="meta-chip"><span class="lbl">Nutzung</span><span class="val" style="display:flex; flex-wrap:wrap; gap:0.3rem; align-items:baseline; justify-content:center;"><span>' + fmtNum(r.hours,1) + ' Std.</span><span style="white-space:nowrap;">(' + fmtNum(r.usageSharePct,1) + ' %)</span></span></div>' +
-        '<div class="meta-chip"><span class="lbl">Benzin (geschätzt)</span><span class="val">' + fmtNum(r.liters,1) + ' l</span></div>' +
-        '<div class="meta-chip"><span class="lbl">Bezahlt</span><span class="val">' + fmtCHF(r.paid) + '</span></div>' +
-        '<div class="meta-chip"><span class="lbl">Fairer Anteil</span><span class="val">' + fmtCHF(r.fairShare) + '</span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">Nutzung</span><span class="val" style="display:flex; flex-wrap:wrap; gap:0.3rem; align-items:baseline; justify-content:center;"><span>' + fmtNum(r.hours,1) + ' Std.</span><span style="white-space:nowrap;">(' + fmtNum(r.usageSharePct,1) + ' %)</span></span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">Benzin (geschätzt)</span><span class="val">' + fmtNum(r.liters,1) + ' l</span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">Bezahlt</span><span class="val">' + fmtCHF(r.paid) + '</span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">Fairer Anteil</span><span class="val">' + fmtCHF(r.fairShare) + '</span></div>' +
       '</div>' +
       '<div class="balance-meta">' +
-        '<div class="meta-chip"><span class="lbl">davon Benzin</span><span class="val">' + fmtCHF(r.fuelFairShare) + '</span></div>' +
-        '<div class="meta-chip"><span class="lbl">davon Fixkosten</span><span class="val">' + fmtCHF(r.annualFairShare) + '</span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">davon Benzin</span><span class="val">' + fmtCHF(r.fuelFairShare) + '</span></div>' +
+        '<div class="meta-chip" style="text-align:center;"><span class="lbl">davon Fixkosten</span><span class="val">' + fmtCHF(r.annualFairShare) + '</span></div>' +
       '</div>' +
       (r.settledOut > 0 || r.settledIn > 0 ? '<div class="balance-meta">' +
-        (r.settledOut > 0 ? '<div class="meta-chip"><span class="lbl">Bereits bezahlt</span><span class="val">−' + fmtCHF(r.settledOut) + '</span></div>' : '') +
-        (r.settledIn > 0 ? '<div class="meta-chip"><span class="lbl">Bereits erhalten</span><span class="val">+' + fmtCHF(r.settledIn) + '</span></div>' : '') +
+        (r.settledOut > 0 ? '<div class="meta-chip" style="text-align:center;"><span class="lbl">Bereits bezahlt</span><span class="val">−' + fmtCHF(r.settledOut) + '</span></div>' : '') +
+        (r.settledIn > 0 ? '<div class="meta-chip" style="text-align:center;"><span class="lbl">Bereits erhalten</span><span class="val">+' + fmtCHF(r.settledIn) + '</span></div>' : '') +
       '</div>' : '') +
       '<div class="gauge"><div class="center-line"></div><div class="fill ' + (isPos?'pos':'neg') + '" style="width:' + (pct/2) + '%"></div></div>' +
       '<div class="gauge-scale"><span>Schuld</span><span>0</span><span>Guthaben</span></div>' +
@@ -1833,6 +1833,19 @@ function renderPriorityRule(){
   renderPriorityRuleBody();
 }
 
+function isoWeekNumber(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+function rotationPartyId(order, year, dateStr){
+  if(!order || !order.length) return null;
+  const weekNum = isoWeekNumber(dateStr);
+  const idx = (weekNum + parseInt(year)) % order.length;
+  return order[idx];
+}
+
 function renderPriorityRuleBody(){
   const yearSel = document.getElementById('priorityYear');
   const body = document.getElementById('priorityRuleBody');
@@ -1851,6 +1864,11 @@ function renderPriorityRuleBody(){
     let display;
     if(rule && rule.mode === 'evenodd'){
       display = 'An geraden Kalendertagen: ' + escapeHtml(partyName(rule.evenPartyId)) + '. An ungeraden Kalendertagen: ' + escapeHtml(partyName(rule.oddPartyId)) + '.';
+    } else if(rule && rule.mode === 'rotation' && rule.order && rule.order.length){
+      const today = new Date().toISOString().slice(0,10);
+      const currentId = rotationPartyId(rule.order, year, today);
+      const weekNum = isoWeekNumber(today);
+      display = 'Automatische Wochenrotation: ' + rule.order.map(id => escapeHtml(partyName(id))).join(' → ') + '. Aktuell (KW ' + weekNum + '): <b>' + escapeHtml(partyName(currentId)) + '</b> hat Vorrecht.';
     } else if(rule && rule.mode === 'custom' && rule.text){
       display = escapeHtml(rule.text);
     } else {
@@ -1889,14 +1907,57 @@ function renderPriorityRuleBody(){
       fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     });
   } else {
+    const mode = (rule && rule.mode) ? rule.mode : 'rotation';
+    const order = (rule && rule.mode === 'rotation' && rule.order && rule.order.length === state.parties.length) ? rule.order : state.parties.map(p => p.id);
     const text = (rule && rule.mode === 'custom') ? rule.text : '';
+
     body.innerHTML =
-      '<div class="hint" style="margin-bottom:0.7rem;">Bei mehr als zwei Parteien lässt sich das Vorrecht nicht mehr eindeutig über gerade/ungerade Tage regeln. Beschreibe die Vorrangregel für ' + year + ' hier als Text.</div>' +
-      '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid transparent; background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A (KW gerade), Partei B (KW ungerade), Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
-      '<button class="btn secondary" style="margin-top:0.7rem;" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '<div class="type-toggle" id="prioModeToggle" style="margin-bottom:0.9rem;">' +
+        '<button type="button" data-mode="rotation" class="' + (mode === 'rotation' ? 'active' : '') + '">Automatische Wochenrotation</button>' +
+        '<button type="button" data-mode="custom" class="' + (mode === 'custom' ? 'active' : '') + '">Freitext</button>' +
+      '</div>' +
+      '<div id="prioRotationBody" style="display:' + (mode === 'rotation' ? 'block' : 'none') + ';">' +
+        '<div class="hint" style="margin-bottom:0.7rem;">Jede Partei bekommt reihum eine ganze Kalenderwoche Vorrecht. Reihenfolge einmal festlegen — der Startpunkt verschiebt sich automatisch jedes Jahr um eine Position, damit es sich über die Jahre fair ausgleicht.</div>' +
+        '<div class="row">' +
+          order.map((id, i) => '<div class="field"><label>Position ' + (i+1) + '</label><select class="prioOrderSelect" data-pos="' + i + '">' +
+            state.parties.map(p => '<option value="' + p.id + '"' + (p.id === id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') +
+          '</select></div>').join('') +
+        '</div>' +
+        '<div class="gate-error" id="prioOrderError">Jede Partei darf nur einmal in der Reihenfolge vorkommen.</div>' +
+        '<button class="btn secondary" id="savePrioRotationBtn">Rotation für ' + year + ' speichern</button>' +
+      '</div>' +
+      '<div id="prioCustomBody" style="display:' + (mode === 'custom' ? 'block' : 'none') + ';">' +
+        '<div class="hint" style="margin-bottom:0.7rem;">Beschreibe die Vorrangregel für ' + year + ' hier frei als Text.</div>' +
+        '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A, Partei B, Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
+        '<button class="btn secondary" style="margin-top:0.7rem;" id="savePrioTextBtn">Text für ' + year + ' speichern</button>' +
+      '</div>' +
       '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
 
-    document.getElementById('savePrioBtn').addEventListener('click', async () => {
+    document.querySelectorAll('#prioModeToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#prioModeToggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('prioRotationBody').style.display = btn.dataset.mode === 'rotation' ? 'block' : 'none';
+        document.getElementById('prioCustomBody').style.display = btn.dataset.mode === 'custom' ? 'block' : 'none';
+      });
+    });
+
+    document.getElementById('savePrioRotationBtn').addEventListener('click', async () => {
+      const fb = document.getElementById('prioFeedback');
+      const errEl = document.getElementById('prioOrderError');
+      const selects = Array.from(document.querySelectorAll('.prioOrderSelect'));
+      const newOrder = selects.map(s => s.value);
+      const uniqueCount = new Set(newOrder).size;
+      if(uniqueCount !== state.parties.length){ errEl.classList.add('show'); return; }
+      errEl.classList.remove('show');
+      state.priorityRules[year] = { mode: 'rotation', order: newOrder };
+      logAudit('Vorrangregel für ' + year + ' gespeichert (Wochenrotation: ' + newOrder.map(id => partyName(id)).join(' → ') + ')');
+      await saveShared();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+      renderPriorityRuleBody();
+    });
+
+    document.getElementById('savePrioTextBtn').addEventListener('click', async () => {
       const val = document.getElementById('prioText').value.trim();
       const fb = document.getElementById('prioFeedback');
       state.priorityRules[year] = { mode: 'custom', text: val };
