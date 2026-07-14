@@ -649,6 +649,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <h2>Jahresabrechnung</h2>
         <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
+        <button class="btn secondary" id="exportPdfBtn" style="margin-bottom:1.2rem;">📄 Als PDF exportieren</button>
         <div id="settlementContent"></div>
       </div>
     </div>
@@ -2116,21 +2117,10 @@ function renderAdminGeneralSection(){
     '</div>' +
     '<div class="admin-box">' +
       '<label>Export</label>' +
-      '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup, oder erstelle eine druckbare Jahresübersicht (als PDF speicherbar über den Drucken-Dialog deines Browsers).</div>' +
-      '<div class="field"><label for="exportYearSelect">Jahr für Jahresübersicht</label><select id="exportYearSelect"></select></div>' +
-      '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
-        '<button class="btn secondary" id="exportCodeBtn">💾 Code exportieren</button>' +
-        '<button class="btn secondary" id="exportPdfBtn">📄 Jahresübersicht als PDF</button>' +
-      '</div>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup. Der PDF-Export der Jahresübersicht steht allen Parteien direkt im Abrechnung-Tab zur Verfügung.</div>' +
+      '<button class="btn secondary" id="exportCodeBtn">💾 Code exportieren</button>' +
       '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
-
-  const exportYearSel = document.getElementById('exportYearSelect');
-  if(exportYearSel){
-    const years = priorityYears();
-    exportYearSel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
-    exportYearSel.value = String(new Date().getFullYear());
-  }
 
   document.getElementById('exportCodeBtn').addEventListener('click', async () => {
     const fb = document.getElementById('exportFeedback');
@@ -2150,11 +2140,6 @@ function renderAdminGeneralSection(){
     } catch(e){
       fb.style.color = '#C0392B'; fb.textContent = 'Download fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
     }
-  });
-
-  document.getElementById('exportPdfBtn').addEventListener('click', () => {
-    const year = parseInt(document.getElementById('exportYearSelect').value);
-    exportYearOverviewPdf(year);
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
@@ -2575,6 +2560,10 @@ async function init(){
   });
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
+  document.getElementById('exportPdfBtn').addEventListener('click', () => {
+    const year = parseInt(document.getElementById('settlementYear').value);
+    exportYearOverviewPdf(year);
+  });
   document.getElementById('giftToggle').addEventListener('change', (ev) => {
     document.getElementById('giftBody').style.display = ev.target.checked ? 'block' : 'none';
     if(!ev.target.checked){
