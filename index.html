@@ -458,6 +458,18 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   .wrap{ max-width:1180px; }
   .hero-container{ max-width:1180px; }
 }
+#printArea{ display:none; }
+@media print{
+  body *{ visibility:hidden; }
+  #printArea, #printArea *{ visibility:visible; }
+  #printArea{ display:block; position:absolute; top:0; left:0; width:100%; padding:1.5rem; }
+  #printArea h1{ font-family:'Big Shoulders Display', sans-serif; font-size:1.8rem; margin-bottom:0.2rem; }
+  #printArea h2{ font-family:'Big Shoulders Display', sans-serif; font-size:1.3rem; margin:1.4rem 0 0.6rem; border-bottom:2px solid #000; padding-bottom:0.2rem; }
+  #printArea table{ width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:1rem; }
+  #printArea th, #printArea td{ border:1px solid #999; padding:0.35rem 0.5rem; text-align:left; }
+  #printArea .print-balance{ margin-bottom:0.8rem; padding:0.6rem 0.8rem; border:1px solid #999; }
+  #printArea .print-meta{ color:#555; font-size:0.8rem; margin-bottom:1rem; }
+}
 </style>
 </head>
 <body>
@@ -649,6 +661,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   </div>
 </div>
 
+<div id="printArea"></div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -677,7 +691,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [] };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -698,7 +712,7 @@ function randomCode(len){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [] };
 }
 
 async function loadShared(){
@@ -712,6 +726,7 @@ async function loadShared(){
       state.priorityRules = loaded.priorityRules || {};
       state.annualCosts = loaded.annualCosts || {};
       state.settlementPayments = loaded.settlementPayments || {};
+      state.auditLog = loaded.auditLog || [];
     } else {
       state = defaultData();
     }
@@ -726,7 +741,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [] });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -740,6 +755,7 @@ function subscribeRealtime(){
     state.priorityRules = loaded.priorityRules || {};
       state.annualCosts = loaded.annualCosts || {};
       state.settlementPayments = loaded.settlementPayments || {};
+      state.auditLog = loaded.auditLog || [];
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -820,6 +836,13 @@ function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currenc
 function fmtNum(n, dec){ return n.toLocaleString('de-CH', { minimumFractionDigits:dec, maximumFractionDigits:dec }); }
 function yearOf(dateStr){ if(!dateStr) return null; return parseInt(dateStr.split('-')[0], 10); }
 function partyName(id){ const p = state.parties.find(p => p.id === id); return p ? p.name : '(unbekannt)'; }
+
+function logAudit(action){
+  if(!state.auditLog) state.auditLog = [];
+  const actor = isAdminUser ? 'Administrator' : (session.partyId ? partyName(session.partyId) : 'Unbekannt');
+  state.auditLog.unshift({ id: uid(), ts: Date.now(), actor, action });
+  if(state.auditLog.length > 300) state.auditLog.length = 300;
+}
 function initials(name){ return name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
 
 function getEntryUsageSplit(e){
@@ -1138,10 +1161,12 @@ async function addEntry(){
         return;
       }
       state.entries[idx] = { id: editingId, createdAt: state.entries[idx].createdAt || Date.now(), ...data };
+      logAudit('Eintrag vom ' + data.date + ' bearbeitet');
     }
     stopEdit();
   } else {
     state.entries.push({ id: uid(), createdAt: Date.now(), ...data });
+    logAudit('Neuer Eintrag vom ' + data.date + ' erstellt (' + (data.hasUsage?'Nutzung':'') + (data.hasUsage&&data.hasRefuel?' + ':'') + (data.hasRefuel?'Tanken':'') + ')');
   }
 
   await saveShared();
@@ -1310,6 +1335,7 @@ async function deleteEntry(id){
     }
   }
   state.entries = state.entries.filter(e => e.id !== id);
+  logAudit('Eintrag vom ' + e.date + ' gelöscht');
   await saveShared();
   renderYearFilters(); renderEntriesTable(); renderSettlement();
 }
@@ -1489,6 +1515,72 @@ function settlementTransactions(rows){
   return tx;
 }
 
+function exportYearOverviewPdf(year){
+  const { rows, totalFuelExpense, totalAnnual, totalGifts } = computeSettlement(year);
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+
+  const yearEntries = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => a.date.localeCompare(b.date));
+  const hoursMap = computeHoursMap();
+
+  let html = '<h1>WakeLog — Jahresübersicht ' + year + '</h1>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + ' · ' + state.parties.length + ' Partei(en) · ' + yearEntries.length + ' Einträge</div>';
+
+  html += '<h2>Saldo je Partei</h2>';
+  rows.forEach(r => {
+    html += '<div class="print-balance"><b>' + escapeHtml(r.name) + '</b>: ' + (r.balance >= 0 ? '+' : '') + fmtCHF(r.balance) +
+      ' — ' + fmtNum(r.hours,1) + ' Std. (' + fmtNum(r.usageSharePct,1) + ' %), bezahlt ' + fmtCHF(r.paid) + ', fairer Anteil ' + fmtCHF(r.fairShare) + '</div>';
+  });
+
+  html += '<h2>Kostenübersicht</h2>' +
+    '<table><tr><th>Position</th><th>Betrag</th></tr>' +
+    '<tr><td>Benzin gesamt</td><td>' + fmtCHF(totalFuelExpense) + '</td></tr>' +
+    '<tr><td>Fixkosten gesamt</td><td>' + fmtCHF(totalAnnual) + '</td></tr>' +
+    (totalGifts > 0 ? '<tr><td>Geschenke von Dritten (bereits abgezogen)</td><td>' + fmtCHF(totalGifts) + '</td></tr>' : '') +
+    '</table>';
+
+  const annualItems = (state.annualCosts && state.annualCosts[year]) || [];
+  if(annualItems.length){
+    html += '<h2>Fixkosten im Detail</h2><table><tr><th>Art</th><th>Beschreibung</th><th>Datum</th><th>Betrag</th><th>Bezahlt von</th></tr>';
+    annualItems.forEach(c => {
+      const payerIds = Object.keys(c.paidBy || {});
+      const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : partyName(payerIds[0]);
+      html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date||'') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + escapeHtml(payerLabel) + '</td></tr>';
+    });
+    html += '</table>';
+  }
+
+  html += '<h2>Logbuch-Einträge</h2>';
+  if(!yearEntries.length){
+    html += '<p>Keine Einträge in diesem Jahr.</p>';
+  } else {
+    html += '<table><tr><th>Datum</th><th>Partei</th><th>Typ</th><th>Zählerstand</th><th>Std.</th><th>Getankt (l)</th><th>Ausgaben</th></tr>';
+    yearEntries.forEach(e => {
+      const flags = getEntryFlags(e);
+      const usage = getEntryUsageSplit(e);
+      const type = (flags.hasUsage?'Nutzung':'') + (flags.hasUsage&&flags.hasRefuel?' + ':'') + (flags.hasRefuel?'Tanken':'');
+      html += '<tr><td>' + e.date + '</td><td>' + escapeHtml(splitLabel(usage.ids, usage.split)) + '</td><td>' + type + '</td>' +
+        '<td>' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading,1) : '—') + '</td>' +
+        '<td>' + (flags.hasUsage ? fmtNum(hoursMap[e.id]||0,1) : '—') + '</td>' +
+        '<td>' + (flags.hasRefuel && e.liters ? fmtNum(e.liters,1) : '—') + '</td>' +
+        '<td>' + (flags.hasRefuel ? fmtCHF(e.expense||0) : '—') + '</td></tr>';
+    });
+    html += '</table>';
+  }
+
+  const settlements = (state.settlementPayments && state.settlementPayments[year]) || [];
+  if(settlements.length){
+    html += '<h2>Ausgleichszahlungen</h2><table><tr><th>Datum</th><th>Von</th><th>An</th><th>Betrag</th></tr>';
+    settlements.forEach(s => {
+      html += '<tr><td>' + (s.date||'') + '</td><td>' + escapeHtml(partyName(s.from)) + '</td><td>' + escapeHtml(partyName(s.to)) + '</td><td>' + fmtCHF(s.amount) + '</td></tr>';
+    });
+    html += '</table>';
+  }
+
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
+}
+
 function renderSettlement(){
   const yearSel = document.getElementById('settlementYear');
   if(!yearSel.value) return;
@@ -1594,7 +1686,9 @@ function renderSettlementPaymentList(year){
   }).join('');
   wrap.querySelectorAll('.del-btn[data-sp-id]').forEach(btn => btn.addEventListener('click', async () => {
     const y = btn.dataset.spYear;
+    const item = (state.settlementPayments[y] || []).find(s => s.id === btn.dataset.spId);
     state.settlementPayments[y] = (state.settlementPayments[y] || []).filter(s => s.id !== btn.dataset.spId);
+    if(item) logAudit('Ausgleichszahlung gelöscht (' + partyName(item.from) + ' → ' + partyName(item.to) + ', ' + fmtCHF(item.amount) + ')');
     await saveShared();
     renderSettlementPaymentList(y); renderSettlement();
   }));
@@ -1662,6 +1756,7 @@ function setupSettlementPaymentUI(year){
     if(!state.settlementPayments) state.settlementPayments = {};
     if(!state.settlementPayments[currentYear]) state.settlementPayments[currentYear] = [];
     state.settlementPayments[currentYear].push({ id: uid(), from, to, amount, date, createdAt: Date.now() });
+    logAudit('Ausgleichszahlung erfasst (' + partyName(from) + ' → ' + partyName(to) + ', ' + fmtCHF(amount) + ')');
     await saveShared();
 
     document.getElementById('spAmount').value = '';
@@ -1684,8 +1779,10 @@ function renderParties(){
   wrap.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('change', async () => {
       const p = state.parties.find(p => p.id === inp.dataset.id);
-      if(p && inp.value.trim()){
+      if(p && inp.value.trim() && inp.value.trim() !== p.name){
+        const oldName = p.name;
         p.name = inp.value.trim();
+        logAudit('Partei umbenannt: "' + oldName + '" → "' + p.name + '"');
         await saveShared();
         populatePartySelect(); renderEntriesTable(); renderSettlement(); renderParties(); renderPriorityRule();
       }
@@ -1704,6 +1801,7 @@ function renderParties(){
       const extra = entryCount > 0 ? ' Es gibt ' + entryCount + ' Eintrag/Einträge, die diese Partei betreffen — diese bleiben erhalten, zeigen die Partei aber künftig als "(unbekannt)" an.' : '';
       if(!confirm('Partei "' + p.name + '" wirklich löschen? Ihr Zugangscode wird ungültig, sie kann sich danach nicht mehr einloggen.' + extra)) return;
       state.parties = state.parties.filter(x => x.id !== p.id);
+      logAudit('Partei gelöscht: "' + p.name + '"');
       await saveShared();
       populatePartySelect(); renderEntriesTable(); renderSettlement(); renderParties(); renderPriorityRule();
     });
@@ -1778,6 +1876,7 @@ function renderPriorityRuleBody(){
       if(!evenId){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte eine Partei auswählen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
       const oddParty = state.parties.find(p => p.id !== evenId);
       state.priorityRules[year] = { mode: 'evenodd', evenPartyId: evenId, oddPartyId: oddParty.id };
+      logAudit('Vorrangregel für ' + year + ' gespeichert (gerade: ' + partyName(evenId) + ', ungerade: ' + partyName(oddParty.id) + ')');
       await saveShared();
       fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     });
@@ -1793,6 +1892,7 @@ function renderPriorityRuleBody(){
       const val = document.getElementById('prioText').value.trim();
       const fb = document.getElementById('prioFeedback');
       state.priorityRules[year] = { mode: 'custom', text: val };
+      logAudit('Vorrangregel für ' + year + ' gespeichert (Freitext)');
       await saveShared();
       fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     });
@@ -1805,6 +1905,7 @@ async function addParty(){
   const name = input.value.trim();
   if(!name) return;
   state.parties.push({ id: uid(), name, code: randomCode(6) });
+  logAudit('Neue Partei angelegt: "' + name + '"');
   await saveShared();
   input.value = '';
   renderParties(); populatePartySelect();
@@ -1825,6 +1926,7 @@ function renderGate(){
       if(!admin){ document.getElementById('gateError').classList.add('show'); return; }
       state.settings = { adminCode: admin, unlockAll: false };
       state.parties.forEach(p => { if(!p.code) p.code = randomCode(6); });
+      state.auditLog = [{ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'WakeLog eingerichtet' }];
       await saveShared();
       session = { adminCode: admin };
       await saveSession();
@@ -1890,6 +1992,7 @@ function renderAdminPanel(){
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
     '<div id="adminSubContent" class="' + (!isAdminUser ? 'admin-readonly' : '') + '"></div>';
 
@@ -1899,7 +2002,26 @@ function renderAdminPanel(){
 
   if(adminSubTab === 'parties') renderAdminPartiesSection();
   else if(adminSubTab === 'costs') renderAdminCostsSection();
+  else if(adminSubTab === 'log') renderAdminAuditSection();
   else renderAdminGeneralSection();
+}
+
+function renderAdminAuditSection(){
+  const content = document.getElementById('adminSubContent');
+  const logEntries = state.auditLog || [];
+  content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Änderungsprotokoll</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
+      (logEntries.length ? logEntries.map(l => {
+        const d = new Date(l.ts);
+        const dateStr = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
+        return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
+          '<div class="hint" style="margin:0;">' + dateStr + ' — <b>' + escapeHtml(l.actor) + '</b></div>' +
+          '<div>' + escapeHtml(l.action) + '</div>' +
+        '</div>';
+      }).join('') : '<div class="empty">Noch keine Änderungen protokolliert.</div>') +
+    '</div>';
 }
 
 function renderAdminPartiesSection(){
@@ -1991,7 +2113,49 @@ function renderAdminGeneralSection(){
         '<label for="requirePhotoToggle">Beweisfoto bei Nutzungseinträgen zwingend</label>' +
       '</div>' +
       '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Beweisfoto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Export</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup, oder erstelle eine druckbare Jahresübersicht (als PDF speicherbar über den Drucken-Dialog deines Browsers).</div>' +
+      '<div class="field"><label for="exportYearSelect">Jahr für Jahresübersicht</label><select id="exportYearSelect"></select></div>' +
+      '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+        '<button class="btn secondary" id="exportCodeBtn">💾 Code exportieren</button>' +
+        '<button class="btn secondary" id="exportPdfBtn">📄 Jahresübersicht als PDF</button>' +
+      '</div>' +
+      '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
+
+  const exportYearSel = document.getElementById('exportYearSelect');
+  if(exportYearSel){
+    const years = priorityYears();
+    exportYearSel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+    exportYearSel.value = String(new Date().getFullYear());
+  }
+
+  document.getElementById('exportCodeBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('exportFeedback');
+    try{
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      fb.style.color = '#1C9A64'; fb.textContent = 'Code-Download gestartet.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    } catch(e){
+      fb.style.color = '#C0392B'; fb.textContent = 'Download fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
+    }
+  });
+
+  document.getElementById('exportPdfBtn').addEventListener('click', () => {
+    const year = parseInt(document.getElementById('exportYearSelect').value);
+    exportYearOverviewPdf(year);
+  });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
     const field = document.getElementById('initialReadingField');
@@ -2003,6 +2167,7 @@ function renderAdminGeneralSection(){
       fb.style.color = '#C0392B'; fb.textContent = 'Der Anfangsstand muss niedriger sein als der erste vorhandene Eintrag (' + fmtNum(firstEntry.reading,1) + ').'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4000); return;
     }
     state.settings.initialReading = val;
+    logAudit('Anfangsstand Motorenstundenzähler auf ' + fmtNum(val,1) + ' gesetzt');
     await saveShared();
     fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     renderEntriesTable(); renderSettlement(); renderInstruments();
@@ -2010,12 +2175,14 @@ function renderAdminGeneralSection(){
 
   document.getElementById('unlockToggle').addEventListener('change', async (ev) => {
     state.settings.unlockAll = ev.target.checked;
+    logAudit('24-Std.-Bearbeitungssperre ' + (ev.target.checked ? 'für alle aufgehoben' : 'wieder aktiviert'));
     await saveShared();
     renderEntriesTable();
   });
 
   document.getElementById('requirePhotoToggle').addEventListener('change', async (ev) => {
     state.settings.requirePhoto = ev.target.checked;
+    logAudit('Beweisfoto-Pflicht ' + (ev.target.checked ? 'aktiviert' : 'deaktiviert'));
     await saveShared();
     updatePhotoRequiredUI();
   });
@@ -2032,6 +2199,7 @@ function renderAdminGeneralSection(){
       return;
     }
     state.settings.shareLink = val;
+    logAudit('Freigabe-Link aktualisiert');
     await saveShared();
     fb.style.color = '#1C9A64';
     fb.textContent = 'Link gespeichert.';
@@ -2092,6 +2260,7 @@ function renderPartyCodeList(){
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
         p.code = randomCode(6);
+        logAudit('Neuer Zugangscode erzeugt für Partei "' + p.name + '" (alter Zugriff widerrufen)');
         await saveShared();
         fb.style.color = '#1C9A64'; fb.textContent = 'Neuer Code erzeugt — alter Zugriff wird widerrufen.'; fb.classList.add('show');
         setTimeout(() => fb.classList.remove('show'), 3000);
@@ -2208,6 +2377,7 @@ function setupAnnualCostUI(){
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
     state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, createdAt: Date.now() });
+    logAudit('Fixkosten-Posten hinzugefügt: ' + type + ' (' + fmtCHF(amount) + ')');
     await saveShared();
 
     document.getElementById('acDesc').value = '';
@@ -2298,7 +2468,9 @@ function renderAnnualCostList(){
   wrap.innerHTML = annualCostItemsHtml(year, true);
   wrap.querySelectorAll('.del-btn[data-ac-id]').forEach(btn => btn.addEventListener('click', async () => {
     const year = btn.dataset.acYear;
+    const item = (state.annualCosts[year] || []).find(c => c.id === btn.dataset.acId);
     state.annualCosts[year] = (state.annualCosts[year] || []).filter(c => c.id !== btn.dataset.acId);
+    if(item) logAudit('Fixkosten-Posten gelöscht: ' + item.type + ' (' + fmtCHF(item.amount) + ')');
     await saveShared();
     renderAnnualCostList(); renderSettlement();
   }));
