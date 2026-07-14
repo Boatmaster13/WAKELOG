@@ -74,7 +74,8 @@ body{
 }
 .scene-strip{ position:fixed; left:0; right:0; bottom:0; height:150px; z-index:5; pointer-events:none; }
 .scene-strip svg{ width:100%; height:100%; display:block; }
-.hero-inner{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
+.hero-inner{ position:relative; z-index:1; }
+.hero-meta-row{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; margin-top:0.9rem; }
 .hero h1{
   font-family:'Big Shoulders Display', sans-serif;
   font-weight:800;
@@ -111,7 +112,6 @@ body{
 }
 .admin-strip{
   position:relative; z-index:1;
-  margin-top:0.9rem;
   display:flex; justify-content:flex-end; align-items:center; gap:0.6rem;
 }
 .logout-btn{
@@ -373,15 +373,18 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
 
 /* ---------- Rundstempel Ausgleich ---------- */
-.cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0.35rem; }
-.cal-weekday{ text-align:center; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint); padding-bottom:0.3rem; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0.25rem; }
+.cal-weekday{
+  text-align:center; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+  color:#fff; background:var(--hull); padding:0.4rem 0; border-radius:4px;
+}
 .cal-day{
-  aspect-ratio:1/1; border-radius:var(--radius-sm); display:flex; flex-direction:column;
-  align-items:center; justify-content:center; cursor:pointer; font-family:'JetBrains Mono', monospace;
-  font-size:0.82rem; color:var(--ink); background:var(--foam); border:1.5px solid transparent; position:relative;
+  aspect-ratio:0.85/1; border-radius:6px; display:flex;
+  align-items:center; justify-content:center; cursor:pointer; font-family:'Inter', sans-serif;
+  font-size:0.8rem; color:var(--ink); background:var(--foam); border:1.5px solid transparent; position:relative;
   transition:transform 0.1s ease;
 }
-.cal-day:hover{ transform:scale(1.05); }
+.cal-day:hover{ transform:scale(1.08); z-index:1; }
 .cal-day.empty{ background:transparent; cursor:default; visibility:hidden; }
 .cal-day.today{ border-color:var(--hull); border-width:2px; font-weight:700; }
 .cal-day.open{ background:repeating-linear-gradient(45deg, #e3e1db, #e3e1db 4px, #d3d1cb 4px, #d3d1cb 8px); color:var(--ink-faint); }
@@ -552,9 +555,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
           </div>
         </div>
-        <div class="meta" id="headerMeta">wird geladen …</div>
       </div>
-      <div id="adminStrip"></div>
+      <div class="hero-meta-row">
+        <div class="meta" id="headerMeta">wird geladen …</div>
+        <div id="adminStrip"></div>
+      </div>
       <div class="instruments" id="instruments"></div>
     </div>
   </div>
@@ -582,7 +587,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div id="calMonthLabel" style="font-family:'Big Shoulders Display', sans-serif; font-size:1.2rem; font-weight:700;"></div>
           <button class="btn secondary" id="calNextBtn">›</button>
         </div>
-        <div id="calendarGrid"></div>
+        <div id="calendarGrid" class="cal-grid"></div>
         <div id="calendarDayPanel" style="margin-top:1.1rem;"></div>
       </div>
     </div>
@@ -904,7 +909,7 @@ function updateHeaderMeta(){
   const el = document.getElementById('headerMeta');
   if(!el) return;
   const now = new Date();
-  el.innerHTML = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
+  el.innerHTML = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
   const strip = document.getElementById('adminStrip');
   if(strip){
     strip.innerHTML = '<div class="admin-strip">' +
@@ -1035,12 +1040,15 @@ function renderCalendarTab(){
   grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell => {
     cell.addEventListener('click', () => {
       calendarSelectedDate = cell.dataset.date;
+      calendarPendingAction = null;
       renderCalendarDayPanel();
     });
   });
 
   if(calendarSelectedDate) renderCalendarDayPanel();
 }
+
+let calendarPendingAction = null;
 
 function renderCalendarDayPanel(){
   const panel = document.getElementById('calendarDayPanel');
@@ -1054,8 +1062,59 @@ function renderCalendarDayPanel(){
     return;
   }
 
-  let statusLine, actions = '';
   const myId = session.partyId;
+
+  if(calendarPendingAction && calendarPendingAction.dateStr === dateStr){
+    const pendingLabels = {
+      giveup: 'Möchtest du den Vorrechtstag am ' + dateLabel + ' wirklich abgeben?',
+      undo: 'Möchtest du die Abgabe des Vorrechtstags am ' + dateLabel + ' wirklich rückgängig machen?',
+      claim: 'Möchtest du den freien Vorrechtstag am ' + dateLabel + ' wirklich übernehmen?'
+    };
+    panel.innerHTML =
+      '<div class="admin-box">' +
+        '<label>' + dateLabel + '</label>' +
+        '<div style="margin:0.5rem 0 0.9rem;">' + pendingLabels[calendarPendingAction.type] + '</div>' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+          '<button class="btn" id="calConfirmBtn">Bestätigen und speichern</button>' +
+          '<button class="btn secondary" id="calCancelBtn">Abbrechen</button>' +
+        '</div>' +
+        '<div class="gate-error" id="calFeedback" style="color:#1C9A64;"></div>' +
+      '</div>';
+
+    document.getElementById('calCancelBtn').addEventListener('click', () => {
+      calendarPendingAction = null;
+      renderCalendarDayPanel();
+    });
+
+    document.getElementById('calConfirmBtn').addEventListener('click', async () => {
+      const fb = document.getElementById('calFeedback');
+      const action = calendarPendingAction.type;
+      if(action === 'giveup'){
+        if(!state.priorityOverrides) state.priorityOverrides = {};
+        state.priorityOverrides[dateStr] = { givenUpBy: myId, claimedBy: null };
+        logAudit(partyName(myId) + ' hat Vorrecht am ' + dateStr + ' abgegeben');
+      } else if(action === 'undo'){
+        if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
+        logAudit(partyName(myId) + ' hat die Abgabe des Vorrechts am ' + dateStr + ' rückgängig gemacht');
+      } else if(action === 'claim'){
+        const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+        if(!ov || ov.claimedBy){
+          fb.style.color = '#C0392B'; fb.textContent = 'Dieser Tag wurde inzwischen bereits übernommen.'; fb.classList.add('show');
+          calendarPendingAction = null;
+          renderCalendarTab();
+          return;
+        }
+        state.priorityOverrides[dateStr].claimedBy = myId;
+        logAudit(partyName(myId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen');
+      }
+      calendarPendingAction = null;
+      await saveShared();
+      renderCalendarTab(); renderInstruments();
+    });
+    return;
+  }
+
+  let statusLine, actions = '';
 
   if(eff.open){
     statusLine = 'Dieser Tag wurde abgegeben und ist aktuell frei — first come, first served.';
@@ -1082,38 +1141,28 @@ function renderCalendarDayPanel(){
     '</div>';
 
   const giveUpBtn = document.getElementById('calGiveUpBtn');
-  if(giveUpBtn) giveUpBtn.addEventListener('click', async () => {
-    if(!state.priorityOverrides) state.priorityOverrides = {};
-    state.priorityOverrides[dateStr] = { givenUpBy: myId, claimedBy: null };
-    logAudit(partyName(myId) + ' hat Vorrecht am ' + dateStr + ' abgegeben');
-    await saveShared();
-    renderCalendarTab(); renderInstruments();
+  if(giveUpBtn) giveUpBtn.addEventListener('click', () => {
+    calendarPendingAction = { type: 'giveup', dateStr };
+    renderCalendarDayPanel();
   });
 
   const undoBtn = document.getElementById('calUndoBtn');
-  if(undoBtn) undoBtn.addEventListener('click', async () => {
-    if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
-    logAudit(partyName(myId) + ' hat die Abgabe des Vorrechts am ' + dateStr + ' rückgängig gemacht');
-    await saveShared();
-    renderCalendarTab(); renderInstruments();
+  if(undoBtn) undoBtn.addEventListener('click', () => {
+    calendarPendingAction = { type: 'undo', dateStr };
+    renderCalendarDayPanel();
   });
 
   const claimBtn = document.getElementById('calClaimBtn');
-  if(claimBtn) claimBtn.addEventListener('click', async () => {
-    const fb = document.getElementById('calFeedback');
-    const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
-    if(!ov || ov.claimedBy){ fb.style.color = '#C0392B'; fb.textContent = 'Dieser Tag wurde inzwischen bereits übernommen.'; fb.classList.add('show'); renderCalendarTab(); return; }
-    state.priorityOverrides[dateStr].claimedBy = myId;
-    logAudit(partyName(myId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen');
-    await saveShared();
-    renderCalendarTab(); renderInstruments();
+  if(claimBtn) claimBtn.addEventListener('click', () => {
+    calendarPendingAction = { type: 'claim', dateStr };
+    renderCalendarDayPanel();
   });
 }
 
 function renderInstruments(){
   const prio = currentPriorityLabel();
   document.getElementById('instruments').innerHTML = prio ?
-    '<div class="instrument" style="border-color:' + prio.color + '66; flex:none; padding:0.7rem 1.1rem;">' +
+    '<div class="instrument" style="border-color:' + prio.color + '66; flex:1; width:100%; padding:0.7rem 1.1rem;">' +
       '<div style="display:flex; align-items:center; gap:0.5rem;">' +
         '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:' + prio.color + ';"></span>' +
         '<span class="num" style="font-size:1.05rem; line-height:1.2;">' + escapeHtml(prio.party) + '</span>' +
@@ -3064,12 +3113,14 @@ async function init(){
     calendarViewMonth--;
     if(calendarViewMonth < 0){ calendarViewMonth = 11; calendarViewYear--; }
     calendarSelectedDate = null;
+    calendarPendingAction = null;
     renderCalendarTab();
   });
   document.getElementById('calNextBtn').addEventListener('click', () => {
     calendarViewMonth++;
     if(calendarViewMonth > 11){ calendarViewMonth = 0; calendarViewYear++; }
     calendarSelectedDate = null;
+    calendarPendingAction = null;
     renderCalendarTab();
   });
   document.getElementById('exportPdfBtn').addEventListener('click', () => {
