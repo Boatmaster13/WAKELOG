@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
-<title>Bootslogbuch</title>
+<title>WakeLog</title>
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#161513">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WakeLog">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -246,6 +255,8 @@ input:focus, select:focus{
 .btn.secondary:hover{ background:var(--foam); }
 
 table{ width:100%; border-collapse:collapse; font-size:0.83rem; }
+#entriesTableWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+#entriesTableWrap table{ min-width:720px; }
 th{
   text-align:left; font-family:'Inter', sans-serif; font-weight:600; font-size:0.68rem;
   text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint);
@@ -324,6 +335,16 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .party-row input{ flex:1; font-family:'Inter', sans-serif; }
 .add-party-form{ display:flex; gap:0.6rem; margin-top:1rem; }
 .add-party-form input{ flex:1; font-family:'Inter', sans-serif; }
+.checkbox-list{ display:flex; flex-direction:column; gap:0.5rem; }
+.checkbox-item{ display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.7rem; background:var(--foam); border-radius:var(--radius-sm); }
+.checkbox-item input{ width:auto; flex:none; }
+.checkbox-item.disabled{ opacity:0.65; }
+.split-row{ display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
+.split-row .split-name{ flex:1; font-size:0.88rem; }
+.split-row input{ width:80px; text-align:right; }
+.split-total{ font-size:0.82rem; margin-top:0.3rem; }
+.split-total.ok{ color:#1C9A64; }
+.split-total.bad{ color:var(--flare); font-weight:600; }
 
 /* ---------- Zugriffscode / Admin ---------- */
 .gate-overlay{ position:fixed; inset:0; z-index:100; background:rgba(10,24,38,0.72); display:flex; align-items:center; justify-content:center; padding:1.2rem; }
@@ -354,6 +375,19 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   .scene-strip{ height:85px; }
   .navwrap, .content{ padding-left:1.1rem; padding-right:1.1rem; }
   .card{ padding:1.2rem; }
+}
+@media (orientation: landscape) and (max-height: 480px){
+  .hero{ padding:1rem 1.4rem 0.9rem; }
+  .hero h1{ font-size:1.6rem; }
+  .hero p{ display:none; }
+  .scene-strip{ height:44px; }
+  .navwrap{ padding-top:0.5rem; }
+  .card{ padding:1rem 1.2rem; }
+  .gate-card{ max-height:88vh; overflow-y:auto; }
+}
+@media (min-width: 720px){
+  .row{ grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
+  .stat-row{ grid-template-columns:repeat(3, 1fr); }
 }
 </style>
 </head>
@@ -407,9 +441,12 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       </svg>
     </div>
     <div class="hero-inner">
-      <div>
-        <h1>Bootslogbuch</h1>
-        <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+      <div style="display:flex; align-items:center; gap:0.9rem;">
+        <img src="header-logo.png" alt="WakeLog Logo" style="width:56px; height:56px; flex-shrink:0;">
+        <div>
+          <h1>WakeLog</h1>
+          <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+        </div>
       </div>
       <div class="meta" id="headerMeta">wird geladen …</div>
     </div>
@@ -457,14 +494,19 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="hint" style="margin-bottom:1.1rem;">Beides antippen, wenn an diesem Tag gefahren <b>und</b> getankt wurde.</div>
         <div class="row">
-          <div class="field"><label for="f-party">Partei *</label><select id="f-party" required></select><div class="gate-error" id="err-party">Bitte eine Partei wählen.</div></div>
+          <div class="field" style="grid-column:1 / -1;">
+            <label>Wer war heute auf dem Boot? *</label>
+            <div id="partyCheckboxes" class="checkbox-list"></div>
+            <div class="gate-error" id="err-party">Bitte mindestens eine Partei wählen.</div>
+            <div id="usageSplitArea" style="display:none; margin-top:0.6rem;"></div>
+          </div>
           <div class="field"><label for="f-date">Datum *</label><input type="date" id="f-date" required><div class="gate-error" id="err-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div class="row" id="usageFields">
           <div class="field">
             <label for="f-reading">Motorenstundenstand *</label>
             <input type="number" id="f-reading" step="0.1" min="0" placeholder="z. B. 1234.5" required>
-            <div class="hint">Der aktuelle Stand des Motorenstundenzählers (wie der km-Stand beim Auto) — die gefahrenen Stunden werden automatisch aus der Differenz zum letzten Eintrag berechnet.</div>
+            <div class="hint">Der aktuelle Stand des Motorenstundenzählers (wie der km-Stand beim Auto) — die gefahrenen Stunden werden automatisch aus der Differenz zum letzten Eintrag berechnet. Bei mehreren Parteien werden die Stunden gemäss Aufteilung oben verteilt.</div>
             <div class="gate-error" id="err-reading"></div>
           </div>
           <div class="field">
@@ -474,8 +516,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label for="f-photo">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
-            <input type="file" id="f-photo" accept="image/*" required>
+            <label for="f-photo" id="photoLabel">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
+            <input type="file" id="f-photo" accept="image/*">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Beweisfoto auswählen — dieses Feld ist Pflicht.</div>
@@ -484,6 +526,12 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="row" id="refuelFields" style="display:none;">
           <div class="field"><label for="f-liters">Liter Benzin</label><input type="number" id="f-liters" step="0.1" min="0" placeholder="0.0"></div>
           <div class="field"><label for="f-expense">Ausgaben Tankfüllung (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
+          <div class="field" style="grid-column:1 / -1;">
+            <label>Wer hat das Benzin bezahlt? *</label>
+            <div id="payerCheckboxes" class="checkbox-list"></div>
+            <div class="gate-error" id="err-payer">Bitte mindestens eine zahlende Partei wählen.</div>
+            <div id="paidSplitArea" style="display:none; margin-top:0.6rem;"></div>
+          </div>
         </div>
         <div style="display:flex; gap:0.6rem; margin-top:0.3rem;">
           <button class="btn" id="addEntryBtn">Eintragen</button>
@@ -529,7 +577,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const dataRef = ref(db, 'bootslogbuch/data');
-let state = { parties: [], entries: [], settings: null, priorityRules: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -550,7 +598,7 @@ function randomCode(len){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {} };
 }
 
 async function loadShared(){
@@ -562,6 +610,7 @@ async function loadShared(){
       state.entries = loaded.entries || [];
       state.settings = loaded.settings || null;
       state.priorityRules = loaded.priorityRules || {};
+      state.annualCosts = loaded.annualCosts || {};
     } else {
       state = defaultData();
     }
@@ -576,7 +625,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {} });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -588,6 +637,7 @@ function subscribeRealtime(){
     state.entries = loaded.entries || [];
     state.settings = loaded.settings || null;
     state.priorityRules = loaded.priorityRules || {};
+      state.annualCosts = loaded.annualCosts || {};
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -641,6 +691,22 @@ function fmtNum(n, dec){ return n.toLocaleString('de-CH', { minimumFractionDigit
 function yearOf(dateStr){ if(!dateStr) return null; return parseInt(dateStr.split('-')[0], 10); }
 function partyName(id){ const p = state.parties.find(p => p.id === id); return p ? p.name : '(unbekannt)'; }
 function initials(name){ return name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
+
+function getEntryUsageSplit(e){
+  if(e.partyIds && e.partyIds.length && e.usageSplit) return { ids: e.partyIds, split: e.usageSplit };
+  if(e.partyId) return { ids: [e.partyId], split: { [e.partyId]: 100 } };
+  return { ids: [], split: {} };
+}
+function getEntryPaidSplit(e){
+  if(e.payerIds && e.payerIds.length && e.paidSplit) return { ids: e.payerIds, split: e.paidSplit };
+  const usage = getEntryUsageSplit(e);
+  return usage;
+}
+function partyNames(ids){ return ids.map(id => partyName(id)).join(' + '); }
+function splitLabel(ids, split){
+  if(ids.length <= 1) return partyNames(ids);
+  return ids.map(id => partyName(id) + ' ' + fmtNum(split[id] || 0, 0) + '%').join(', ');
+}
 
 function getEntryFlags(e){
   if(typeof e.hasUsage === 'boolean' || typeof e.hasRefuel === 'boolean'){ return { hasUsage: !!e.hasUsage, hasRefuel: !!e.hasRefuel }; }
@@ -697,13 +763,106 @@ function validateReading(date, reading, excludeId){
 }
 
 function populatePartySelect(){
-  const sel = document.getElementById('f-party');
-  const prev = sel.value;
-  sel.innerHTML = state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
-  if(state.parties.some(p => p.id === prev)) sel.value = prev;
+  renderPartyCheckboxes();
+  renderPayerCheckboxes();
+}
+
+function renderPartyCheckboxes(){
+  const wrap = document.getElementById('partyCheckboxes');
+  if(!wrap) return;
+  const myPartyId = (!isAdminUser && session.partyId) ? session.partyId : null;
+  const prevChecked = Array.from(wrap.querySelectorAll('input:checked')).map(i => i.value);
+  wrap.innerHTML = state.parties.map(p => {
+    const locked = (p.id === myPartyId);
+    const checked = locked || prevChecked.includes(p.id);
+    return '<label class="checkbox-item' + (locked ? ' disabled' : '') + '"><input type="checkbox" class="party-check" value="' + p.id + '"' + (checked ? ' checked' : '') + (locked ? ' disabled' : '') + '> ' + escapeHtml(p.name) + (locked ? ' (du)' : '') + '</label>';
+  }).join('');
+  wrap.querySelectorAll('.party-check').forEach(cb => cb.addEventListener('change', () => {
+    document.getElementById('err-party').classList.remove('show');
+    renderUsageSplitArea();
+  }));
+  renderUsageSplitArea();
+}
+
+function renderUsageSplitArea(){
+  const wrap = document.getElementById('partyCheckboxes');
+  const area = document.getElementById('usageSplitArea');
+  if(!wrap || !area) return;
+  const ids = Array.from(wrap.querySelectorAll('.party-check:checked')).map(cb => cb.value);
+  if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
+  area.style.display = 'block';
+  const equal = Math.round((100/ids.length)*10)/10;
+  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Gemeinsame Nutzung — Aufteilung der heutigen Motorstunden (muss 100% ergeben):</div>' +
+    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="usage-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
+    '<div class="split-total" id="usageSplitTotal"></div>';
+  area.querySelectorAll('.usage-split-input').forEach(inp => inp.addEventListener('input', updateUsageSplitTotal));
+  updateUsageSplitTotal();
+}
+
+function updateUsageSplitTotal(){
+  const area = document.getElementById('usageSplitArea');
+  const inputs = Array.from(area.querySelectorAll('.usage-split-input'));
+  const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const el = document.getElementById('usageSplitTotal');
+  el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
+  el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
+}
+
+function renderPayerCheckboxes(){
+  const wrap = document.getElementById('payerCheckboxes');
+  if(!wrap) return;
+  const myPartyId = (!isAdminUser && session.partyId) ? session.partyId : null;
+  const prevChecked = Array.from(wrap.querySelectorAll('input:checked')).map(i => i.value);
+  wrap.innerHTML = state.parties.map(p => {
+    const locked = (p.id === myPartyId);
+    const checked = locked || prevChecked.includes(p.id);
+    return '<label class="checkbox-item' + (locked ? ' disabled' : '') + '"><input type="checkbox" class="payer-check" value="' + p.id + '"' + (checked ? ' checked' : '') + (locked ? ' disabled' : '') + '> ' + escapeHtml(p.name) + (locked ? ' (du)' : '') + '</label>';
+  }).join('');
+  wrap.querySelectorAll('.payer-check').forEach(cb => cb.addEventListener('change', () => {
+    document.getElementById('err-payer').classList.remove('show');
+    renderPaidSplitArea();
+  }));
+  renderPaidSplitArea();
+}
+
+function renderPaidSplitArea(){
+  const wrap = document.getElementById('payerCheckboxes');
+  const area = document.getElementById('paidSplitArea');
+  if(!wrap || !area) return;
+  const ids = Array.from(wrap.querySelectorAll('.payer-check:checked')).map(cb => cb.value);
+  if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
+  area.style.display = 'block';
+  const equal = Math.round((100/ids.length)*10)/10;
+  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Aufteilung der Ausgaben zwischen den zahlenden Parteien (muss 100% ergeben):</div>' +
+    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="paid-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
+    '<div class="split-total" id="paidSplitTotal"></div>';
+  area.querySelectorAll('.paid-split-input').forEach(inp => inp.addEventListener('input', updatePaidSplitTotal));
+  updatePaidSplitTotal();
+}
+
+function updatePaidSplitTotal(){
+  const area = document.getElementById('paidSplitArea');
+  const inputs = Array.from(area.querySelectorAll('.paid-split-input'));
+  const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const el = document.getElementById('paidSplitTotal');
+  el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
+  el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
 }
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function updatePhotoRequiredUI(){
+  const label = document.getElementById('photoLabel');
+  const status = document.getElementById('photoStatus');
+  if(!label || !status) return;
+  const required = !state.settings || state.settings.requirePhoto !== false;
+  label.textContent = required ? 'Beweisfoto Bordcomputer / Tagesverbrauch *' : 'Beweisfoto Bordcomputer / Tagesverbrauch (optional)';
+  if(!pendingPhotoDataUrl && !existingPhotoDataUrl){
+    status.textContent = required
+      ? 'Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.'
+      : 'Optional: Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.';
+  }
+}
 
 function toggleType(type){
   if(activeTypes.has(type)){ if(activeTypes.size === 1) return; activeTypes.delete(type); }
@@ -717,7 +876,6 @@ function applyTypeDisplay(){
 }
 
 async function addEntry(){
-  const partyId = document.getElementById('f-party').value;
   const date = document.getElementById('f-date').value;
 
   clearEntryErrors();
@@ -729,14 +887,29 @@ async function addEntry(){
     hasError = true;
   };
 
-  if(!partyId){ showErr('err-party'); }
+  const partyIds = Array.from(document.querySelectorAll('#partyCheckboxes .party-check:checked')).map(cb => cb.value);
+  if(!partyIds.length){ showErr('err-party'); }
+
   if(!date){ showErr('err-date'); }
   else {
     const today = new Date().toISOString().slice(0,10);
     if(date > today){ showErr('err-date', 'Das Datum darf nicht in der Zukunft liegen.'); }
   }
 
-  const data = { partyId, date, hasUsage: activeTypes.has('usage'), hasRefuel: activeTypes.has('refuel') };
+  const data = { partyIds, date, hasUsage: activeTypes.has('usage'), hasRefuel: activeTypes.has('refuel') };
+
+  if(partyIds.length > 1){
+    const inputs = Array.from(document.querySelectorAll('#usageSplitArea .usage-split-input'));
+    const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+    if(Math.abs(total - 100) > 0.15){
+      showErr('err-party', 'Die Aufteilung der Motorstunden muss in Summe 100% ergeben (aktuell ' + fmtNum(total,1) + '%).');
+    } else {
+      data.usageSplit = {};
+      inputs.forEach(i => { data.usageSplit[i.dataset.id] = parseFloat(i.value) || 0; });
+    }
+  } else if(partyIds.length === 1){
+    data.usageSplit = { [partyIds[0]]: 100 };
+  }
 
   if(data.hasUsage){
     const readingRaw = document.getElementById('f-reading').value;
@@ -755,7 +928,7 @@ async function addEntry(){
       data.photo = pendingPhotoDataUrl;
     } else if(editingId && existingPhotoDataUrl){
       data.photo = existingPhotoDataUrl;
-    } else {
+    } else if(state.settings.requirePhoto !== false){
       showErr('err-photo');
     }
   }
@@ -763,6 +936,22 @@ async function addEntry(){
     data.liters = parseFloat(document.getElementById('f-liters').value) || 0;
     data.expense = parseFloat(document.getElementById('f-expense').value) || 0;
     if(data.expense <= 0){ showErr('err-expense'); }
+
+    const payerIds = Array.from(document.querySelectorAll('#payerCheckboxes .payer-check:checked')).map(cb => cb.value);
+    if(!payerIds.length){ showErr('err-payer'); }
+    data.payerIds = payerIds;
+    if(payerIds.length > 1){
+      const pInputs = Array.from(document.querySelectorAll('#paidSplitArea .paid-split-input'));
+      const pTotal = pInputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      if(Math.abs(pTotal - 100) > 0.15){
+        showErr('err-payer', 'Die Aufteilung der Ausgaben muss in Summe 100% ergeben (aktuell ' + fmtNum(pTotal,1) + '%).');
+      } else {
+        data.paidSplit = {};
+        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = parseFloat(i.value) || 0; });
+      }
+    } else if(payerIds.length === 1){
+      data.paidSplit = { [payerIds[0]]: 100 };
+    }
   }
 
   if(hasError) return;
@@ -789,11 +978,12 @@ async function addEntry(){
   document.getElementById('f-liters').value = '';
   document.getElementById('f-expense').value = '';
   resetPhotoField();
+  populatePartySelect();
   renderYearFilters(); renderEntriesTable(); renderSettlement();
 }
 
 function clearEntryErrors(){
-  ['err-party','err-date','err-reading','err-consumption','err-photo','err-expense'].forEach(id => {
+  ['err-party','err-date','err-reading','err-consumption','err-photo','err-expense','err-payer'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.classList.remove('show');
   });
@@ -852,6 +1042,14 @@ function startEdit(id){
   const e = state.entries.find(e => e.id === id);
   if(!e) return;
   if(isLocked(e)){ alert('Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn ändern oder die Sperre aufheben.'); return; }
+  if(!isAdminUser && session.partyId){
+    const usageCheck = getEntryUsageSplit(e);
+    const paidCheck = getEntryFlags(e).hasRefuel ? getEntryPaidSplit(e) : { ids: [] };
+    if(!usageCheck.ids.includes(session.partyId) && !paidCheck.ids.includes(session.partyId)){
+      alert('Dieser Eintrag betrifft deine Partei nicht — du kannst ihn nicht bearbeiten.');
+      return;
+    }
+  }
   editingId = id;
   const flags = getEntryFlags(e);
   activeTypes = new Set();
@@ -859,12 +1057,33 @@ function startEdit(id){
   if(flags.hasRefuel) activeTypes.add('refuel');
   if(activeTypes.size === 0) activeTypes.add('usage');
   applyTypeDisplay();
-  document.getElementById('f-party').value = e.partyId;
+  const usage = getEntryUsageSplit(e);
+  document.querySelectorAll('#partyCheckboxes .party-check').forEach(cb => { cb.checked = usage.ids.includes(cb.value); });
+  renderUsageSplitArea();
+  if(usage.ids.length > 1){
+    usage.ids.forEach(id => {
+      const inp = document.querySelector('#usageSplitArea .usage-split-input[data-id="' + id + '"]');
+      if(inp) inp.value = usage.split[id] || 0;
+    });
+    updateUsageSplitTotal();
+  }
   document.getElementById('f-date').value = e.date;
   document.getElementById('f-reading').value = flags.hasUsage ? (typeof e.reading === 'number' ? e.reading : '') : '';
   document.getElementById('f-consumption').value = flags.hasUsage ? (e.consumption || '') : '';
   document.getElementById('f-liters').value = flags.hasRefuel ? (e.liters || '') : '';
   document.getElementById('f-expense').value = flags.hasRefuel ? (e.expense || '') : '';
+  if(flags.hasRefuel){
+    const paid = getEntryPaidSplit(e);
+    document.querySelectorAll('#payerCheckboxes .payer-check').forEach(cb => { cb.checked = paid.ids.includes(cb.value); });
+    renderPaidSplitArea();
+    if(paid.ids.length > 1){
+      paid.ids.forEach(id => {
+        const inp = document.querySelector('#paidSplitArea .paid-split-input[data-id="' + id + '"]');
+        if(inp) inp.value = paid.split[id] || 0;
+      });
+      updatePaidSplitTotal();
+    }
+  }
   resetPhotoField();
   if(flags.hasUsage && e.photo){
     existingPhotoDataUrl = e.photo;
@@ -884,11 +1103,24 @@ function stopEdit(){
   document.getElementById('addEntryBtn').textContent = 'Eintragen';
   document.getElementById('cancelEditBtn').style.display = 'none';
   resetPhotoField();
+  document.querySelectorAll('#partyCheckboxes .party-check').forEach(cb => { if(!cb.disabled) cb.checked = false; });
+  document.querySelectorAll('#payerCheckboxes .payer-check').forEach(cb => { if(!cb.disabled) cb.checked = false; });
+  renderUsageSplitArea();
+  renderPaidSplitArea();
 }
 
 async function deleteEntry(id){
   const e = state.entries.find(e => e.id === id);
-  if(e && isLocked(e)){ alert('Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn löschen oder die Sperre aufheben.'); return; }
+  if(!e) return;
+  if(isLocked(e)){ alert('Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn löschen oder die Sperre aufheben.'); return; }
+  if(!isAdminUser && session.partyId){
+    const usage = getEntryUsageSplit(e);
+    const paid = getEntryFlags(e).hasRefuel ? getEntryPaidSplit(e) : { ids: [] };
+    if(!usage.ids.includes(session.partyId) && !paid.ids.includes(session.partyId)){
+      alert('Dieser Eintrag betrifft deine Partei nicht — du kannst ihn nicht löschen.');
+      return;
+    }
+  }
   state.entries = state.entries.filter(e => e.id !== id);
   await saveShared();
   renderYearFilters(); renderEntriesTable(); renderSettlement();
@@ -926,13 +1158,19 @@ function renderEntriesTable(){
     const hasConsumption = flags.hasUsage && typeof e.consumption === 'number' && e.consumption > 0;
     const estLiters = hasConsumption ? hours * e.consumption : null;
     const locked = isLocked(e);
+    const usage = getEntryUsageSplit(e);
+    const paid = flags.hasRefuel ? getEntryPaidSplit(e) : null;
     const tags = (flags.hasUsage ? '<span class="tag usage">Nutzung</span>' : '') +
                  (flags.hasUsage && flags.hasRefuel ? ' ' : '') +
                  (flags.hasRefuel ? '<span class="tag refuel">Tanken</span>' : '') +
                  (locked ? ' <span class="tag locked">gesperrt</span>' : '');
+    let partyCell = escapeHtml(splitLabel(usage.ids, usage.split));
+    if(flags.hasRefuel && paid && (paid.ids.length !== usage.ids.length || !paid.ids.every(id => usage.ids.includes(id)))){
+      partyCell += '<div class="hint" style="margin:0.2rem 0 0;">Bezahlt: ' + escapeHtml(splitLabel(paid.ids, paid.split)) + '</div>';
+    }
     html += '<tr>';
     html += '<td>' + e.date + '</td>';
-    html += '<td class="name-cell">' + escapeHtml(partyName(e.partyId)) + '</td>';
+    html += '<td class="name-cell">' + partyCell + '</td>';
     html += '<td>' + tags + '</td>';
     html += '<td class="num">' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading, 1) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasUsage ? fmtNum(hours, 1) : '—') + '</td>';
@@ -943,6 +1181,9 @@ function renderEntriesTable(){
     html += '<td class="num">' + (flags.hasRefuel ? fmtCHF(e.expense) : '—') + '</td>';
     html += '<td>' + (flags.hasUsage && e.photo ? '<img class="thumb" data-photo-id="' + e.id + '" src="' + e.photo + '" alt="Beweisfoto">' : '—') + '</td>';
     if(locked){ html += '<td><span class="locked-note">nur Admin</span></td>'; }
+    else if(!isAdminUser && session.partyId && !usage.ids.includes(session.partyId) && !(paid && paid.ids.includes(session.partyId))){
+      html += '<td><span class="locked-note">betrifft dich nicht</span></td>';
+    }
     else { html += '<td><button class="del-btn" data-edit="' + e.id + '">bearbeiten</button> · <button class="del-btn" data-id="' + e.id + '">löschen</button></td>'; }
     html += '</tr>';
   });
@@ -972,30 +1213,61 @@ function computeSettlement(year){
   const entryHours = computeHoursMap();
 
   state.entries.filter(e => yearOf(e.date) === year).forEach(e => {
-    if(!(e.partyId in consumed)) return;
     const flags = getEntryFlags(e);
     if(flags.hasUsage){
+      const usage = getEntryUsageSplit(e);
       const h = entryHours[e.id] || 0;
-      partyHoursMap[e.partyId] += h;
       const c = (typeof e.consumption === 'number' && e.consumption > 0) ? e.consumption : 0;
-      consumed[e.partyId] += h * c;
+      usage.ids.forEach(id => {
+        if(!(id in partyHoursMap)) return;
+        const pct = (usage.split[id] || 0) / 100;
+        partyHoursMap[id] += h * pct;
+        consumed[id] += h * c * pct;
+      });
     }
-    if(flags.hasRefuel){ paid[e.partyId] += e.expense || 0; }
+    if(flags.hasRefuel){
+      const payer = getEntryPaidSplit(e);
+      payer.ids.forEach(id => {
+        if(!(id in paid)) return;
+        const pct = (payer.split[id] || 0) / 100;
+        paid[id] += (e.expense || 0) * pct;
+      });
+    }
   });
 
   const totalConsumed = Object.values(consumed).reduce((a,b) => a+b, 0);
-  const totalExpense = Object.values(paid).reduce((a,b) => a+b, 0);
+  const totalHours = Object.values(partyHoursMap).reduce((a,b) => a+b, 0);
+  const totalFuelExpense = Object.values(paid).reduce((a,b) => a+b, 0);
+
+  const annualItems = (state.annualCosts && state.annualCosts[year]) || [];
+  const totalAnnual = annualItems.reduce((s,c) => s + (c.amount || 0), 0);
+  const annualPaid = {}; state.parties.forEach(p => annualPaid[p.id] = 0);
+  annualItems.forEach(c => {
+    Object.keys(c.paidBy || {}).forEach(id => {
+      if(!(id in annualPaid)) return;
+      annualPaid[id] += (c.amount || 0) * ((c.paidBy[id]||0)/100);
+    });
+  });
+
+  const usedEqualFallback = totalHours === 0 && state.parties.length > 0;
 
   const rows = state.parties.map(p => {
-    const share = totalConsumed > 0 ? totalExpense * (consumed[p.id] / totalConsumed) : 0;
+    const usageSharePct = totalHours > 0 ? (partyHoursMap[p.id] / totalHours) : (state.parties.length ? 1/state.parties.length : 0);
+    const fuelFairShare = totalConsumed > 0 ? totalFuelExpense * (consumed[p.id] / totalConsumed) : 0;
+    const annualFairShare = totalAnnual * usageSharePct;
+    const totalPaid = paid[p.id] + annualPaid[p.id];
+    const totalFairShare = fuelFairShare + annualFairShare;
     return {
       id: p.id, name: p.name, hours: partyHoursMap[p.id], liters: consumed[p.id],
       pct: totalConsumed > 0 ? (consumed[p.id] / totalConsumed) * 100 : 0,
-      paid: paid[p.id], fairShare: share, balance: paid[p.id] - share
+      usageSharePct: usageSharePct * 100,
+      paid: totalPaid, fuelPaid: paid[p.id], annualPaid: annualPaid[p.id],
+      fairShare: totalFairShare, fuelFairShare, annualFairShare,
+      balance: totalPaid - totalFairShare
     };
   });
 
-  return { rows, totalConsumed, totalExpense };
+  return { rows, totalConsumed, totalExpense: totalFuelExpense + totalAnnual, totalFuelExpense, totalAnnual, usedEqualFallback };
 }
 
 function settlementTransactions(rows){
@@ -1018,10 +1290,10 @@ function renderSettlement(){
   const year = parseInt(yearSel.value);
   const container = document.getElementById('settlementContent');
 
-  const { rows, totalConsumed, totalExpense } = computeSettlement(year);
+  const { rows, totalConsumed, totalExpense, totalFuelExpense, totalAnnual, usedEqualFallback } = computeSettlement(year);
 
   if(totalConsumed === 0 && totalExpense === 0){
-    container.innerHTML = '<div class="empty">Für ' + year + ' liegen noch keine Einträge vor.</div>';
+    container.innerHTML = '<div class="empty">Für ' + year + ' liegen noch keine Einträge oder Fixkosten vor.</div>';
     return;
   }
 
@@ -1030,11 +1302,14 @@ function renderSettlement(){
   if(missingConsumption){
     html += '<div class="notice warn">Mindestens ein Nutzungseintrag in ' + year + ' hat keinen Durchschnittsverbrauch hinterlegt und geht daher mit 0 Litern in die Abrechnung ein. Im Logbuch bearbeiten, um den fairen Anteil korrekt zu berechnen.</div>';
   }
+  if(usedEqualFallback && totalAnnual > 0){
+    html += '<div class="notice warn">Für ' + year + ' liegen keine Nutzungsstunden vor — die jährlichen Fixkosten wurden daher gleichmässig auf alle Parteien aufgeteilt, nicht nach Nutzungsanteil.</div>';
+  }
 
   html += '<div class="stat-row">' +
     '<div class="stat"><div class="num">' + fmtNum(rows.reduce((a,r)=>a+r.hours,0),1) + '</div><div class="lbl">Motorstunden</div></div>' +
-    '<div class="stat"><div class="num">' + fmtNum(totalConsumed,1) + ' l</div><div class="lbl">Geschätzt verbraucht</div></div>' +
-    '<div class="stat"><div class="num">' + fmtCHF(totalExpense) + '</div><div class="lbl">Ausgaben gesamt</div></div>' +
+    '<div class="stat"><div class="num">' + fmtCHF(totalFuelExpense) + '</div><div class="lbl">Benzin gesamt</div></div>' +
+    '<div class="stat"><div class="num">' + fmtCHF(totalAnnual) + '</div><div class="lbl">Fixkosten gesamt</div></div>' +
   '</div>';
 
   const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
@@ -1045,7 +1320,8 @@ function renderSettlement(){
     html += '<div class="balance-card">' +
       '<div class="balance-head"><span class="name">' + escapeHtml(r.name) + '</span>' +
         '<span class="amt ' + (isPos?'pos':(isNeg?'neg':'')) + '">' + (r.balance >= 0 ? '+' : '') + fmtCHF(r.balance) + '</span></div>' +
-      '<div class="balance-meta"><span>' + fmtNum(r.hours,1) + ' Std.</span><span>' + fmtNum(r.liters,1) + ' l · ' + fmtNum(r.pct,1) + ' %</span><span>bezahlt ' + fmtCHF(r.paid) + '</span><span>fairer Anteil ' + fmtCHF(r.fairShare) + '</span></div>' +
+      '<div class="balance-meta"><span>' + fmtNum(r.hours,1) + ' Std. (' + fmtNum(r.usageSharePct,1) + ' % Nutzung)</span><span>' + fmtNum(r.liters,1) + ' l Benzin</span><span>bezahlt ' + fmtCHF(r.paid) + '</span><span>fairer Anteil ' + fmtCHF(r.fairShare) + '</span></div>' +
+      '<div class="balance-meta"><span>davon Benzin: ' + fmtCHF(r.fuelFairShare) + '</span><span>davon Fixkosten: ' + fmtCHF(r.annualFairShare) + '</span></div>' +
       '<div class="gauge"><div class="center-line"></div><div class="fill ' + (isPos?'pos':'neg') + '" style="width:' + (pct/2) + '%"></div></div>' +
       '<div class="gauge-scale"><span>Schuld</span><span>0</span><span>Guthaben</span></div>' +
     '</div>';
@@ -1070,7 +1346,18 @@ function renderSettlement(){
 
 function renderParties(){
   const wrap = document.getElementById('partyList');
+  const addForm = document.querySelector('.add-party-form');
+  if(addForm) addForm.style.display = isAdminUser ? 'flex' : 'none';
+
   if(!state.parties.length){ wrap.innerHTML = '<div class="empty">Noch keine Parteien angelegt.</div>'; return; }
+
+  if(!isAdminUser){
+    wrap.innerHTML = state.parties.map(p =>
+      '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><span>' + escapeHtml(p.name) + '</span></div>'
+    ).join('');
+    return;
+  }
+
   wrap.innerHTML = state.parties.map(p =>
     '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><input type="text" data-id="' + p.id + '" value="' + escapeHtml(p.name) + '"></div>'
   ).join('');
@@ -1177,6 +1464,7 @@ function renderPriorityRuleBody(){
 }
 
 async function addParty(){
+  if(!isAdminUser) return;
   const input = document.getElementById('newPartyName');
   const name = input.value.trim();
   if(!name) return;
@@ -1191,7 +1479,7 @@ function renderGate(){
   const card = document.getElementById('gateCard');
   if(!state.settings){
     card.innerHTML =
-      '<h2>Bootslogbuch einrichten</h2>' +
+      '<h2>WakeLog einrichten</h2>' +
       '<p>Diese App wird zum ersten Mal geöffnet. Lege deinen Administrator-Code fest — jede Partei bekommt automatisch ihren eigenen persönlichen Code, den du unter "Verwaltung" findest und einzeln weitergeben kannst.</p>' +
       '<div class="field"><label for="setup-admin">Dein Administrator-Code</label><input id="setup-admin" type="text" placeholder="z. B. AB3F7K2P"></div>' +
       '<button class="btn" id="setupBtn">Einrichten</button>' +
@@ -1208,17 +1496,43 @@ function renderGate(){
     });
   } else {
     card.innerHTML =
-      '<h2>Zugang zum Bootslogbuch</h2>' +
-      '<p>Gib deinen persönlichen Code ein — entweder deinen individuellen Partei-Code oder, falls du der Administrator bist, deinen Administrator-Code. Beide funktionieren im selben Feld.</p>' +
-      '<div class="field"><label for="gate-code">Code</label><input id="gate-code" type="text" placeholder="z. B. AB3F7K"></div>' +
+      '<h2>Zugang zu WakeLog</h2>' +
+      '<p>Bist du eine Partei oder der Administrator?</p>' +
+      '<div class="type-toggle" id="roleToggle">' +
+        '<button type="button" class="active" data-role="party">Partei</button>' +
+        '<button type="button" data-role="admin">Administrator</button>' +
+      '</div>' +
+      '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><input id="gate-code" type="text" placeholder="z. B. AB3F7K"></div>' +
       '<button class="btn" id="gateBtn">Bestätigen</button>' +
       '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>';
+
+    let role = 'party';
+    document.querySelectorAll('#roleToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        role = btn.dataset.role;
+        document.querySelectorAll('#roleToggle button').forEach(b => b.classList.toggle('active', b === btn));
+        document.getElementById('gate-code-label').textContent = role === 'admin' ? 'Administrator-Code' : 'Dein Zugangscode';
+        document.getElementById('gateError').classList.remove('show');
+      });
+    });
+
     const submit = async () => {
       const code = document.getElementById('gate-code').value.trim();
-      const matchedParty = state.parties.find(p => p.code === code);
-      if(code && state.settings.adminCode === code){ session = { adminCode: code, partyCode: null, partyId: null }; }
-      else if(matchedParty){ session = { adminCode: null, partyCode: code, partyId: matchedParty.id }; }
-      else { document.getElementById('gateError').classList.add('show'); return; }
+      const errEl = document.getElementById('gateError');
+      if(role === 'admin'){
+        if(code && state.settings.adminCode === code){
+          session = { adminCode: code, partyCode: null, partyId: null };
+        } else {
+          errEl.textContent = 'Administrator-Code ungültig.'; errEl.classList.add('show'); return;
+        }
+      } else {
+        const matchedParty = state.parties.find(p => p.code === code);
+        if(matchedParty){
+          session = { adminCode: null, partyCode: code, partyId: matchedParty.id };
+        } else {
+          errEl.textContent = 'Zugangscode ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.'; errEl.classList.add('show'); return;
+        }
+      }
       await saveSession(); evaluateAccess(); hideGate(); renderAll();
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
@@ -1265,10 +1579,27 @@ function renderAdminPanel(){
     '</div>' +
     '<div class="admin-box">' +
       '<label>Anfangsstand Motorenstundenzähler</label>' +
-      '<div class="hint" style="margin-bottom:0.7rem;">Der Stand des Motorenstundenzählers, bevor mit diesem Bootslogbuch zu rechnen begonnen wurde (0, falls die Zählung bei diesem Logbuch beginnt). Alle künftigen Einträge berechnen die gefahrenen Stunden als Differenz zum jeweils letzten Stand — beim allerersten Eintrag zu diesem Wert.</div>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Der Stand des Motorenstundenzählers, bevor mit WakeLog zu rechnen begonnen wurde (0, falls die Zählung bei diesem Logbuch beginnt). Alle künftigen Einträge berechnen die gefahrenen Stunden als Differenz zum jeweils letzten Stand — beim allerersten Eintrag zu diesem Wert.</div>' +
       '<input id="initialReadingField" type="number" step="0.1" placeholder="z. B. 0" value="' + (typeof state.settings.initialReading === 'number' ? state.settings.initialReading : '') + '" style="margin-bottom:0.7rem;">' +
       '<button class="btn secondary" id="saveInitialReadingBtn">Anfangsstand speichern</button>' +
       '<div class="gate-error" id="initialReadingFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Jährliche Fixkosten</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Verkehrssteuer, Winterlager, Versicherung, Service, Rückstellungen usw. — laufend übers Jahr erfassen, sobald eine Rechnung eintrifft. Wird bei der Jahresabrechnung automatisch nach Nutzungsanteil (gefahrene Stunden) auf die Parteien verteilt, nicht mehr fix 50:50.</div>' +
+      '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
+      '<div id="annualCostList"></div>' +
+      '<div class="row" style="margin-top:0.9rem;">' +
+        '<div class="field"><label for="acType">Kostenart</label><select id="acType">' +
+          '<option>Verkehrssteuer</option><option>Winterlager</option><option>Versicherung</option><option>Service</option><option>Rückstellung / Abschreibung</option><option>Sonstiges</option>' +
+        '</select></div>' +
+        '<div class="field"><label for="acDesc">Beschreibung</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"></div>' +
+        '<div class="field"><label for="acAmount">Betrag (CHF)</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"></div>' +
+        '<div class="field"><label for="acDate">Datum</label><input id="acDate" type="date"></div>' +
+      '</div>' +
+      '<div class="field"><label>Wer hat bezahlt / vorgeschossen?</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div></div>' +
+      '<button class="btn secondary" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
+      '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<div class="toggle-row">' +
@@ -1276,9 +1607,17 @@ function renderAdminPanel(){
         '<label for="unlockToggle">Bearbeitung von Einträgen älter als 24 Std. für alle freigeben</label>' +
       '</div>' +
       '<div class="hint">Normalerweise können Parteien einen Eintrag nur in den ersten 24 Stunden nach dem Erstellen bearbeiten oder löschen. Mit diesem Schalter hebst du die Sperre vorübergehend für alle auf.</div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<div class="toggle-row">' +
+        '<label class="switch"><input type="checkbox" id="requirePhotoToggle"' + (state.settings.requirePhoto !== false ? ' checked' : '') + '><span class="slider"></span></label>' +
+        '<label for="requirePhotoToggle">Beweisfoto bei Nutzungseinträgen zwingend</label>' +
+      '</div>' +
+      '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Beweisfoto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
     '</div>';
 
   renderPartyCodeList();
+  setupAnnualCostUI();
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
     const field = document.getElementById('initialReadingField');
@@ -1299,6 +1638,12 @@ function renderAdminPanel(){
     state.settings.unlockAll = ev.target.checked;
     await saveShared();
     renderEntriesTable();
+  });
+
+  document.getElementById('requirePhotoToggle').addEventListener('change', async (ev) => {
+    state.settings.requirePhoto = ev.target.checked;
+    await saveShared();
+    updatePhotoRequiredUI();
   });
 
   document.getElementById('saveLinkBtn').addEventListener('click', async () => {
@@ -1369,7 +1714,7 @@ function renderPartyCodeList(){
           setTimeout(() => fb.classList.remove('show'), 3000);
           return;
         }
-        const msg = 'Hier ist der Link zu unserem Bootslogbuch: ' + link + '\nDein persönlicher Code: ' + p.code;
+        const msg = 'Hier ist der Link zu unserem WakeLog: ' + link + '\nDein persönlicher Code: ' + p.code;
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
         p.code = randomCode(6);
@@ -1380,6 +1725,109 @@ function renderPartyCodeList(){
       }
     });
   });
+}
+
+function setupAnnualCostUI(){
+  const yearSel = document.getElementById('annualCostYear');
+  if(!yearSel) return;
+  const years = priorityYears();
+  const prev = yearSel.value;
+  yearSel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+  yearSel.value = years.includes(parseInt(prev)) ? prev : String(new Date().getFullYear());
+  yearSel.addEventListener('change', renderAnnualCostList);
+
+  const dateField = document.getElementById('acDate');
+  if(dateField && !dateField.value) dateField.value = new Date().toISOString().slice(0,10);
+
+  renderAcPayerCheckboxes();
+  renderAnnualCostList();
+
+  document.getElementById('addAnnualCostBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('acFeedback');
+    const type = document.getElementById('acType').value;
+    const desc = document.getElementById('acDesc').value.trim();
+    const amount = parseFloat(document.getElementById('acAmount').value);
+    const date = document.getElementById('acDate').value;
+    const year = yearSel.value;
+    const payerIds = Array.from(document.querySelectorAll('#acPayerCheckboxes .ac-payer-check:checked')).map(cb => cb.value);
+
+    if(isNaN(amount) || amount <= 0){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte einen Betrag grösser als 0 angeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+    if(!payerIds.length){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte mindestens eine zahlende Partei wählen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+
+    let paidBy = {};
+    if(payerIds.length > 1){
+      const inputs = Array.from(document.querySelectorAll('#acPaidSplitArea .ac-split-input'));
+      const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      if(Math.abs(total - 100) > 0.15){ fb.style.color = '#C0392B'; fb.textContent = 'Die Aufteilung muss in Summe 100% ergeben (aktuell ' + fmtNum(total,1) + '%).'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500); return; }
+      inputs.forEach(i => { paidBy[i.dataset.id] = parseFloat(i.value) || 0; });
+    } else {
+      paidBy = { [payerIds[0]]: 100 };
+    }
+
+    if(!state.annualCosts) state.annualCosts = {};
+    if(!state.annualCosts[year]) state.annualCosts[year] = [];
+    state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, createdAt: Date.now() });
+    await saveShared();
+
+    document.getElementById('acDesc').value = '';
+    document.getElementById('acAmount').value = '';
+    fb.style.color = '#1C9A64'; fb.textContent = 'Kostenposten gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    renderAnnualCostList(); renderSettlement();
+  });
+}
+
+function renderAcPayerCheckboxes(){
+  const wrap = document.getElementById('acPayerCheckboxes');
+  if(!wrap) return;
+  wrap.innerHTML = state.parties.map(p =>
+    '<label class="checkbox-item"><input type="checkbox" class="ac-payer-check" value="' + p.id + '"> ' + escapeHtml(p.name) + '</label>'
+  ).join('');
+  wrap.querySelectorAll('.ac-payer-check').forEach(cb => cb.addEventListener('change', renderAcPaidSplitArea));
+  renderAcPaidSplitArea();
+}
+
+function renderAcPaidSplitArea(){
+  const wrap = document.getElementById('acPayerCheckboxes');
+  const area = document.getElementById('acPaidSplitArea');
+  if(!wrap || !area) return;
+  const ids = Array.from(wrap.querySelectorAll('.ac-payer-check:checked')).map(cb => cb.value);
+  if(ids.length <= 1){ area.innerHTML = ''; return; }
+  const equal = Math.round((100/ids.length)*10)/10;
+  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Aufteilung der Vorschusszahlung (muss 100% ergeben):</div>' +
+    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="ac-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
+    '<div class="split-total" id="acSplitTotal"></div>';
+  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', () => {
+    const inputs = Array.from(area.querySelectorAll('.ac-split-input'));
+    const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+    const el = document.getElementById('acSplitTotal');
+    el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
+    el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
+  }));
+}
+
+function renderAnnualCostList(){
+  const yearSel = document.getElementById('annualCostYear');
+  const wrap = document.getElementById('annualCostList');
+  if(!yearSel || !wrap) return;
+  const year = yearSel.value;
+  const items = (state.annualCosts && state.annualCosts[year]) || [];
+  if(!items.length){ wrap.innerHTML = '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; return; }
+  wrap.innerHTML = items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
+    const payerIds = Object.keys(c.paidBy || {});
+    const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : partyName(payerIds[0]);
+    return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
+      '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(c.type) + '</b><span>' + fmtCHF(c.amount) + '</span></div>' +
+      '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + (c.date ? ' · ' + c.date : '') + '</div>' +
+      '<div class="hint" style="margin:0;">Bezahlt: ' + escapeHtml(payerLabel) + '</div>' +
+      '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' +
+    '</div>';
+  }).join('');
+  wrap.querySelectorAll('.del-btn[data-ac-id]').forEach(btn => btn.addEventListener('click', async () => {
+    const year = btn.dataset.acYear;
+    state.annualCosts[year] = (state.annualCosts[year] || []).filter(c => c.id !== btn.dataset.acId);
+    await saveShared();
+    renderAnnualCostList(); renderSettlement();
+  }));
 }
 
 function copyToClipboard(text){
@@ -1464,6 +1912,7 @@ function renderAll(){
   updateHeaderMeta();
   renderInstruments();
   updateTabVisibility();
+  updatePhotoRequiredUI();
 }
 
 function startPolling(){
@@ -1508,7 +1957,7 @@ async function init(){
       status.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
     }
   });
-  [['f-party','err-party'],['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
+  [['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
     const el = document.getElementById(fieldId);
     el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
     el.addEventListener('change', () => document.getElementById(errId).classList.remove('show'));
