@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>Bootslogbuch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --hull:#161513;
+  --hull2:#211F1C;
+  --hull-glow:#332E26;
+  --foam:#F2F0EC;
+  --panel:#FFFFFF;
+  --ink:#181715;
+  --ink-soft:#5C5852;
+  --ink-faint:#9A958C;
+  --volt:#B8823B;
+  --volt-dark:#93661E;
+  --flare:#C4453A;
+  --flare-bg:#F5E3E0;
+  --surf:#93661E;
+  --surf-bg:#EFE3CD;
+  --line: rgba(24,23,21,0.10);
+  --line-strong: rgba(24,23,21,0.20);
+  --radius-sm:10px;
+  --radius:16px;
+  --radius-lg:24px;
+  --shadow:0 1px 2px rgba(20,18,14,0.05), 0 10px 28px -14px rgba(20,18,14,0.24);
+}
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  background:var(--foam);
+  color:var(--ink);
+  font-family:'Inter', sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{ max-width:900px; margin:0 auto; padding:0 0 5rem; }
+
+/* ---------- Hero ---------- */
+.hero{
+  position:relative;
+  background:linear-gradient(155deg, var(--hull) 0%, var(--hull2) 65%, #2A2318 100%);
+  color:#fff;
+  padding:2.4rem 1.6rem 2rem;
+  overflow:hidden;
+}
+.hero-mesh{ position:absolute; inset:0; z-index:0; pointer-events:none; }
+.hero-mesh svg{ width:100%; height:100%; display:block; }
+.hero::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:0; height:4px;
+  background:linear-gradient(90deg, transparent 0%, var(--volt) 35%, var(--volt) 65%, transparent 100%);
+}
+.scene-strip{ position:fixed; left:0; right:0; bottom:0; height:150px; z-index:0; pointer-events:none; }
+.scene-strip svg{ width:100%; height:100%; display:block; }
+.hero-inner{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; }
+.hero h1{
+  font-family:'Big Shoulders Display', sans-serif;
+  font-weight:800;
+  font-size:2.6rem;
+  text-transform:uppercase;
+  letter-spacing:0.01em;
+  line-height:0.95;
+  margin:0;
+}
+.hero .sub{
+  font-size:0.85rem;
+  color:rgba(255,255,255,0.62);
+  margin-top:0.5rem;
+  max-width:32ch;
+}
+.hero .meta{
+  font-family:'JetBrains Mono', monospace;
+  font-size:0.72rem;
+  color:rgba(255,255,255,0.55);
+  text-align:right;
+  line-height:1.6;
+}
+.admin-badge{
+  display:inline-block;
+  background:var(--volt);
+  color:var(--hull);
+  font-family:'Inter', sans-serif;
+  font-size:0.62rem;
+  font-weight:700;
+  letter-spacing:0.05em;
+  text-transform:uppercase;
+  padding:0.15rem 0.5rem;
+  border-radius:20px;
+}
+.admin-strip{
+  position:relative; z-index:1;
+  margin-top:0.9rem;
+  display:flex; justify-content:flex-end;
+}
+.instruments{ display:flex; gap:0.6rem; margin-top:1.5rem; position:relative; z-index:1; flex-wrap:wrap; }
+.instrument{
+  background:rgba(255,255,255,0.14);
+  border:1px solid rgba(255,255,255,0.22);
+  border-radius:var(--radius-sm);
+  padding:0.6rem 0.9rem;
+  flex:1; min-width:110px;
+}
+.instrument .num{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.4rem; line-height:1; }
+.instrument .lbl{ font-size:0.62rem; text-transform:uppercase; letter-spacing:0.05em; color:rgba(255,255,255,0.5); margin-top:0.2rem; }
+
+/* ---------- Nav ---------- */
+.navwrap{ padding:0 1.6rem; position:sticky; top:0; z-index:20; background:var(--foam); padding-top:1rem; }
+.nav{
+  display:flex; gap:0.2rem;
+  background:var(--hull);
+  border-radius:999px;
+  padding:0.3rem;
+  position:relative;
+  margin-bottom:0.6rem;
+}
+.nav-indicator{
+  position:absolute; top:0.3rem; bottom:0.3rem; left:0.3rem;
+  background:var(--volt);
+  border-radius:999px;
+  transition:transform 0.3s cubic-bezier(.65,0,.35,1), width 0.3s cubic-bezier(.65,0,.35,1);
+  z-index:0;
+}
+.tab{
+  flex:1;
+  font-family:'Inter', sans-serif;
+  font-weight:600;
+  font-size:0.78rem;
+  letter-spacing:0.02em;
+  color:rgba(255,255,255,0.55);
+  background:transparent;
+  border:none;
+  padding:0.65rem 0.5rem;
+  cursor:pointer;
+  border-radius:999px;
+  position:relative;
+  z-index:1;
+  transition:color 0.25s ease;
+  white-space:nowrap;
+}
+.tab.active{ color:var(--hull); }
+
+.content{ padding:0.9rem 1.6rem 0; }
+.panel{ display:none; }
+.panel.active{ display:block; animation:fadeIn 0.3s ease; }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(4px);} to{ opacity:1; transform:translateY(0);} }
+@media (prefers-reduced-motion: reduce){
+  .panel.active{ animation:none; }
+  .nav-indicator, .gauge .fill{ transition:none !important; }
+}
+
+/* ---------- Cards ---------- */
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius-lg);
+  padding:1.5rem 1.5rem 1.6rem;
+  margin-bottom:1.2rem;
+  box-shadow:var(--shadow);
+}
+.card h2{
+  font-family:'Big Shoulders Display', sans-serif;
+  font-weight:700;
+  font-size:1.3rem;
+  text-transform:uppercase;
+  letter-spacing:0.01em;
+  margin:0 0 1.1rem;
+  color:var(--hull);
+}
+.card h3{
+  font-family:'Big Shoulders Display', sans-serif;
+  font-weight:700;
+  font-size:1.05rem;
+  text-transform:uppercase;
+  letter-spacing:0.01em;
+  margin:1.4rem 0 0.8rem;
+  color:var(--hull);
+}
+
+label{
+  display:block;
+  font-size:0.7rem;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:var(--ink-faint);
+  margin-bottom:0.35rem;
+}
+input, select{
+  width:100%;
+  font-family:'JetBrains Mono', monospace;
+  font-size:0.9rem;
+  color:var(--ink);
+  background:var(--foam);
+  border:1.5px solid transparent;
+  border-radius:var(--radius-sm);
+  padding:0.6rem 0.7rem;
+  transition:border-color 0.15s ease;
+}
+input:focus, select:focus{
+  outline:none;
+  border-color:var(--surf);
+  background:#fff;
+}
+.field{ margin-bottom:0.9rem; }
+.row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.9rem; }
+
+.type-toggle{ display:flex; gap:0.4rem; margin-bottom:1.2rem; }
+.type-toggle button{
+  flex:1;
+  font-family:'Inter', sans-serif;
+  font-size:0.82rem;
+  font-weight:600;
+  padding:0.65rem 0.8rem;
+  border-radius:var(--radius-sm);
+  border:1.5px solid var(--line-strong);
+  background:#fff;
+  color:var(--ink-soft);
+  cursor:pointer;
+  transition:all 0.15s ease;
+}
+.type-toggle button.active{ background:var(--hull); border-color:var(--hull); color:#fff; }
+.hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
+
+.btn{
+  font-family:'Inter', sans-serif;
+  font-weight:700;
+  font-size:0.85rem;
+  padding:0.68rem 1.3rem;
+  border-radius:var(--radius-sm);
+  border:none;
+  background:var(--volt);
+  color:var(--hull);
+  cursor:pointer;
+  transition:background 0.15s ease, transform 0.1s ease;
+}
+.btn:hover{ background:var(--volt-dark); }
+.btn:active{ transform:scale(0.98); }
+.btn.secondary{ background:transparent; color:var(--hull); border:1.5px solid var(--line-strong); }
+.btn.secondary:hover{ background:var(--foam); }
+
+table{ width:100%; border-collapse:collapse; font-size:0.83rem; }
+th{
+  text-align:left; font-family:'Inter', sans-serif; font-weight:600; font-size:0.68rem;
+  text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint);
+  border-bottom:1px solid var(--line); padding:0.5rem 0.5rem;
+}
+td{ padding:0.55rem 0.5rem; border-bottom:1px solid var(--line); font-family:'JetBrains Mono', monospace; vertical-align:middle; }
+td.name-cell, th.name-cell{ font-family:'Inter', sans-serif; font-weight:500; }
+tr:last-child td{ border-bottom:1px solid var(--line-strong); }
+.num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+.tag{ font-family:'Inter', sans-serif; font-size:0.64rem; font-weight:700; padding:0.18rem 0.55rem; border-radius:20px; display:inline-block; letter-spacing:0.02em; }
+.tag.usage{ background:var(--surf-bg); color:var(--surf); }
+.tag.refuel{ background:var(--flare-bg); color:var(--flare); }
+.tag.locked{ background:var(--foam); color:var(--ink-faint); border:1px solid var(--line-strong); }
+.del-btn{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-family:'Inter', sans-serif; font-weight:600; font-size:0.76rem; }
+.del-btn:hover{ color:var(--surf); }
+.locked-note{ font-family:'Inter', sans-serif; font-size:0.72rem; color:var(--ink-faint); font-style:italic; }
+.thumb{ width:38px; height:38px; object-fit:cover; border-radius:6px; cursor:zoom-in; border:1px solid var(--line-strong); display:block; }
+.empty{ color:var(--ink-faint); font-size:0.88rem; padding:1.6rem 1rem; text-align:center; border:1.5px dashed var(--line-strong); border-radius:var(--radius-sm); }
+
+.year-select{ display:flex; align-items:center; gap:0.6rem; margin-bottom:1.3rem; }
+.year-select label{ margin:0; }
+.year-select select{ width:auto; min-width:100px; }
+
+.notice{
+  font-size:0.8rem; color:var(--ink-soft); background:var(--surf-bg);
+  border:1px solid rgba(0,144,255,0.18); padding:0.65rem 0.9rem;
+  border-radius:var(--radius-sm); margin-bottom:1.2rem;
+}
+.notice.warn{ background:var(--flare-bg); border-color:rgba(255,71,87,0.2); }
+
+/* ---------- Pegel-Balken (Saldo) ---------- */
+.stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.7rem; margin-bottom:1.4rem; }
+.stat{ background:var(--foam); border-radius:var(--radius-sm); padding:0.8rem 0.95rem; }
+.stat .num{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.4rem; color:var(--hull); }
+.stat .lbl{ font-size:0.66rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.05em; margin-top:0.1rem; }
+
+.balance-card{ border:1px solid var(--line); border-radius:var(--radius-sm); padding:1rem 1.1rem; margin-bottom:0.7rem; }
+.balance-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.6rem; }
+.balance-head .name{ font-weight:700; font-size:0.95rem; }
+.balance-head .amt{ font-family:'JetBrains Mono', monospace; font-weight:700; font-size:1rem; }
+.amt.pos{ color:#1C9A64; }
+.amt.neg{ color:var(--flare); }
+.balance-meta{ font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:var(--ink-faint); margin-bottom:0.6rem; display:flex; gap:1rem; flex-wrap:wrap; }
+.gauge{ height:12px; border-radius:8px; background:var(--foam); position:relative; overflow:hidden; border:1px solid var(--line); }
+.gauge .center-line{ position:absolute; left:50%; top:-2px; bottom:-2px; width:2px; background:var(--ink-faint); z-index:2; }
+.gauge .fill{ position:absolute; top:0; bottom:0; transition:width 0.7s cubic-bezier(.65,0,.35,1); width:0; }
+.gauge .fill.pos{ left:50%; background:linear-gradient(90deg, #1C9A64, var(--volt)); border-radius:0 8px 8px 0; }
+.gauge .fill.neg{ right:50%; background:linear-gradient(270deg, var(--flare), #FF8A7A); border-radius:8px 0 0 8px; }
+.gauge-scale{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.6rem; color:var(--ink-faint); margin-top:0.3rem; }
+
+.foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
+
+/* ---------- Rundstempel Ausgleich ---------- */
+.stamps{ display:flex; flex-wrap:wrap; gap:1.3rem; margin-top:1.4rem; }
+.stamp{
+  border:3px solid var(--hull);
+  border-radius:50%;
+  width:172px; height:172px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:0.8rem; position:relative; flex-shrink:0;
+  background:var(--panel);
+}
+.stamp::before{
+  content:""; position:absolute; inset:7px; border:1.5px dashed var(--volt-dark); border-radius:50%;
+}
+.stamp .lbl{ font-family:'Inter', sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:0.2rem; }
+.stamp .amt{ font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:1.6rem; color:var(--hull); line-height:1.1; }
+.stamp .parties{ font-family:'JetBrains Mono', monospace; font-size:0.66rem; color:var(--ink-soft); margin-top:0.25rem; }
+.settled-note{ font-weight:600; color:#1C9A64; font-size:0.9rem; background:#E4F7EE; padding:0.7rem 0.9rem; border-radius:var(--radius-sm); }
+
+/* ---------- Parteien ---------- */
+.party-row{ display:flex; align-items:center; gap:0.8rem; padding:0.7rem 0; border-bottom:1px solid var(--line); }
+.party-row:last-child{ border-bottom:none; }
+.avatar{ width:34px; height:34px; border-radius:50%; flex-shrink:0; background:var(--hull); color:var(--volt); display:flex; align-items:center; justify-content:center; font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:0.9rem; }
+.party-row input{ flex:1; font-family:'Inter', sans-serif; }
+.add-party-form{ display:flex; gap:0.6rem; margin-top:1rem; }
+.add-party-form input{ flex:1; font-family:'Inter', sans-serif; }
+
+/* ---------- Zugriffscode / Admin ---------- */
+.gate-overlay{ position:fixed; inset:0; z-index:100; background:rgba(10,24,38,0.72); display:flex; align-items:center; justify-content:center; padding:1.2rem; }
+.gate-card{ background:var(--panel); border-radius:var(--radius-lg); padding:1.9rem 1.8rem; max-width:370px; width:100%; box-shadow:var(--shadow); }
+.gate-card h2{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; text-transform:uppercase; font-size:1.4rem; color:var(--hull); margin:0 0 0.6rem; }
+.gate-card p{ font-size:0.83rem; color:var(--ink-soft); margin:0 0 1.1rem; line-height:1.5; }
+.gate-error{ color:var(--flare); font-size:0.78rem; margin-top:0.5rem; display:none; font-weight:600; }
+.gate-error.show{ display:block; }
+
+.admin-box{ border:1px solid var(--line); border-radius:var(--radius-sm); padding:1.1rem 1.2rem; margin-bottom:1.2rem; background:var(--foam); }
+.admin-box .code-display{
+  font-family:'JetBrains Mono', monospace; font-size:1.2rem; letter-spacing:0.08em;
+  background:var(--hull); color:var(--volt); border-radius:var(--radius-sm);
+  padding:0.55rem 0.85rem; display:inline-block; margin:0.3rem 0 0.8rem;
+}
+.toggle-row{ display:flex; align-items:center; gap:0.7rem; margin:0.6rem 0; }
+.toggle-row label{ margin:0; text-transform:none; font-size:0.86rem; color:var(--ink); letter-spacing:0; font-weight:500; }
+.switch{ position:relative; width:42px; height:24px; flex-shrink:0; }
+.switch input{ opacity:0; width:0; height:0; }
+.switch .slider{ position:absolute; inset:0; background:var(--line-strong); border-radius:22px; cursor:pointer; transition:0.2s; }
+.switch .slider::before{ content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:0.2s; }
+.switch input:checked + .slider{ background:var(--volt); }
+.switch input:checked + .slider::before{ transform:translateX(18px); }
+
+@media (max-width: 560px){
+  .hero{ padding:1.9rem 1.1rem 1.6rem; }
+  .hero h1{ font-size:2.1rem; }
+  .scene-strip{ height:85px; }
+  .navwrap, .content{ padding-left:1.1rem; padding-right:1.1rem; }
+  .card{ padding:1.2rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="gate-overlay" id="gateOverlay" style="display:none;">
+  <div class="gate-card" id="gateCard"></div>
+</div>
+
+<div class="scene-strip" aria-hidden="true">
+  <svg viewBox="0 0 1400 180" preserveAspectRatio="none">
+    <!-- Hintere Wellenschicht -->
+    <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105 L1400,180 L0,180 Z"
+          fill="var(--ink)" fill-opacity="0.4"/>
+    <!-- Vordere Wellenschicht (durchgehend) -->
+    <path d="M0,125 Q100,100 200,125 Q300,150 400,125 Q500,100 600,125 Q700,150 800,125 Q900,100 1000,125 Q1100,150 1200,125 Q1300,100 1400,125 L1400,180 L0,180 Z"
+          fill="var(--ink)" fill-opacity="0.85"/>
+
+    <!-- Bronze-Akzente: Wellenkämme -->
+    <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105"
+          fill="none" stroke="var(--volt)" stroke-width="1.4" opacity="0.55"/>
+    <path d="M0,125 Q100,100 200,125 Q300,150 400,125 Q500,100 600,125 Q700,150 800,125 Q900,100 1000,125 Q1100,150 1200,125 Q1300,100 1400,125"
+          fill="none" stroke="var(--volt)" stroke-width="1.8" opacity="0.7"/>
+  </svg>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
+
+  <div class="hero">
+    <div class="hero-mesh" aria-hidden="true">
+      <svg viewBox="0 0 420 130" preserveAspectRatio="none">
+        <path d="M0,10 Q35,1 70,10 Q105,19 140,10 Q175,1 210,10 Q245,19 280,10 Q315,1 350,10 Q385,19 420,10
+                 M0,42 Q35,33 70,42 Q105,51 140,42 Q175,33 210,42 Q245,51 280,42 Q315,33 350,42 Q385,51 420,42
+                 M0,74 Q35,83 70,74 Q105,65 140,74 Q175,83 210,74 Q245,65 280,74 Q315,83 350,74 Q385,65 420,74
+                 M0,102 Q26,93 53,102 Q79,111 105,102 Q131,93 158,102 Q184,111 210,102 Q236,93 263,102 Q289,111 315,102 Q341,93 368,102 Q394,111 420,102"
+              stroke="var(--volt)" stroke-width="0.8" fill="none" opacity="0.28"/>
+        <path d="M0,18 Q35,6 70,18 Q105,30 140,18 Q175,6 210,18 Q245,30 280,18 Q315,6 350,18 Q385,30 420,18
+                 M0,50 Q35,37 70,50 Q105,63 140,50 Q175,37 210,50 Q245,63 280,50 Q315,37 350,50 Q385,63 420,50
+                 M0,82 Q35,94 70,82 Q105,70 140,82 Q175,94 210,82 Q245,70 280,82 Q315,94 350,82 Q385,70 420,82
+                 M0,108 Q26,102 53,108 Q79,114 105,108 Q131,102 158,108 Q184,114 210,108 Q236,102 263,108 Q289,114 315,108 Q341,102 368,108 Q394,114 420,108"
+              stroke="var(--volt)" stroke-width="0.55" fill="none" opacity="0.24"/>
+        <path d="M0,26 Q35,18 70,26 Q105,34 140,26 Q175,18 210,26 Q245,34 280,26 Q315,18 350,26 Q385,34 420,26
+                 M0,58 Q35,68 70,58 Q105,48 140,58 Q175,68 210,58 Q245,48 280,58 Q315,68 350,58 Q385,48 420,58
+                 M0,90 Q35,100 70,90 Q105,80 140,90 Q175,100 210,90 Q245,80 280,90 Q315,100 350,90 Q385,80 420,90
+                 M0,114 Q26,106 53,114 Q79,122 105,114 Q131,106 158,114 Q184,122 210,114 Q236,106 263,114 Q289,122 315,114 Q341,106 368,114 Q394,122 420,114"
+              stroke="var(--volt)" stroke-width="0.35" fill="none" opacity="0.18"/>
+        <path d="M0,34 Q35,23 70,34 Q105,45 140,34 Q175,23 210,34 Q245,45 280,34 Q315,23 350,34 Q385,45 420,34
+                 M0,66 Q35,79 70,66 Q105,53 140,66 Q175,79 210,66 Q245,53 280,66 Q315,79 350,66 Q385,53 420,66
+                 M0,96 Q26,89 53,96 Q79,103 105,96 Q131,89 158,96 Q184,103 210,96 Q236,89 263,96 Q289,103 315,96 Q341,89 368,96 Q394,103 420,96"
+              stroke="var(--volt)" stroke-width="0.22" fill="none" opacity="0.14"/>
+      </svg>
+    </div>
+    <div class="hero-inner">
+      <div>
+        <h1>Bootslogbuch</h1>
+        <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+      </div>
+      <div class="meta" id="headerMeta">wird geladen …</div>
+    </div>
+    <div id="adminStrip"></div>
+    <div class="instruments" id="instruments"></div>
+  </div>
+
+  <div class="navwrap">
+    <div class="nav" id="tabNav">
+      <div class="nav-indicator" id="navIndicator"></div>
+      <button class="tab active" data-tab="parties">Parteien</button>
+      <button class="tab" data-tab="log">Logbuch</button>
+      <button class="tab" data-tab="settlement">Abrechnung</button>
+      <button class="tab" data-tab="admin" style="display:none;">Verwaltung</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="panel active" id="panel-parties">
+      <div class="card">
+        <h2>Parteien verwalten</h2>
+        <div id="partyList"></div>
+        <div class="add-party-form">
+          <input type="text" id="newPartyName" placeholder="Name der neuen Partei">
+          <button class="btn secondary" id="addPartyBtn">Hinzufügen</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Vorrangregel</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Legt fest, welche Partei bei Terminüberschneidungen das Vorrecht hat. Wird jedes Kalenderjahr neu festgelegt.</div>
+        <div class="field"><label for="priorityYear">Jahr</label><select id="priorityYear"></select></div>
+        <div id="priorityRuleBody"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-log">
+      <div class="notice">Diese Daten sind geteilt gespeichert — alle Parteien mit gültigem Zugangscode sehen dasselbe Logbuch. Änderungen erscheinen in Echtzeit bei allen.</div>
+
+      <div class="card">
+        <h2>Neuer Eintrag</h2>
+        <div class="type-toggle" id="typeToggle">
+          <button type="button" class="active" data-type="usage">Nutzung</button>
+          <button type="button" data-type="refuel">Tanken</button>
+        </div>
+        <div class="hint" style="margin-bottom:1.1rem;">Beides antippen, wenn an diesem Tag gefahren <b>und</b> getankt wurde.</div>
+        <div class="row">
+          <div class="field"><label for="f-party">Partei *</label><select id="f-party" required></select><div class="gate-error" id="err-party">Bitte eine Partei wählen.</div></div>
+          <div class="field"><label for="f-date">Datum *</label><input type="date" id="f-date" required><div class="gate-error" id="err-date">Bitte ein Datum angeben.</div></div>
+        </div>
+        <div class="row" id="usageFields">
+          <div class="field">
+            <label for="f-reading">Motorenstundenstand *</label>
+            <input type="number" id="f-reading" step="0.1" min="0" placeholder="z. B. 1234.5" required>
+            <div class="hint">Der aktuelle Stand des Motorenstundenzählers (wie der km-Stand beim Auto) — die gefahrenen Stunden werden automatisch aus der Differenz zum letzten Eintrag berechnet.</div>
+            <div class="gate-error" id="err-reading"></div>
+          </div>
+          <div class="field">
+            <label for="f-consumption">Ø Verbrauch dieses Tages (l/h) *</label>
+            <input type="number" id="f-consumption" step="0.1" min="0" placeholder="0.0" required>
+            <div class="hint">Hängt von der Fahrweise ab — ruhige Fahrt niedriger, Wakesurfen mit vollen Ballasttanks deutlich höher.</div>
+            <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
+          </div>
+          <div class="field" style="grid-column:1 / -1;">
+            <label for="f-photo">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
+            <input type="file" id="f-photo" accept="image/*" required>
+            <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
+            <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
+            <div class="gate-error" id="err-photo">Bitte ein Beweisfoto auswählen — dieses Feld ist Pflicht.</div>
+          </div>
+        </div>
+        <div class="row" id="refuelFields" style="display:none;">
+          <div class="field"><label for="f-liters">Liter Benzin</label><input type="number" id="f-liters" step="0.1" min="0" placeholder="0.0"></div>
+          <div class="field"><label for="f-expense">Ausgaben Tankfüllung (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
+        </div>
+        <div style="display:flex; gap:0.6rem; margin-top:0.3rem;">
+          <button class="btn" id="addEntryBtn">Eintragen</button>
+          <button class="btn secondary" id="cancelEditBtn" style="display:none;">Abbrechen</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Einträge</h2>
+        <div class="year-select"><label>Jahr</label><select id="logYearFilter"></select></div>
+        <div id="entriesTableWrap"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-settlement">
+      <div class="card">
+        <h2>Jahresabrechnung</h2>
+        <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
+        <div id="settlementContent"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-admin">
+      <div class="card" id="adminCard"></div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBciyBsE9G38gqPGKHbx5Jru8bD8JiB07I",
+  authDomain: "bootslogbuch.firebaseapp.com",
+  databaseURL: "https://bootslogbuch-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "bootslogbuch",
+  storageBucket: "bootslogbuch.firebasestorage.app",
+  messagingSenderId: "699837873827",
+  appId: "1:699837873827:web:fb420c59d0e91abe330916"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const dataRef = ref(db, 'bootslogbuch/data');
+let state = { parties: [], entries: [], settings: null, priorityRules: {} };
+let session = { partyCode: null, partyId: null, adminCode: null };
+let isAdminUser = false;
+let accessGranted = false;
+let activeTypes = new Set(['usage']);
+let editingId = null;
+let pendingPhotoDataUrl = null;
+let existingPhotoDataUrl = null;
+const STORAGE_KEY = 'boot-logbuch-data';
+const SESSION_KEY = 'boot-logbuch-session';
+const LOCK_MS = 24 * 60 * 60 * 1000;
+
+function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+function randomCode(len){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for(let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+function defaultData(){
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {} };
+}
+
+async function loadShared(){
+  try{
+    const snap = await get(dataRef);
+    if(snap.exists()){
+      const loaded = snap.val() || {};
+      state.parties = (loaded.parties && loaded.parties.length) ? loaded.parties : defaultData().parties;
+      state.entries = loaded.entries || [];
+      state.settings = loaded.settings || null;
+      state.priorityRules = loaded.priorityRules || {};
+    } else {
+      state = defaultData();
+    }
+  } catch(e){
+    console.error('Laden fehlgeschlagen', e);
+    if(!state.parties.length) state = defaultData();
+  }
+  let migrated = false;
+  state.parties.forEach(p => { if(!p.code){ p.code = randomCode(6); migrated = true; } });
+  if(migrated && state.settings){ await saveShared(); }
+}
+
+async function saveShared(){
+  try{
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {} });
+  } catch(e){ console.error('Speichern fehlgeschlagen', e); }
+  updateHeaderMeta();
+}
+
+function subscribeRealtime(){
+  onValue(dataRef, (snapshot) => {
+    const loaded = snapshot.val() || {};
+    state.parties = (loaded.parties && loaded.parties.length) ? loaded.parties : (state.parties.length ? state.parties : defaultData().parties);
+    state.entries = loaded.entries || [];
+    state.settings = loaded.settings || null;
+    state.priorityRules = loaded.priorityRules || {};
+    evaluateAccess();
+    if(!state.settings || !accessGranted){ showGate(); return; }
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+    if(isTyping) return;
+    hideGate();
+    renderAll();
+  });
+}
+
+async function loadSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(raw) session = JSON.parse(raw);
+  } catch(e){ /* noch kein persönlicher Code gespeichert */ }
+}
+async function saveSession(){
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+  catch(e){ console.error('Sitzung konnte nicht gespeichert werden', e); }
+}
+
+function evaluateAccess(){
+  if(!state.settings){ accessGranted = false; isAdminUser = false; return; }
+  isAdminUser = !!(session.adminCode && session.adminCode === state.settings.adminCode);
+  const partyStillValid = !!(session.partyCode && state.parties.some(p => p.id === session.partyId && p.code === session.partyCode));
+  accessGranted = isAdminUser || partyStillValid;
+}
+
+function updateHeaderMeta(){
+  const el = document.getElementById('headerMeta');
+  if(!el) return;
+  el.innerHTML = 'Parteien: ' + state.parties.length + ' · Einträge: ' + state.entries.length;
+  const strip = document.getElementById('adminStrip');
+  if(strip){
+    strip.innerHTML = isAdminUser ? '<div class="admin-strip"><span class="admin-badge">Administrator</span></div>' : '';
+  }
+}
+
+function renderInstruments(){
+  const year = new Date().getFullYear();
+  const hoursMap = computeHoursMap();
+  const hoursThisYear = state.entries.filter(e => yearOf(e.date) === year).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+  document.getElementById('instruments').innerHTML =
+    '<div class="instrument"><div class="num">' + state.entries.length + '</div><div class="lbl">Einträge</div></div>' +
+    '<div class="instrument"><div class="num">' + fmtNum(hoursThisYear,1) + '</div><div class="lbl">Std. ' + year + '</div></div>' +
+    '<div class="instrument"><div class="num">' + state.parties.length + '</div><div class="lbl">Parteien</div></div>';
+}
+
+function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currency:'CHF', minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function fmtNum(n, dec){ return n.toLocaleString('de-CH', { minimumFractionDigits:dec, maximumFractionDigits:dec }); }
+function yearOf(dateStr){ if(!dateStr) return null; return parseInt(dateStr.split('-')[0], 10); }
+function partyName(id){ const p = state.parties.find(p => p.id === id); return p ? p.name : '(unbekannt)'; }
+function initials(name){ return name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
+
+function getEntryFlags(e){
+  if(typeof e.hasUsage === 'boolean' || typeof e.hasRefuel === 'boolean'){ return { hasUsage: !!e.hasUsage, hasRefuel: !!e.hasRefuel }; }
+  return { hasUsage: e.type === 'usage', hasRefuel: e.type === 'refuel' };
+}
+
+function isLocked(e){
+  if(isAdminUser) return false;
+  if(state.settings && state.settings.unlockAll) return false;
+  const createdAt = e.createdAt || 0;
+  return (Date.now() - createdAt) > LOCK_MS;
+}
+
+function allYears(){
+  const ys = new Set();
+  state.entries.forEach(e => { const y = yearOf(e.date); if(y) ys.add(y); });
+  ys.add(new Date().getFullYear());
+  return Array.from(ys).sort((a,b) => b - a);
+}
+
+function sortedUsageEntries(excludeId){
+  return state.entries
+    .filter(e => e.id !== excludeId && getEntryFlags(e).hasUsage && typeof e.reading === 'number')
+    .sort((a,b) => (a.date === b.date) ? ((a.createdAt||0)-(b.createdAt||0)) : a.date.localeCompare(b.date));
+}
+
+function initialReading(){
+  return (state.settings && typeof state.settings.initialReading === 'number') ? state.settings.initialReading : 0;
+}
+
+function computeHoursMap(){
+  const map = {};
+  const chain = sortedUsageEntries(null);
+  let prev = initialReading();
+  chain.forEach(e => { map[e.id] = e.reading - prev; prev = e.reading; });
+  state.entries.forEach(e => {
+    if(getEntryFlags(e).hasUsage && typeof e.reading !== 'number' && typeof e.hours === 'number'){ map[e.id] = e.hours; }
+  });
+  return map;
+}
+
+function validateReading(date, reading, excludeId){
+  const chain = sortedUsageEntries(excludeId);
+  const existing = excludeId ? state.entries.find(e => e.id === excludeId) : null;
+  const candidate = { date, reading, createdAt: (existing ? existing.createdAt : Date.now()) || Date.now(), __new:true };
+  chain.push(candidate);
+  chain.sort((a,b) => (a.date === b.date) ? ((a.createdAt||0)-(b.createdAt||0)) : a.date.localeCompare(b.date));
+  const idx = chain.findIndex(e => e.__new);
+  const prev = idx > 0 ? chain[idx-1].reading : initialReading();
+  const next = idx < chain.length-1 ? chain[idx+1] : null;
+  if(reading <= prev){ return { ok:false, message:'Der Stand muss höher sein als der vorherige Eintrag (' + fmtNum(prev,1) + ').' }; }
+  if(next && reading >= next.reading){ return { ok:false, message:'Der Stand muss niedriger sein als der nachfolgende Eintrag (' + fmtNum(next.reading,1) + ').' }; }
+  return { ok:true };
+}
+
+function populatePartySelect(){
+  const sel = document.getElementById('f-party');
+  const prev = sel.value;
+  sel.innerHTML = state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
+  if(state.parties.some(p => p.id === prev)) sel.value = prev;
+}
+
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function toggleType(type){
+  if(activeTypes.has(type)){ if(activeTypes.size === 1) return; activeTypes.delete(type); }
+  else { activeTypes.add(type); }
+  applyTypeDisplay();
+}
+function applyTypeDisplay(){
+  document.querySelectorAll('#typeToggle button').forEach(b => b.classList.toggle('active', activeTypes.has(b.dataset.type)));
+  document.getElementById('usageFields').style.display = activeTypes.has('usage') ? 'grid' : 'none';
+  document.getElementById('refuelFields').style.display = activeTypes.has('refuel') ? 'grid' : 'none';
+}
+
+async function addEntry(){
+  const partyId = document.getElementById('f-party').value;
+  const date = document.getElementById('f-date').value;
+
+  clearEntryErrors();
+  let hasError = false;
+  const showErr = (id, msg) => {
+    const el = document.getElementById(id);
+    if(msg) el.textContent = msg;
+    el.classList.add('show');
+    hasError = true;
+  };
+
+  if(!partyId){ showErr('err-party'); }
+  if(!date){ showErr('err-date'); }
+  else {
+    const today = new Date().toISOString().slice(0,10);
+    if(date > today){ showErr('err-date', 'Das Datum darf nicht in der Zukunft liegen.'); }
+  }
+
+  const data = { partyId, date, hasUsage: activeTypes.has('usage'), hasRefuel: activeTypes.has('refuel') };
+
+  if(data.hasUsage){
+    const readingRaw = document.getElementById('f-reading').value;
+    const readingVal = parseFloat(readingRaw);
+    if(readingRaw === '' || isNaN(readingVal)){
+      showErr('err-reading', 'Bitte den aktuellen Motorenstundenstand angeben.');
+    } else {
+      const check = validateReading(date || '0000-00-00', readingVal, editingId);
+      if(!check.ok){ showErr('err-reading', check.message); }
+      else { data.reading = readingVal; }
+    }
+    const consumptionRaw = document.getElementById('f-consumption').value;
+    data.consumption = parseFloat(consumptionRaw) || 0;
+    if(!consumptionRaw || data.consumption <= 0){ showErr('err-consumption'); }
+    if(pendingPhotoDataUrl){
+      data.photo = pendingPhotoDataUrl;
+    } else if(editingId && existingPhotoDataUrl){
+      data.photo = existingPhotoDataUrl;
+    } else {
+      showErr('err-photo');
+    }
+  }
+  if(data.hasRefuel){
+    data.liters = parseFloat(document.getElementById('f-liters').value) || 0;
+    data.expense = parseFloat(document.getElementById('f-expense').value) || 0;
+    if(data.expense <= 0){ showErr('err-expense'); }
+  }
+
+  if(hasError) return;
+
+  if(editingId){
+    const idx = state.entries.findIndex(e => e.id === editingId);
+    if(idx !== -1){
+      if(isLocked(state.entries[idx])){
+        showErr('err-party', 'Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn ändern oder die Sperre aufheben.');
+        stopEdit();
+        return;
+      }
+      state.entries[idx] = { id: editingId, createdAt: state.entries[idx].createdAt || Date.now(), ...data };
+    }
+    stopEdit();
+  } else {
+    state.entries.push({ id: uid(), createdAt: Date.now(), ...data });
+  }
+
+  await saveShared();
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-reading').value = '';
+  document.getElementById('f-consumption').value = '';
+  document.getElementById('f-liters').value = '';
+  document.getElementById('f-expense').value = '';
+  resetPhotoField();
+  renderYearFilters(); renderEntriesTable(); renderSettlement();
+}
+
+function clearEntryErrors(){
+  ['err-party','err-date','err-reading','err-consumption','err-photo','err-expense'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('show');
+  });
+}
+
+async function compressImage(file, maxDim, quality){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > height){ if(width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; } }
+        else { if(height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        // Graustufen + leicht erhöhter Kontrast: kleinere Datei, Zahlen/Anzeige bleiben gut lesbar
+        ctx.filter = 'grayscale(1) contrast(1.15)';
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const PHOTO_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+
+function pruneOldPhotos(){
+  let changed = false;
+  state.entries.forEach(e => {
+    if(e.photo && (Date.now() - (e.createdAt || 0)) > PHOTO_MAX_AGE_MS){
+      delete e.photo;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function resetPhotoField(){
+  pendingPhotoDataUrl = null;
+  existingPhotoDataUrl = null;
+  const input = document.getElementById('f-photo');
+  if(input) input.value = '';
+  const preview = document.getElementById('photoPreview');
+  if(preview){ preview.style.display = 'none'; preview.src = ''; }
+  const status = document.getElementById('photoStatus');
+  if(status) status.textContent = 'Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.';
+}
+
+function startEdit(id){
+  const e = state.entries.find(e => e.id === id);
+  if(!e) return;
+  if(isLocked(e)){ alert('Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn ändern oder die Sperre aufheben.'); return; }
+  editingId = id;
+  const flags = getEntryFlags(e);
+  activeTypes = new Set();
+  if(flags.hasUsage) activeTypes.add('usage');
+  if(flags.hasRefuel) activeTypes.add('refuel');
+  if(activeTypes.size === 0) activeTypes.add('usage');
+  applyTypeDisplay();
+  document.getElementById('f-party').value = e.partyId;
+  document.getElementById('f-date').value = e.date;
+  document.getElementById('f-reading').value = flags.hasUsage ? (typeof e.reading === 'number' ? e.reading : '') : '';
+  document.getElementById('f-consumption').value = flags.hasUsage ? (e.consumption || '') : '';
+  document.getElementById('f-liters').value = flags.hasRefuel ? (e.liters || '') : '';
+  document.getElementById('f-expense').value = flags.hasRefuel ? (e.expense || '') : '';
+  resetPhotoField();
+  if(flags.hasUsage && e.photo){
+    existingPhotoDataUrl = e.photo;
+    const preview = document.getElementById('photoPreview');
+    preview.src = e.photo; preview.style.display = 'block';
+    document.getElementById('photoStatus').textContent = 'Vorhandenes Foto wird beibehalten. Nur bei Bedarf ein neues auswählen, um es zu ersetzen.';
+  }
+  document.getElementById('addEntryBtn').textContent = 'Aktualisieren';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  document.querySelector('#panel-log .card h2').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function stopEdit(){
+  editingId = null;
+  activeTypes = new Set(['usage']);
+  applyTypeDisplay();
+  document.getElementById('addEntryBtn').textContent = 'Eintragen';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  resetPhotoField();
+}
+
+async function deleteEntry(id){
+  const e = state.entries.find(e => e.id === id);
+  if(e && isLocked(e)){ alert('Dieser Eintrag ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn löschen oder die Sperre aufheben.'); return; }
+  state.entries = state.entries.filter(e => e.id !== id);
+  await saveShared();
+  renderYearFilters(); renderEntriesTable(); renderSettlement();
+}
+
+function renderYearFilters(){
+  const years = allYears();
+  const logSel = document.getElementById('logYearFilter');
+  const setSel = document.getElementById('settlementYear');
+  const prevLog = logSel.value; const prevSet = setSel.value;
+  const opts = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+  logSel.innerHTML = opts; setSel.innerHTML = opts;
+  logSel.value = years.includes(parseInt(prevLog)) ? prevLog : years[0];
+  setSel.value = years.includes(parseInt(prevSet)) ? prevSet : years[0];
+}
+
+function renderEntriesTable(){
+  const yearSel = document.getElementById('logYearFilter');
+  if(!yearSel.value) return;
+  const year = parseInt(yearSel.value);
+  const wrap = document.getElementById('entriesTableWrap');
+  const rows = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => b.date.localeCompare(a.date));
+  const hoursMap = computeHoursMap();
+
+  if(!rows.length){ wrap.innerHTML = '<div class="empty">Noch keine Einträge für ' + year + '.</div>'; return; }
+
+  let html = '<table><thead><tr>' +
+    '<th>Datum</th><th class="name-cell">Partei</th><th>Typ</th>' +
+    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">l/h</th><th class="num">Gesch. l</th><th class="num">Getankt l</th><th class="num">CHF/l</th><th class="num">Ausgaben</th><th>Foto</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  rows.forEach(e => {
+    const flags = getEntryFlags(e);
+    const hours = hoursMap[e.id] || 0;
+    const hasConsumption = flags.hasUsage && typeof e.consumption === 'number' && e.consumption > 0;
+    const estLiters = hasConsumption ? hours * e.consumption : null;
+    const locked = isLocked(e);
+    const tags = (flags.hasUsage ? '<span class="tag usage">Nutzung</span>' : '') +
+                 (flags.hasUsage && flags.hasRefuel ? ' ' : '') +
+                 (flags.hasRefuel ? '<span class="tag refuel">Tanken</span>' : '') +
+                 (locked ? ' <span class="tag locked">gesperrt</span>' : '');
+    html += '<tr>';
+    html += '<td>' + e.date + '</td>';
+    html += '<td class="name-cell">' + escapeHtml(partyName(e.partyId)) + '</td>';
+    html += '<td>' + tags + '</td>';
+    html += '<td class="num">' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading, 1) : '—') + '</td>';
+    html += '<td class="num">' + (flags.hasUsage ? fmtNum(hours, 1) : '—') + '</td>';
+    html += '<td class="num">' + (hasConsumption ? fmtNum(e.consumption, 1) : (flags.hasUsage ? '<span class="amt neg">fehlt</span>' : '—')) + '</td>';
+    html += '<td class="num">' + (estLiters !== null ? fmtNum(estLiters, 1) : '—') + '</td>';
+    html += '<td class="num">' + (flags.hasRefuel && e.liters ? fmtNum(e.liters, 1) : '—') + '</td>';
+    html += '<td class="num">' + (flags.hasRefuel && e.liters > 0 ? fmtNum(e.expense / e.liters, 3) : '—') + '</td>';
+    html += '<td class="num">' + (flags.hasRefuel ? fmtCHF(e.expense) : '—') + '</td>';
+    html += '<td>' + (flags.hasUsage && e.photo ? '<img class="thumb" data-photo-id="' + e.id + '" src="' + e.photo + '" alt="Beweisfoto">' : '—') + '</td>';
+    if(locked){ html += '<td><span class="locked-note">nur Admin</span></td>'; }
+    else { html += '<td><button class="del-btn" data-edit="' + e.id + '">bearbeiten</button> · <button class="del-btn" data-id="' + e.id + '">löschen</button></td>'; }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.del-btn[data-id]').forEach(btn => btn.addEventListener('click', () => deleteEntry(btn.dataset.id)));
+  wrap.querySelectorAll('.del-btn[data-edit]').forEach(btn => btn.addEventListener('click', () => startEdit(btn.dataset.edit)));
+  wrap.querySelectorAll('.thumb').forEach(img => img.addEventListener('click', () => {
+    const entry = state.entries.find(x => x.id === img.dataset.photoId);
+    if(entry && entry.photo) openPhotoLightbox(entry.photo);
+  }));
+}
+
+function openPhotoLightbox(src){
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.cursor = 'zoom-out';
+  overlay.innerHTML = '<img src="' + src + '" style="max-width:92vw; max-height:88vh; border-radius:8px;">';
+  overlay.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+
+function computeSettlement(year){
+  const consumed = {}, partyHoursMap = {}, paid = {};
+  state.parties.forEach(p => { consumed[p.id] = 0; partyHoursMap[p.id] = 0; paid[p.id] = 0; });
+  const entryHours = computeHoursMap();
+
+  state.entries.filter(e => yearOf(e.date) === year).forEach(e => {
+    if(!(e.partyId in consumed)) return;
+    const flags = getEntryFlags(e);
+    if(flags.hasUsage){
+      const h = entryHours[e.id] || 0;
+      partyHoursMap[e.partyId] += h;
+      const c = (typeof e.consumption === 'number' && e.consumption > 0) ? e.consumption : 0;
+      consumed[e.partyId] += h * c;
+    }
+    if(flags.hasRefuel){ paid[e.partyId] += e.expense || 0; }
+  });
+
+  const totalConsumed = Object.values(consumed).reduce((a,b) => a+b, 0);
+  const totalExpense = Object.values(paid).reduce((a,b) => a+b, 0);
+
+  const rows = state.parties.map(p => {
+    const share = totalConsumed > 0 ? totalExpense * (consumed[p.id] / totalConsumed) : 0;
+    return {
+      id: p.id, name: p.name, hours: partyHoursMap[p.id], liters: consumed[p.id],
+      pct: totalConsumed > 0 ? (consumed[p.id] / totalConsumed) * 100 : 0,
+      paid: paid[p.id], fairShare: share, balance: paid[p.id] - share
+    };
+  });
+
+  return { rows, totalConsumed, totalExpense };
+}
+
+function settlementTransactions(rows){
+  const debtors = rows.filter(r => r.balance < -0.005).map(r => ({ name:r.name, amt:-r.balance })).sort((a,b) => b.amt - a.amt);
+  const creditors = rows.filter(r => r.balance > 0.005).map(r => ({ name:r.name, amt:r.balance })).sort((a,b) => b.amt - a.amt);
+  const tx = []; let i = 0, j = 0;
+  while(i < debtors.length && j < creditors.length){
+    const pay = Math.min(debtors[i].amt, creditors[j].amt);
+    if(pay > 0.005){ tx.push({ from: debtors[i].name, to: creditors[j].name, amount: pay }); }
+    debtors[i].amt -= pay; creditors[j].amt -= pay;
+    if(debtors[i].amt <= 0.005) i++;
+    if(creditors[j].amt <= 0.005) j++;
+  }
+  return tx;
+}
+
+function renderSettlement(){
+  const yearSel = document.getElementById('settlementYear');
+  if(!yearSel.value) return;
+  const year = parseInt(yearSel.value);
+  const container = document.getElementById('settlementContent');
+
+  const { rows, totalConsumed, totalExpense } = computeSettlement(year);
+
+  if(totalConsumed === 0 && totalExpense === 0){
+    container.innerHTML = '<div class="empty">Für ' + year + ' liegen noch keine Einträge vor.</div>';
+    return;
+  }
+
+  const missingConsumption = state.entries.some(e => yearOf(e.date) === year && getEntryFlags(e).hasUsage && !(typeof e.consumption === 'number' && e.consumption > 0));
+  let html = '';
+  if(missingConsumption){
+    html += '<div class="notice warn">Mindestens ein Nutzungseintrag in ' + year + ' hat keinen Durchschnittsverbrauch hinterlegt und geht daher mit 0 Litern in die Abrechnung ein. Im Logbuch bearbeiten, um den fairen Anteil korrekt zu berechnen.</div>';
+  }
+
+  html += '<div class="stat-row">' +
+    '<div class="stat"><div class="num">' + fmtNum(rows.reduce((a,r)=>a+r.hours,0),1) + '</div><div class="lbl">Motorstunden</div></div>' +
+    '<div class="stat"><div class="num">' + fmtNum(totalConsumed,1) + ' l</div><div class="lbl">Geschätzt verbraucht</div></div>' +
+    '<div class="stat"><div class="num">' + fmtCHF(totalExpense) + '</div><div class="lbl">Ausgaben gesamt</div></div>' +
+  '</div>';
+
+  const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
+  html += '<h3>Saldo je Partei</h3>';
+  rows.forEach(r => {
+    const isPos = r.balance > 0.005, isNeg = r.balance < -0.005;
+    const pct = Math.min(100, (Math.abs(r.balance) / maxAbs) * 100);
+    html += '<div class="balance-card">' +
+      '<div class="balance-head"><span class="name">' + escapeHtml(r.name) + '</span>' +
+        '<span class="amt ' + (isPos?'pos':(isNeg?'neg':'')) + '">' + (r.balance >= 0 ? '+' : '') + fmtCHF(r.balance) + '</span></div>' +
+      '<div class="balance-meta"><span>' + fmtNum(r.hours,1) + ' Std.</span><span>' + fmtNum(r.liters,1) + ' l · ' + fmtNum(r.pct,1) + ' %</span><span>bezahlt ' + fmtCHF(r.paid) + '</span><span>fairer Anteil ' + fmtCHF(r.fairShare) + '</span></div>' +
+      '<div class="gauge"><div class="center-line"></div><div class="fill ' + (isPos?'pos':'neg') + '" style="width:' + (pct/2) + '%"></div></div>' +
+      '<div class="gauge-scale"><span>Schuld</span><span>0</span><span>Guthaben</span></div>' +
+    '</div>';
+  });
+
+  html += '<div class="foot-total"><span>Total</span><span>' + fmtCHF(totalExpense) + '</span></div>';
+
+  const tx = settlementTransactions(rows);
+  html += '<h3>Ausgleichszahlung</h3>';
+  if(!tx.length){
+    html += '<div class="settled-note">Die Kosten sind bereits ausgeglichen — keine Zahlung nötig.</div>';
+  } else {
+    html += '<div class="stamps">';
+    tx.forEach(t => {
+      html += '<div class="stamp"><div class="lbl">Ausgleich ' + year + '</div><div class="amt">' + fmtCHF(t.amount) + '</div><div class="parties">' + escapeHtml(t.from) + ' → ' + escapeHtml(t.to) + '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderParties(){
+  const wrap = document.getElementById('partyList');
+  if(!state.parties.length){ wrap.innerHTML = '<div class="empty">Noch keine Parteien angelegt.</div>'; return; }
+  wrap.innerHTML = state.parties.map(p =>
+    '<div class="party-row"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><input type="text" data-id="' + p.id + '" value="' + escapeHtml(p.name) + '"></div>'
+  ).join('');
+
+  wrap.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const p = state.parties.find(p => p.id === inp.dataset.id);
+      if(p && inp.value.trim()){
+        p.name = inp.value.trim();
+        await saveShared();
+        populatePartySelect(); renderEntriesTable(); renderSettlement(); renderParties(); renderPriorityRule();
+      }
+    });
+  });
+}
+
+function priorityYears(){
+  const ys = new Set(allYears());
+  ys.add(new Date().getFullYear());
+  ys.add(new Date().getFullYear() + 1);
+  return Array.from(ys).sort((a,b) => b - a);
+}
+
+function renderPriorityRule(){
+  const yearSel = document.getElementById('priorityYear');
+  if(!yearSel) return;
+  const years = priorityYears();
+  const prev = yearSel.value;
+  yearSel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+  yearSel.value = years.includes(parseInt(prev)) ? prev : String(new Date().getFullYear());
+  renderPriorityRuleBody();
+}
+
+function renderPriorityRuleBody(){
+  const yearSel = document.getElementById('priorityYear');
+  const body = document.getElementById('priorityRuleBody');
+  if(!yearSel || !body) return;
+  const year = yearSel.value;
+  if(!state.priorityRules) state.priorityRules = {};
+  const rule = state.priorityRules[year];
+  const twoParties = state.parties.length === 2;
+
+  if(state.parties.length < 2){
+    body.innerHTML = '<div class="empty">Lege mindestens zwei Parteien an, um eine Vorrangregel festzulegen.</div>';
+    return;
+  }
+
+  if(!isAdminUser){
+    let display;
+    if(rule && rule.mode === 'evenodd'){
+      display = 'An geraden Kalendertagen: ' + escapeHtml(partyName(rule.evenPartyId)) + '. An ungeraden Kalendertagen: ' + escapeHtml(partyName(rule.oddPartyId)) + '.';
+    } else if(rule && rule.mode === 'custom' && rule.text){
+      display = escapeHtml(rule.text);
+    } else {
+      display = 'Für ' + year + ' wurde noch keine Vorrangregel festgelegt.';
+    }
+    body.innerHTML = '<div class="hint">' + display + '</div>';
+    return;
+  }
+
+  if(twoParties){
+    const a = state.parties[0], b = state.parties[1];
+    const evenSel = (rule && rule.mode === 'evenodd') ? rule.evenPartyId : '';
+    body.innerHTML =
+      '<div class="row">' +
+        '<div class="field"><label for="prioEven">Vorrecht an geraden Kalendertagen</label>' +
+          '<select id="prioEven"><option value="">— wählen —</option>' +
+          state.parties.map(p => '<option value="' + p.id + '"' + (evenSel === p.id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') +
+          '</select></div>' +
+        '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><div class="code-display" id="prioOddDisplay" style="font-size:0.95rem;">' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '</div></div>' +
+      '</div>' +
+      '<button class="btn secondary" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
+
+    document.getElementById('prioEven').addEventListener('change', (ev) => {
+      const other = state.parties.find(p => p.id !== ev.target.value);
+      document.getElementById('prioOddDisplay').textContent = ev.target.value && other ? partyName(other.id) : '—';
+    });
+    document.getElementById('savePrioBtn').addEventListener('click', async () => {
+      const evenId = document.getElementById('prioEven').value;
+      const fb = document.getElementById('prioFeedback');
+      if(!evenId){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte eine Partei auswählen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+      const oddParty = state.parties.find(p => p.id !== evenId);
+      state.priorityRules[year] = { mode: 'evenodd', evenPartyId: evenId, oddPartyId: oddParty.id };
+      await saveShared();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    });
+  } else {
+    const text = (rule && rule.mode === 'custom') ? rule.text : '';
+    body.innerHTML =
+      '<div class="hint" style="margin-bottom:0.7rem;">Bei mehr als zwei Parteien lässt sich das Vorrecht nicht mehr eindeutig über gerade/ungerade Tage regeln. Beschreibe die Vorrangregel für ' + year + ' hier als Text.</div>' +
+      '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid transparent; background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A (KW gerade), Partei B (KW ungerade), Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
+      '<button class="btn secondary" style="margin-top:0.7rem;" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
+
+    document.getElementById('savePrioBtn').addEventListener('click', async () => {
+      const val = document.getElementById('prioText').value.trim();
+      const fb = document.getElementById('prioFeedback');
+      state.priorityRules[year] = { mode: 'custom', text: val };
+      await saveShared();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    });
+  }
+}
+
+async function addParty(){
+  const input = document.getElementById('newPartyName');
+  const name = input.value.trim();
+  if(!name) return;
+  state.parties.push({ id: uid(), name, code: randomCode(6) });
+  await saveShared();
+  input.value = '';
+  renderParties(); populatePartySelect();
+}
+
+/* ---------- Zugriffscode / Admin ---------- */
+function renderGate(){
+  const card = document.getElementById('gateCard');
+  if(!state.settings){
+    card.innerHTML =
+      '<h2>Bootslogbuch einrichten</h2>' +
+      '<p>Diese App wird zum ersten Mal geöffnet. Lege deinen Administrator-Code fest — jede Partei bekommt automatisch ihren eigenen persönlichen Code, den du unter "Verwaltung" findest und einzeln weitergeben kannst.</p>' +
+      '<div class="field"><label for="setup-admin">Dein Administrator-Code</label><input id="setup-admin" type="text" placeholder="z. B. AB3F7K2P"></div>' +
+      '<button class="btn" id="setupBtn">Einrichten</button>' +
+      '<div class="gate-error" id="gateError">Bitte das Feld ausfüllen.</div>';
+    document.getElementById('setupBtn').addEventListener('click', async () => {
+      const admin = document.getElementById('setup-admin').value.trim();
+      if(!admin){ document.getElementById('gateError').classList.add('show'); return; }
+      state.settings = { adminCode: admin, unlockAll: false };
+      state.parties.forEach(p => { if(!p.code) p.code = randomCode(6); });
+      await saveShared();
+      session = { adminCode: admin };
+      await saveSession();
+      evaluateAccess(); hideGate(); renderAll();
+    });
+  } else {
+    card.innerHTML =
+      '<h2>Zugang zum Bootslogbuch</h2>' +
+      '<p>Gib deinen persönlichen Code ein — entweder deinen individuellen Partei-Code oder, falls du der Administrator bist, deinen Administrator-Code. Beide funktionieren im selben Feld.</p>' +
+      '<div class="field"><label for="gate-code">Code</label><input id="gate-code" type="text" placeholder="z. B. AB3F7K"></div>' +
+      '<button class="btn" id="gateBtn">Bestätigen</button>' +
+      '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>';
+    const submit = async () => {
+      const code = document.getElementById('gate-code').value.trim();
+      const matchedParty = state.parties.find(p => p.code === code);
+      if(code && state.settings.adminCode === code){ session = { adminCode: code, partyCode: null, partyId: null }; }
+      else if(matchedParty){ session = { adminCode: null, partyCode: code, partyId: matchedParty.id }; }
+      else { document.getElementById('gateError').classList.add('show'); return; }
+      await saveSession(); evaluateAccess(); hideGate(); renderAll();
+    };
+    document.getElementById('gateBtn').addEventListener('click', submit);
+    document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
+  }
+}
+function showGate(){ document.getElementById('appWrap').style.display = 'none'; document.getElementById('gateOverlay').style.display = 'flex'; renderGate(); }
+function hideGate(){ document.getElementById('gateOverlay').style.display = 'none'; document.getElementById('appWrap').style.display = 'block'; }
+
+function renderAdminPanel(){
+  const card = document.getElementById('adminCard');
+  if(!isAdminUser){
+    card.innerHTML =
+      '<h2>Verwaltung</h2>' +
+      '<p class="hint">Diese Einstellungen sind nur für den Administrator sichtbar. Gib deinen Administrator-Code ein (nicht den Zugangscode der Parteien).</p>' +
+      '<div class="field"><label for="admin-elevate">Administrator-Code</label><input id="admin-elevate" type="text"></div>' +
+      '<button class="btn secondary" id="elevateBtn">Bestätigen</button>' +
+      '<div class="gate-error" id="elevateError">Code ungültig.</div>';
+    document.getElementById('elevateBtn').addEventListener('click', async () => {
+      const code = document.getElementById('admin-elevate').value.trim();
+      if(code && state.settings.adminCode === code){
+        session.adminCode = code; await saveSession(); evaluateAccess();
+        renderAdminPanel(); updateHeaderMeta(); renderEntriesTable();
+      } else { document.getElementById('elevateError').classList.add('show'); }
+    });
+    return;
+  }
+  card.innerHTML =
+    '<h2>Verwaltung</h2>' +
+    '<div class="admin-box">' +
+      '<label>Zugangscodes der Parteien</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Jede Partei hat ihren eigenen persönlichen Code. Erzeuge für eine Partei einen neuen Code, um genau diese Person auszuschliessen — der alte Code funktioniert praktisch sofort nicht mehr, alle anderen Parteien bleiben unberührt.</div>' +
+      '<div id="partyCodeList"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Freigabe-Link</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Trage hier einmalig den echten Link ein, den du siehst, wenn du oben in Claude auf "Veröffentlichen" klickst und die Adresse aus der Adresszeile/dem Teilen-Dialog kopierst. Die App kann diesen Link technisch nicht selbst erkennen — er muss von Hand eingetragen werden.</div>' +
+      '<input id="shareLinkField" type="text" placeholder="https://claude.ai/public/artifacts/..." value="' + escapeHtml(state.settings.shareLink || '') + '" style="margin-bottom:0.7rem;">' +
+      '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+        '<button class="btn secondary" id="saveLinkBtn">Link speichern</button>' +
+        '<button class="btn secondary" id="copyLinkBtn">Link kopieren</button>' +
+      '</div>' +
+      '<div class="gate-error" id="copyFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Anfangsstand Motorenstundenzähler</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Der Stand des Motorenstundenzählers, bevor mit diesem Bootslogbuch zu rechnen begonnen wurde (0, falls die Zählung bei diesem Logbuch beginnt). Alle künftigen Einträge berechnen die gefahrenen Stunden als Differenz zum jeweils letzten Stand — beim allerersten Eintrag zu diesem Wert.</div>' +
+      '<input id="initialReadingField" type="number" step="0.1" placeholder="z. B. 0" value="' + (typeof state.settings.initialReading === 'number' ? state.settings.initialReading : '') + '" style="margin-bottom:0.7rem;">' +
+      '<button class="btn secondary" id="saveInitialReadingBtn">Anfangsstand speichern</button>' +
+      '<div class="gate-error" id="initialReadingFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<div class="toggle-row">' +
+        '<label class="switch"><input type="checkbox" id="unlockToggle"' + (state.settings.unlockAll ? ' checked' : '') + '><span class="slider"></span></label>' +
+        '<label for="unlockToggle">Bearbeitung von Einträgen älter als 24 Std. für alle freigeben</label>' +
+      '</div>' +
+      '<div class="hint">Normalerweise können Parteien einen Eintrag nur in den ersten 24 Stunden nach dem Erstellen bearbeiten oder löschen. Mit diesem Schalter hebst du die Sperre vorübergehend für alle auf.</div>' +
+    '</div>';
+
+  renderPartyCodeList();
+
+  document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
+    const field = document.getElementById('initialReadingField');
+    const fb = document.getElementById('initialReadingFeedback');
+    const val = parseFloat(field.value);
+    if(isNaN(val)){ fb.style.color = '#C0392B'; fb.textContent = 'Bitte eine Zahl eingeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000); return; }
+    const firstEntry = sortedUsageEntries(null)[0];
+    if(firstEntry && val >= firstEntry.reading){
+      fb.style.color = '#C0392B'; fb.textContent = 'Der Anfangsstand muss niedriger sein als der erste vorhandene Eintrag (' + fmtNum(firstEntry.reading,1) + ').'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4000); return;
+    }
+    state.settings.initialReading = val;
+    await saveShared();
+    fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    renderEntriesTable(); renderSettlement(); renderInstruments();
+  });
+
+  document.getElementById('unlockToggle').addEventListener('change', async (ev) => {
+    state.settings.unlockAll = ev.target.checked;
+    await saveShared();
+    renderEntriesTable();
+  });
+
+  document.getElementById('saveLinkBtn').addEventListener('click', async () => {
+    const field = document.getElementById('shareLinkField');
+    const val = field.value.trim();
+    const fb = document.getElementById('copyFeedback');
+    if(!/^https?:\/\//i.test(val)){
+      fb.style.color = '#C0392B';
+      fb.textContent = 'Bitte einen vollständigen Link eingeben, der mit http:// oder https:// beginnt.';
+      fb.classList.add('show');
+      setTimeout(() => fb.classList.remove('show'), 3000);
+      return;
+    }
+    state.settings.shareLink = val;
+    await saveShared();
+    fb.style.color = '#1C9A64';
+    fb.textContent = 'Link gespeichert.';
+    fb.classList.add('show');
+    setTimeout(() => fb.classList.remove('show'), 2500);
+  });
+  document.getElementById('copyLinkBtn').addEventListener('click', () => {
+    const field = document.getElementById('shareLinkField');
+    const fb = document.getElementById('copyFeedback');
+    if(!field.value.trim()){
+      fb.style.color = '#C0392B';
+      fb.textContent = 'Bitte zuerst einen Link eintragen und speichern.';
+      fb.classList.add('show');
+      setTimeout(() => fb.classList.remove('show'), 3000);
+      return;
+    }
+    copyToClipboard(field.value.trim());
+    fb.style.color = '#1C9A64';
+    fb.textContent = 'Link kopiert.';
+    fb.classList.add('show');
+    setTimeout(() => fb.classList.remove('show'), 2500);
+  });
+}
+
+function renderPartyCodeList(){
+  const wrap = document.getElementById('partyCodeList');
+  if(!wrap) return;
+  if(!state.parties.length){ wrap.innerHTML = '<div class="empty">Noch keine Parteien angelegt.</div>'; return; }
+  wrap.innerHTML = state.parties.map(p =>
+    '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">' +
+      '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + escapeHtml(p.code || '') + '</span></div>' +
+      '<div style="display:flex; gap:0.5rem; flex-wrap:wrap;">' +
+        '<button class="btn secondary" data-action="copy" data-id="' + p.id + '">Code kopieren</button>' +
+        '<button class="btn secondary" data-action="whatsapp" data-id="' + p.id + '">Per WhatsApp teilen</button>' +
+        '<button class="btn secondary" data-action="kick" data-id="' + p.id + '">Neuen Code erzeugen (Zugriff entziehen)</button>' +
+      '</div>' +
+      '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
+    '</div>'
+  ).join('');
+
+  wrap.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const p = state.parties.find(p => p.id === btn.dataset.id);
+      if(!p) return;
+      const fb = document.getElementById('partyFeedback-' + p.id);
+      if(btn.dataset.action === 'copy'){
+        copyToClipboard(p.code);
+        fb.style.color = '#1C9A64'; fb.textContent = 'Code kopiert.'; fb.classList.add('show');
+        setTimeout(() => fb.classList.remove('show'), 2500);
+      } else if(btn.dataset.action === 'whatsapp'){
+        const link = (state.settings.shareLink || '').trim();
+        if(!link){
+          fb.style.color = '#C0392B'; fb.textContent = 'Bitte zuerst oben den Freigabe-Link eintragen und speichern.'; fb.classList.add('show');
+          setTimeout(() => fb.classList.remove('show'), 3000);
+          return;
+        }
+        const msg = 'Hier ist der Link zu unserem Bootslogbuch: ' + link + '\nDein persönlicher Code: ' + p.code;
+        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+      } else if(btn.dataset.action === 'kick'){
+        p.code = randomCode(6);
+        await saveShared();
+        fb.style.color = '#1C9A64'; fb.textContent = 'Neuer Code erzeugt — alter Zugriff wird widerrufen.'; fb.classList.add('show');
+        setTimeout(() => fb.classList.remove('show'), 3000);
+        renderPartyCodeList();
+      }
+    });
+  });
+}
+
+function copyToClipboard(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); } catch(e){ /* Kopieren nicht möglich, Text ist im Feld markiert */ }
+  document.body.removeChild(ta);
+}
+
+function setupTabs(){
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const indicator = document.getElementById('navIndicator');
+  function moveIndicator(tab){
+    if(!tab) return;
+    indicator.style.width = tab.offsetWidth + 'px';
+    indicator.style.transform = 'translateX(' + (tab.offsetLeft - tabs[0].offsetLeft) + 'px)';
+  }
+  function positionActiveNow(){
+    moveIndicator(document.querySelector('.tab.active') || tabs[0]);
+  }
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      moveIndicator(tab);
+    });
+  });
+  window.addEventListener('resize', () => positionActiveNow());
+  positionActiveNow();
+  requestAnimationFrame(() => requestAnimationFrame(positionActiveNow));
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(positionActiveNow); }
+  setTimeout(positionActiveNow, 300);
+}
+
+function updateTabVisibility(){
+  const adminTab = document.querySelector('.tab[data-tab="admin"]');
+  if(!adminTab) return;
+  if(isAdminUser){
+    adminTab.style.display = '';
+  } else {
+    adminTab.style.display = 'none';
+    if(adminTab.classList.contains('active')){
+      adminTab.classList.remove('active');
+      document.getElementById('panel-admin').classList.remove('active');
+      const logTab = document.querySelector('.tab[data-tab="parties"]');
+      logTab.classList.add('active');
+      document.getElementById('panel-parties').classList.add('active');
+    }
+  }
+  requestAnimationFrame(() => {
+    const indicator = document.getElementById('navIndicator');
+    const active = document.querySelector('.tab.active');
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+    if(indicator && active && tabs.length){
+      indicator.style.width = active.offsetWidth + 'px';
+      indicator.style.transform = 'translateX(' + (active.offsetLeft - tabs[0].offsetLeft) + 'px)';
+    }
+  });
+}
+
+function renderAll(){
+  populatePartySelect();
+  renderYearFilters();
+  renderEntriesTable();
+  renderSettlement();
+  renderParties();
+  renderPriorityRule();
+  renderAdminPanel();
+  updateHeaderMeta();
+  renderInstruments();
+  updateTabVisibility();
+}
+
+function startPolling(){
+  subscribeRealtime();
+}
+
+async function init(){
+  setupTabs();
+  await loadShared();
+  await loadSession();
+  evaluateAccess();
+  if(accessGranted && pruneOldPhotos()){ await saveShared(); }
+
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-date').max = new Date().toISOString().slice(0,10);
+
+  document.querySelectorAll('#typeToggle button').forEach(btn => btn.addEventListener('click', () => toggleType(btn.dataset.type)));
+  document.getElementById('addEntryBtn').addEventListener('click', addEntry);
+  document.getElementById('cancelEditBtn').addEventListener('click', () => {
+    stopEdit();
+    document.getElementById('f-reading').value = '';
+    document.getElementById('f-consumption').value = '';
+    document.getElementById('f-liters').value = '';
+    document.getElementById('f-expense').value = '';
+  });
+  document.getElementById('addPartyBtn').addEventListener('click', addParty);
+  document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
+  document.getElementById('settlementYear').addEventListener('change', renderSettlement);
+  document.getElementById('priorityYear').addEventListener('change', renderPriorityRuleBody);
+  document.getElementById('f-photo').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    const status = document.getElementById('photoStatus');
+    status.textContent = 'Foto wird verarbeitet …';
+    try{
+      pendingPhotoDataUrl = await compressImage(file, 640, 0.55);
+      const preview = document.getElementById('photoPreview');
+      preview.src = pendingPhotoDataUrl; preview.style.display = 'block';
+      status.textContent = 'Foto hinzugefügt.';
+      document.getElementById('err-photo').classList.remove('show');
+    } catch(e){
+      status.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
+    }
+  });
+  [['f-party','err-party'],['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
+    const el = document.getElementById(fieldId);
+    el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
+    el.addEventListener('change', () => document.getElementById(errId).classList.remove('show'));
+  });
+
+  if(!state.settings || !accessGranted){ showGate(); }
+  else { hideGate(); renderAll(); }
+  startPolling();
+}
+
+init();
+</script>
+</body>
+</html>
