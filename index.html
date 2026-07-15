@@ -332,15 +332,17 @@ input:disabled, select:disabled{
 }
 .admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
 .admin-readonly{ opacity:0.5; pointer-events:none; filter:grayscale(0.4); user-select:none; }
-.party-code-actions{ display:flex; gap:0.35rem; flex-wrap:nowrap; }
+.party-code-actions{ display:flex; gap:0.25rem; flex-wrap:nowrap; }
 .icon-btn{
   font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
-  padding:0.42rem 0.5rem; border-radius:20px; border:1px solid var(--bronze-line);
+  padding:0.42rem 0.3rem; border-radius:20px; border:1px solid var(--bronze-line);
   background:#fff; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
-  display:inline-flex; align-items:center; justify-content:center; gap:0.3rem; transition:background 0.15s ease;
+  display:inline-flex; align-items:center; justify-content:center; gap:0.25rem; transition:background 0.15s ease;
   flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
 }
 .icon-btn:hover{ background:var(--foam); }
+.chat-recipient-chip{ flex:none !important; }
+.chat-recipient-chip.active{ background:var(--volt); color:var(--hull); border-color:var(--volt); }
 .hint{ font-size:0.76rem; color:var(--ink-faint); margin-top:0.35rem; line-height:1.4; }
 
 .btn{
@@ -407,9 +409,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 /* ---------- Pegel-Balken (Saldo) ---------- */
 .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.7rem; margin-bottom:1.4rem; }
 .stat{ background:var(--foam); border-radius:var(--radius-sm); padding:0.8rem 0.95rem; text-align:center; border:1.5px solid var(--bronze-line); }
-.stat-highlight{ background:#8a7f6e; }
-.stat-highlight .num{ color:#fff; }
-.stat-highlight .lbl{ color:rgba(255,255,255,0.65); }
+.stat-highlight{ background:#DAD5CC; }
+.stat-highlight .num{ color:var(--ink); }
+.stat-highlight .lbl{ color:var(--ink-soft); }
 .stat .num{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.4rem; color:var(--hull); text-align:center; }
 .stat .lbl{ font-size:0.66rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.05em; margin-top:0.1rem; }
 
@@ -644,7 +646,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="nav-indicator" id="navIndicator"></div>
         <button class="tab" data-tab="calendar">Kalender</button>
         <button class="tab active" data-tab="log">Logbuch</button>
-        <button class="tab" data-tab="chat">Chat</button>
         <button class="tab" data-tab="adjustment">Ausgleich</button>
         <button class="tab" data-tab="settlement">Abrechnung</button>
         <button class="tab" data-tab="admin">Verwaltung</button>
@@ -720,7 +721,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="gate-error" id="err-reading"></div>
           </div>
           <div class="field">
-            <label for="f-consumption">Ø Verbrauch dieses Tages (l/h) *</label>
+            <label for="f-consumption">Tagesverbrauch (l/h) *</label>
             <input type="number" id="f-consumption" step="0.1" min="0" placeholder="0.0" required>
             <div class="hint">Hängt von der Fahrweise ab — ruhige Fahrt niedriger, Wakesurfen mit vollen Ballasttanks deutlich höher.</div>
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
@@ -772,31 +773,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       </div>
     </div>
 
-    <div class="panel" id="panel-chat">
-      <div class="card">
-        <h2>🍻 Feierabendbier ausrufen</h2>
-        <div class="hint" style="margin-bottom:0.9rem;">Ruf spontan zum Feierabendbier — alle anderen Parteien bekommen sofort eine Mitteilung und können anstossen oder sich anschliessen.</div>
-        <div id="beerPhotoPreviewArea" style="margin-bottom:0.7rem;"></div>
-        <input type="file" id="beerPhotoInput" accept="image/*" style="display:none;">
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.7rem;">
-          <button type="button" class="btn secondary" id="beerPhotoBtn">📷 Foto anhängen</button>
-        </div>
-        <button class="btn" id="beerCallBtn" style="background:#C9A227;">🍻 Feierabendbier ausrufen!</button>
-      </div>
-      <div class="card">
-        <h2>Chat</h2>
-        <div class="hint" style="margin-bottom:0.9rem;">Nachrichten und Fotos zwischen allen Parteien — für alles, was nicht ins Logbuch gehört.</div>
-        <div id="chatMessageList" style="max-height:420px; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>
-        <div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>
-        <input type="file" id="chatPhotoInput" accept="image/*" style="display:none;">
-        <div style="display:flex; gap:0.5rem; align-items:flex-end;">
-          <div class="field" style="flex:1; margin:0;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:'Inter', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>
-          <button type="button" class="btn secondary" id="chatPhotoBtn" style="flex-shrink:0;">📷</button>
-          <button type="button" class="btn" id="chatSendBtn" style="flex-shrink:0;">Senden</button>
-        </div>
-      </div>
-    </div>
-
     <div class="panel" id="panel-adjustment">
       <div class="card">
         <h2>Ausgleichszahlung erfassen</h2>
@@ -831,14 +807,22 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
           <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
-          <button class="btn" id="exportPdfBtn" style="white-space:nowrap; flex-shrink:0;">📄 PDF-Export</button>
-          <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; flex-shrink:0;">📊 CSV-Export</button>
+          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
+            <button class="btn" id="exportPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
+          </div>
         </div>
         <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
         <div id="settlementContent"></div>
       </div>
       <div class="card">
-        <h2>Jahresvergleich</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:nowrap;">
+          <h2 style="margin:0; white-space:nowrap;">Jahresvergleich</h2>
+          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
+            <button class="btn" id="exportComparisonPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportComparisonCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
+          </div>
+        </div>
         <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
         <div id="yearComparisonChart"></div>
       </div>
@@ -892,7 +876,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-10';
+const APP_VERSION = '2026-07-15-12';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1101,15 +1085,21 @@ function updateHeaderMeta(){
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length;
+    const unreadChat = getUnreadChatCount();
     strip.innerHTML = '<div class="admin-strip">' +
       (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
-      '<button type="button" class="inbox-btn" id="inboxBtn">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
+      (todayWeatherCache ? '<span class="inbox-btn" style="cursor:default; font-size:0.9rem;" title="Heutiges Wetter">' + weatherEmoji(todayWeatherCache.code) + ' ' + Math.round(todayWeatherCache.temp) + '°</span>' : '') +
+      '<a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
+      '<button type="button" class="inbox-btn" id="chatHeaderBtn" title="Chat">💬' + (unreadChat > 0 ? '<span class="inbox-count">' + (unreadChat > 9 ? '9+' : unreadChat) + '</span>' : '') + '</button>' +
+      '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
     '</div>';
     const btn = document.getElementById('logoutBtn');
     if(btn) btn.addEventListener('click', logout);
     const inboxBtn = document.getElementById('inboxBtn');
     if(inboxBtn) inboxBtn.addEventListener('click', showInboxModal);
+    const chatBtn = document.getElementById('chatHeaderBtn');
+    if(chatBtn) chatBtn.addEventListener('click', showChatModal);
   }
   updateAppBadge();
 }
@@ -1985,6 +1975,19 @@ function updatePaidSplitTotal(){
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let weatherCache = {};
+let todayWeatherCache = null;
+async function fetchTodayWeather(){
+  if(!state.settings || typeof state.settings.weatherLat !== 'number' || typeof state.settings.weatherLon !== 'number') return;
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + state.settings.weatherLat + '&longitude=' + state.settings.weatherLon + '&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data.current){
+      todayWeatherCache = { temp: data.current.temperature_2m, code: data.current.weathercode };
+      updateHeaderMeta();
+    }
+  } catch(e){}
+}
 function weatherEmoji(code){
   if(code === 0) return '☀️';
   if(code <= 2) return '🌤️';
@@ -2042,6 +2045,21 @@ async function checkWindWarning(){
       el.innerHTML = '';
     }
   } catch(e){ el.innerHTML = ''; }
+}
+
+function wgs84ToLv95(lat, lon){
+  const latAux = (lat*3600 - 169028.66)/10000;
+  const lonAux = (lon*3600 - 26782.5)/10000;
+  const E = 2600072.37 + 211455.93*lonAux - 10938.51*lonAux*latAux - 0.36*lonAux*latAux*latAux - 44.54*lonAux*lonAux*lonAux;
+  const N = 1200147.07 + 308807.95*latAux + 3745.25*lonAux*lonAux + 76.63*latAux*latAux - 194.56*lonAux*lonAux*latAux + 119.79*latAux*latAux*latAux;
+  return { E, N };
+}
+function lv95ToWgs84(E, N){
+  const y = (E - 2600000)/1000000;
+  const x = (N - 1200000)/1000000;
+  const lonAux = 2.6779094 + 4.728982*y + 0.791484*y*x + 0.1306*y*x*x - 0.0436*y*y*y;
+  const latAux = 16.9023892 + 3.238272*x - 0.270978*y*y - 0.002528*x*x - 0.0447*y*y*x - 0.0140*x*x*x;
+  return { lat: latAux * 100/36, lon: lonAux * 100/36 };
 }
 
 function fmtDateCH(dateStr){
@@ -2210,42 +2228,46 @@ function clearEntryErrors(){
   });
 }
 
+const BURP_SOUND_COUNT = 13;
 function playCheersSound(){
   try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
-    // Kurzer "Glas-Anstoss"-Klang: zwei helle, kurz überlappende Töne + ein tieferer "Plopp"
-    function tone(freq, start, dur, vol, type){
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type || 'sine';
-      osc.frequency.setValueAtTime(freq, now + start);
-      gain.gain.setValueAtTime(0, now + start);
-      gain.gain.linearRampToValueAtTime(vol, now + start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now + start); osc.stop(now + start + dur + 0.05);
-    }
-    tone(1800, 0, 0.25, 0.18, 'triangle');
-    tone(2400, 0.03, 0.22, 0.14, 'triangle');
-    tone(180, 0.28, 0.18, 0.22, 'sine');
-    tone(120, 0.3, 0.22, 0.16, 'sine');
+    const canOpen = new Audio('sounds/sound-can-open.mp3');
+    const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
+    const burp = new Audio('sounds/sound-burp-' + burpIndex + '.mp3');
+    canOpen.addEventListener('ended', () => { burp.play().catch(() => {}); });
+    canOpen.play().catch(() => {});
   } catch(e){}
 }
 
-function renderChatTab(){
-  if(!document.getElementById('chatMessageList')) return;
-  const list = document.getElementById('chatMessageList');
-  const msgs = (state.chatMessages || []).slice().sort((a,b) => a.ts - b.ts);
+function getChatLastSeen(){
+  try{ return parseInt(localStorage.getItem('wakelog-chat-seen')) || 0; } catch(e){ return 0; }
+}
+function setChatLastSeen(ts){
+  try{ localStorage.setItem('wakelog-chat-seen', String(ts)); } catch(e){}
+}
+function getRelevantChatMessages(){
+  const myId = session.partyId;
+  return (state.chatMessages || []).filter(m => !m.toPartyIds || m.toPartyIds.length === 0 || m.toPartyIds.includes(myId) || m.fromPartyId === myId);
+}
+function getUnreadChatCount(){
+  const lastSeen = getChatLastSeen();
+  return getRelevantChatMessages().filter(m => m.ts > lastSeen && m.fromPartyId !== session.partyId).length;
+}
+
+let chatRecipientIds = null; // null = alle
+
+function renderChatMessageListInto(list){
+  const msgs = getRelevantChatMessages().slice().sort((a,b) => a.ts - b.ts);
   if(!msgs.length){
     list.innerHTML = '<div class="empty">Noch keine Nachrichten.</div>';
   } else {
     list.innerHTML = msgs.map(m => {
       const mine = m.fromPartyId === session.partyId;
       const isBeer = m.type === 'beer';
+      const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
         '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.6rem 0.8rem;">' +
-          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">🍻 ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zum Feierabendbier!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + '</div>') +
+          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zur Ankerdose!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + toLabel + '</div>') +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
         '</div>' +
@@ -2254,6 +2276,114 @@ function renderChatTab(){
     }).join('');
     list.scrollTop = list.scrollHeight;
   }
+}
+
+function showChatModal(){
+  setChatLastSeen(Date.now());
+  updateHeaderMeta();
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  const otherParties = state.parties.filter(p => p.id !== session.partyId);
+  overlay.innerHTML =
+    '<div class="gate-card" style="max-width:480px;">' +
+      '<h2>Chat</h2>' +
+      '<div class="admin-box" style="margin-bottom:1rem;">' +
+        '<div class="hint" style="margin-bottom:0.7rem;">Spontan zur Ankerdose rufen — alle anderen Parteien bekommen sofort eine Mitteilung.</div>' +
+        '<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" style="display:none;">' +
+        '<button class="btn" id="beerCallBtn" style="background:#C9A227;">⚓ Ankerdose ausrufen!</button>' +
+      '</div>' +
+      '<div id="chatMessageList" style="max-height:40vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
+      (otherParties.length > 1 ? (
+        '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
+        '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
+          '<button type="button" class="icon-btn chat-recipient-chip active" data-id="">Alle</button>' +
+          otherParties.map(p => '<button type="button" class="icon-btn chat-recipient-chip" data-id="' + p.id + '">' + escapeHtml(p.name) + '</button>').join('') +
+        '</div>'
+      ) : '') +
+      '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
+      '<input type="file" id="chatPhotoInput" accept="image/*" style="display:none;">' +
+      '<div style="display:flex; gap:0.5rem; align-items:flex-end;">' +
+        '<div class="field" style="flex:1; margin:0;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+        '<button type="button" class="btn secondary" id="chatPhotoBtn" style="flex-shrink:0;">📷</button>' +
+        '<button type="button" class="btn" id="chatSendBtn" style="flex-shrink:0;">Senden</button>' +
+      '</div>' +
+      '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  renderChatMessageListInto(document.getElementById('chatMessageList'));
+
+  chatRecipientIds = null;
+  overlay.querySelectorAll('.chat-recipient-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if(chip.dataset.id === ''){
+        chatRecipientIds = null;
+        overlay.querySelectorAll('.chat-recipient-chip').forEach(c => c.classList.toggle('active', c.dataset.id === ''));
+      } else {
+        overlay.querySelector('.chat-recipient-chip[data-id=""]').classList.remove('active');
+        chip.classList.toggle('active');
+        chatRecipientIds = Array.from(overlay.querySelectorAll('.chat-recipient-chip.active')).map(c => c.dataset.id).filter(Boolean);
+        if(!chatRecipientIds.length){
+          chatRecipientIds = null;
+          overlay.querySelector('.chat-recipient-chip[data-id=""]').classList.add('active');
+        }
+      }
+    });
+  });
+
+  const chatPhotoInput = document.getElementById('chatPhotoInput');
+  const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
+  document.getElementById('chatPhotoBtn').addEventListener('click', () => chatPhotoInput.click());
+  chatPhotoInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    try{
+      chatPendingPhoto = await compressImage(file, 700, 0.6);
+      chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
+      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; ev.target.value = ''; });
+    } catch(e){}
+  });
+
+  document.getElementById('chatSendBtn').addEventListener('click', async () => {
+    if(!session.partyId && !isAdminUser) return;
+    const textInput = document.getElementById('chatTextInput');
+    const text = textInput.value.trim();
+    if(!text && !chatPendingPhoto) return;
+    if(!state.chatMessages) state.chatMessages = [];
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text, photo: chatPendingPhoto, type: 'normal', toPartyIds: chatRecipientIds });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    textInput.value = '';
+    chatPendingPhoto = null;
+    chatPreviewArea.innerHTML = '';
+    chatPhotoInput.value = '';
+    await saveShared();
+    renderChatMessageListInto(document.getElementById('chatMessageList'));
+    updateHeaderMeta();
+  });
+
+  document.getElementById('chatCloseBtn').addEventListener('click', () => {
+    setChatLastSeen(Date.now());
+    overlay.remove();
+    updateHeaderMeta();
+  });
+
+  const beerPhotoInput = document.getElementById('beerPhotoInput');
+  document.getElementById('beerCallBtn').addEventListener('click', () => beerPhotoInput.click());
+  beerPhotoInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    let photo = null;
+    try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
+    if(!state.chatMessages) state.chatMessages = [];
+    const name = session.partyId ? partyName(session.partyId) : 'Administrator';
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo, type: 'beer', toPartyIds: null });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    playCheersSound();
+    await saveShared();
+    renderChatMessageListInto(document.getElementById('chatMessageList'));
+    updateHeaderMeta();
+    ev.target.value = '';
+  });
 }
 
 let chatPendingPhoto = null;
@@ -2449,7 +2579,7 @@ function renderEntriesTable(){
 
   let html = '<table><thead><tr>' +
     '<th>Datum</th>' + (weatherOn ? '<th>Wetter</th>' : '') + '<th class="name-cell">Partei</th><th class="type-cell">Typ</th>' +
-    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">Verbrauch [l/h]</th><th class="num">Mutm. Verbrauch [l]</th><th class="num">Getankt [l]</th><th class="num">Preis [CHF/l]</th><th class="num">Ausgaben [CHF]</th><th>Foto</th><th></th>' +
+    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">Ø-Rate [l/h]</th><th class="num">Verbrauch [l]</th><th class="num">Getankt [l]</th><th class="num">Preis [CHF/l]</th><th class="num">Ausgaben [CHF]</th><th>Foto</th><th></th>' +
     '</tr></thead><tbody>';
 
   rows.forEach(e => {
@@ -2868,36 +2998,94 @@ function setupQrCodeUI(){
   });
 }
 
+function getYearComparisonData(){
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear];
+  const hoursMap = computeHoursMap();
+  return years.map(y => {
+    const { rows, totalFuelExpense, totalAnnual } = computeSettlement(y);
+    const total = totalFuelExpense + totalAnnual;
+    const hours = state.entries.filter(e => yearOf(e.date) === y).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+    return { year: y, total, hours, rows };
+  });
+}
+
 function renderYearComparison(){
   const el = document.getElementById('yearComparisonChart');
   if(!el) return;
-  const years = priorityYears();
-  if(years.length < 2){ el.innerHTML = '<div class="hint">Sobald Daten aus mehr als einem Jahr vorliegen, erscheint hier ein Vergleich.</div>'; return; }
-  const hoursMap = computeHoursMap();
-  const perYear = years.map(y => {
-    const yr = String(y);
-    const { totalFuelExpense, totalAnnual } = computeSettlement(y);
-    const hours = state.entries.filter(e => yearOf(e.date) === y).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
-    return { year: y, total: totalFuelExpense + totalAnnual, hours };
-  });
+  const perYear = getYearComparisonData();
   const maxTotal = Math.max(...perYear.map(p => p.total), 1);
   const maxHours = Math.max(...perYear.map(p => p.hours), 1);
+
+  function segments(p, valueKey, totalValue){
+    if(totalValue <= 0) return '';
+    return p.rows.map(r => {
+      const val = valueKey === 'total' ? r.fairShare : r.hours;
+      const share = val / totalValue;
+      if(share <= 0) return '';
+      return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + '"></div>';
+    }).join('');
+  }
+
   el.innerHTML =
-    '<div style="display:flex; gap:0.4rem; align-items:flex-end; margin-bottom:0.6rem;">' +
+    '<div style="display:flex; gap:2rem; align-items:center; margin-bottom:0.9rem; flex-wrap:wrap;">' +
       '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:var(--volt);"></span>Gesamtaufwand CHF</div>' +
       '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#6E85A8;"></span>Motorstunden</div>' +
     '</div>' +
+    '<div class="hint" style="margin-bottom:0.9rem;">Balken sind zusätzlich nach Partei eingefärbt (gleiche Farben wie im Kalender).</div>' +
     '<div style="display:flex; gap:1.2rem; align-items:flex-end; height:140px; padding:0 0.3rem;">' +
     perYear.map(p =>
       '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
-        '<div style="display:flex; gap:0.25rem; align-items:flex-end; height:100%;">' +
-          '<div style="width:16px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; background:var(--volt); border-radius:3px 3px 0 0;" title="' + fmtCHF(p.total) + '"></div>' +
-          '<div style="width:16px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; background:#6E85A8; border-radius:3px 3px 0 0;" title="' + fmtNum(p.hours,1) + ' Std."></div>' +
+        '<div style="display:flex; gap:0.3rem; align-items:flex-end; height:100%;">' +
+          '<div style="width:18px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'total', p.total) + '</div>' +
+          '<div style="width:18px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam); opacity:0.75;">' + segments(p, 'hours', p.hours) + '</div>' +
         '</div>' +
-        '<div class="hint" style="margin:0;">' + p.year + '</div>' +
+        '<div class="hint" style="margin:0;">' + p.year + (p.total === 0 && p.hours === 0 ? ' (keine Daten)' : '') + '</div>' +
       '</div>'
     ).join('') +
     '</div>';
+}
+
+function exportYearComparisonCsv(){
+  const perYear = getYearComparisonData();
+  const rows = [['Jahr','Partei','Gesamtaufwand_CHF_Anteil','Motorstunden_Anteil']];
+  perYear.forEach(p => {
+    p.rows.forEach(r => {
+      rows.push([p.year, r.name, r.fairShare.toFixed(2), fmtNum(r.hours,1)]);
+    });
+  });
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'wakelog-jahresvergleich.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportYearComparisonPdf(){
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+  const perYear = getYearComparisonData();
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Jahresvergleich</div></div>' +
+    '</div>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  perYear.forEach(p => {
+    html += '<h2>' + p.year + '</h2>';
+    html += '<div class="print-balance">Gesamtaufwand: ' + fmtCHF(p.total) + ' · Motorstunden: ' + fmtNum(p.hours,1) + '</div>';
+    html += '<table><tr><th>Partei</th><th>Anteil Gesamtaufwand</th><th>Motorstunden</th></tr>';
+    p.rows.forEach(r => {
+      html += '<tr><td>' + escapeHtml(r.name) + '</td><td>' + fmtCHF(r.fairShare) + '</td><td>' + fmtNum(r.hours,1) + '</td></tr>';
+    });
+    html += '</table>';
+  });
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
 }
 
 function renderSettlementPaymentList(year){
@@ -3470,9 +3658,12 @@ function renderAdminAuditSection(){
   const logEntries = state.auditLog || [];
   content.innerHTML =
     '<div class="admin-box">' +
-      '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:nowrap;">' +
         '<label style="margin:0;">Änderungsprotokoll</label>' +
-        '<button type="button" class="btn" id="exportAuditPdfBtn">📄 PDF-Export</button>' +
+        '<div style="display:flex; gap:0.4rem; flex-shrink:0;">' +
+          '<button type="button" class="btn" id="exportAuditPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+          '<button type="button" class="btn secondary" id="exportAuditCsvBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>' +
+        '</div>' +
       '</div>' +
       '<div class="hint" style="margin:0.6rem 0 0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
       (logEntries.length ? logEntries.map(l => {
@@ -3486,6 +3677,27 @@ function renderAdminAuditSection(){
     '</div>';
   const exportBtn = document.getElementById('exportAuditPdfBtn');
   if(exportBtn) exportBtn.addEventListener('click', exportAuditLogPdf);
+  const exportCsvBtn = document.getElementById('exportAuditCsvBtn');
+  if(exportCsvBtn) exportCsvBtn.addEventListener('click', exportAuditLogCsv);
+}
+
+function exportAuditLogCsv(){
+  const logEntries = state.auditLog || [];
+  const rows = [['Datum','Wer','Was']];
+  logEntries.forEach(l => {
+    const d = new Date(l.ts);
+    rows.push([d.toLocaleDateString('de-CH') + ', ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr', l.actor, l.action]);
+  });
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'wakelog-protokoll.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function exportAuditLogPdf(){
@@ -3613,6 +3825,12 @@ function renderAdminGeneralSection(){
     '<div class="admin-box">' +
       '<label>Service-Erinnerung</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Lege ein Intervall (Motorstunden) fest — die App warnt alle Parteien, sobald der Zählerstand seit dem letzten Service dieses Intervall überschreitet.</div>' +
+      (state.serviceReminder ? (
+        '<div class="stat-row" style="grid-template-columns:repeat(2,1fr); margin-bottom:1rem;">' +
+          '<div class="stat"><div class="num">' + fmtNum(state.serviceReminder.lastServiceReading,1) + '</div><div class="lbl">Letzter Service (Std.)</div></div>' +
+          '<div class="stat"><div class="num">' + fmtNum(state.serviceReminder.lastServiceReading + state.serviceReminder.intervalHours,1) + '</div><div class="lbl">Nächster Service fällig (Std.)</div></div>' +
+        '</div>'
+      ) : '') +
       '<div class="row">' +
         '<div class="field"><label for="serviceIntervalField">Intervall (Std.)</label><input type="number" id="serviceIntervalField" min="0" step="1" value="' + (state.serviceReminder ? state.serviceReminder.intervalHours : '') + '" placeholder="z. B. 100"></div>' +
         '<div class="field"><label for="serviceLastField">Letzter Service bei Std.</label><input type="number" id="serviceLastField" min="0" step="0.1" value="' + (state.serviceReminder ? state.serviceReminder.lastServiceReading : '') + '" placeholder="z. B. 1200"></div>' +
@@ -3637,15 +3855,14 @@ function renderAdminGeneralSection(){
         '<option value="47.0693,8.5308">Arth</option>' +
       '</select></div>' +
       '<div class="row">' +
-        '<div class="field"><label for="weatherLatField">Breitengrad</label><input type="number" id="weatherLatField" step="0.0001" value="' + (state.settings.weatherLat || '') + '" placeholder="z. B. 47.1662"></div>' +
-        '<div class="field"><label for="weatherLonField">Längengrad</label><input type="number" id="weatherLonField" step="0.0001" value="' + (state.settings.weatherLon || '') + '" placeholder="z. B. 8.5155"></div>' +
+        '<div class="field"><label for="weatherEField">E (LV95)</label><input type="number" id="weatherEField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).E) : '') + '" placeholder="z. B. 2681100"></div>' +
+        '<div class="field"><label for="weatherNField">N (LV95)</label><input type="number" id="weatherNField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).N) : '') + '" placeholder="z. B. 1224200"></div>' +
       '</div>' +
       '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
         '<button type="button" class="btn secondary" id="useMyLocationBtn">📍 Aktuellen Standort verwenden</button>' +
         '<button class="btn" id="saveWeatherLocationBtn">Speichern</button>' +
       '</div>' +
       '<div class="gate-error" id="weatherLocationFeedback" style="color:#1C9A64;"></div>' +
-      '<div style="margin-top:0.8rem;"><a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener" style="font-size:0.82rem; color:var(--ink-soft);">↗ Offizielle Sturmwarnung / Gefahrenkarte (MeteoSchweiz)</a></div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<label>Export</label>' +
@@ -3809,29 +4026,32 @@ function renderAdminGeneralSection(){
 
   document.getElementById('weatherPresetSelect').addEventListener('change', (ev) => {
     if(!ev.target.value) return;
-    const [lat, lon] = ev.target.value.split(',');
-    document.getElementById('weatherLatField').value = lat;
-    document.getElementById('weatherLonField').value = lon;
+    const [lat, lon] = ev.target.value.split(',').map(parseFloat);
+    const { E, N } = wgs84ToLv95(lat, lon);
+    document.getElementById('weatherEField').value = Math.round(E);
+    document.getElementById('weatherNField').value = Math.round(N);
   });
 
   document.getElementById('useMyLocationBtn').addEventListener('click', () => {
     const fb = document.getElementById('weatherLocationFeedback');
     if(!navigator.geolocation){ fb.style.color = '#C0392B'; fb.textContent = 'Standort wird von diesem Gerät nicht unterstützt.'; fb.classList.add('show'); return; }
     navigator.geolocation.getCurrentPosition((pos) => {
-      document.getElementById('weatherLatField').value = pos.coords.latitude.toFixed(4);
-      document.getElementById('weatherLonField').value = pos.coords.longitude.toFixed(4);
+      const { E, N } = wgs84ToLv95(pos.coords.latitude, pos.coords.longitude);
+      document.getElementById('weatherEField').value = Math.round(E);
+      document.getElementById('weatherNField').value = Math.round(N);
     }, () => {
       fb.style.color = '#C0392B'; fb.textContent = 'Standort konnte nicht ermittelt werden.'; fb.classList.add('show');
     });
   });
 
   document.getElementById('saveWeatherLocationBtn').addEventListener('click', async () => {
-    const lat = parseFloat(document.getElementById('weatherLatField').value);
-    const lon = parseFloat(document.getElementById('weatherLonField').value);
+    const E = parseFloat(document.getElementById('weatherEField').value);
+    const N = parseFloat(document.getElementById('weatherNField').value);
     const fb = document.getElementById('weatherLocationFeedback');
-    if(isNaN(lat) || isNaN(lon)){
+    if(isNaN(E) || isNaN(N)){
       fb.style.color = '#C0392B'; fb.textContent = 'Bitte gültige Koordinaten angeben.'; fb.classList.add('show'); return;
     }
+    const { lat, lon } = lv95ToWgs84(E, N);
     state.settings.weatherLat = lat;
     state.settings.weatherLon = lon;
     logAudit('Standort für Wetteranzeige gesetzt');
@@ -3839,6 +4059,7 @@ function renderAdminGeneralSection(){
     fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     weatherCache = {};
     renderEntriesTable();
+    fetchTodayWeather();
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
@@ -4239,7 +4460,6 @@ function renderAll(){
   renderAdjustmentTab();
   renderAdminPanel();
   renderCalendarTab();
-  renderChatTab();
   renderSeasonEventsList();
   updateHeaderMeta();
   renderInstruments();
@@ -4419,6 +4639,8 @@ async function init(){
     const year = parseInt(document.getElementById('settlementYear').value);
     exportYearOverviewCsv(year);
   });
+  document.getElementById('exportComparisonPdfBtn').addEventListener('click', exportYearComparisonPdf);
+  document.getElementById('exportComparisonCsvBtn').addEventListener('click', exportYearComparisonCsv);
   document.getElementById('giftToggle').addEventListener('change', (ev) => {
     document.getElementById('giftBody').style.display = ev.target.checked ? 'block' : 'none';
     if(!ev.target.checked){
@@ -4489,6 +4711,8 @@ async function init(){
   setupSceneStripTracking();
   setupChatUI();
   setupSeasonUI();
+  fetchTodayWeather();
+  setInterval(fetchTodayWeather, 30 * 60 * 1000);
 }
 
 function renderSeasonEventsList(){
@@ -4507,85 +4731,27 @@ function setupSeasonUI(){
   checkWindWarning();
   setInterval(checkWindWarning, 30 * 60 * 1000);
   renderSeasonEventsList();
-  launchBtn.addEventListener('click', async () => {
+
+  async function toggleSeasonEvent(type, label){
     const today = new Date().toISOString().slice(0,10);
     if(!state.seasonEvents) state.seasonEvents = [];
-    state.seasonEvents.push({ id: uid(), date: today, type: 'launch' });
-    logAudit('Boot am ' + fmtDateCH(today) + ' eingewassert');
+    const existing = state.seasonEvents.find(ev => ev.date === today && ev.type === type);
+    if(existing){
+      state.seasonEvents = state.seasonEvents.filter(ev => ev.id !== existing.id);
+      logAudit('Eintrag "Boot ' + label + ' am ' + fmtDateCH(today) + '" wieder entfernt');
+    } else {
+      state.seasonEvents.push({ id: uid(), date: today, type });
+      logAudit('Boot am ' + fmtDateCH(today) + ' ' + label);
+    }
     await saveShared();
     renderSeasonEventsList();
-  });
-  haulBtn.addEventListener('click', async () => {
-    const today = new Date().toISOString().slice(0,10);
-    if(!state.seasonEvents) state.seasonEvents = [];
-    state.seasonEvents.push({ id: uid(), date: today, type: 'haul' });
-    logAudit('Boot am ' + fmtDateCH(today) + ' ausgewassert');
-    await saveShared();
-    renderSeasonEventsList();
-  });
+  }
+  launchBtn.addEventListener('click', () => toggleSeasonEvent('launch', 'eingewassert'));
+  haulBtn.addEventListener('click', () => toggleSeasonEvent('haul', 'ausgewassert'));
 }
 
 function setupChatUI(){
-  const chatPhotoInput = document.getElementById('chatPhotoInput');
-  const chatPhotoBtn = document.getElementById('chatPhotoBtn');
-  const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
-  if(!chatPhotoInput) return;
-
-  chatPhotoBtn.addEventListener('click', () => chatPhotoInput.click());
-  chatPhotoInput.addEventListener('change', async (ev) => {
-    const file = ev.target.files[0];
-    if(!file) return;
-    try{
-      chatPendingPhoto = await compressImage(file, 700, 0.6);
-      chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
-      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; ev.target.value = ''; });
-    } catch(e){}
-  });
-
-  document.getElementById('chatSendBtn').addEventListener('click', async () => {
-    if(!session.partyId && !isAdminUser) return;
-    const textInput = document.getElementById('chatTextInput');
-    const text = textInput.value.trim();
-    if(!text && !chatPendingPhoto) return;
-    if(!state.chatMessages) state.chatMessages = [];
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text, photo: chatPendingPhoto, type: 'normal' });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-    pushNotification((session.partyId ? partyName(session.partyId) : 'Administrator') + ' hat eine Nachricht geschrieben' + (text ? ': "' + (text.length > 60 ? text.slice(0,60) + '…' : text) + '"' : ' (Foto)'), null);
-    textInput.value = '';
-    chatPendingPhoto = null;
-    chatPreviewArea.innerHTML = '';
-    chatPhotoInput.value = '';
-    await saveShared();
-    renderChatTab();
-  });
-
-  const beerPhotoInput = document.getElementById('beerPhotoInput');
-  const beerPhotoBtn = document.getElementById('beerPhotoBtn');
-  const beerPreviewArea = document.getElementById('beerPhotoPreviewArea');
-  beerPhotoBtn.addEventListener('click', () => beerPhotoInput.click());
-  beerPhotoInput.addEventListener('change', async (ev) => {
-    const file = ev.target.files[0];
-    if(!file) return;
-    try{
-      beerPendingPhoto = await compressImage(file, 700, 0.6);
-      beerPreviewArea.innerHTML = '<img src="' + beerPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="beerPhotoRemoveBtn">entfernen</button>';
-      document.getElementById('beerPhotoRemoveBtn').addEventListener('click', () => { beerPendingPhoto = null; beerPreviewArea.innerHTML = ''; ev.target.value = ''; });
-    } catch(e){}
-  });
-
-  document.getElementById('beerCallBtn').addEventListener('click', async () => {
-    if(!state.chatMessages) state.chatMessages = [];
-    const name = session.partyId ? partyName(session.partyId) : 'Administrator';
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo: beerPendingPhoto, type: 'beer' });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-    pushNotification('🍻 ' + name + ' ruft zum Feierabendbier! Prost mitmachen?', null);
-    beerPendingPhoto = null;
-    beerPreviewArea.innerHTML = '';
-    beerPhotoInput.value = '';
-    playCheersSound();
-    await saveShared();
-    renderChatTab();
-  });
+  // Chat-Logik läuft jetzt vollständig innerhalb von showChatModal(), da Chat kein Tab mehr ist.
 }
 
 init();
