@@ -651,7 +651,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label id="photoLabel">Beweisfoto Bordcomputer / Tagesverbrauch *</label>
+            <label id="photoLabel">Foto Bordcomputer / Tagesverbrauch *</label>
             <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
               <button type="button" class="btn secondary" id="photoCameraBtn">📷 Foto aufnehmen</button>
               <button type="button" class="btn secondary" id="photoGalleryBtn">🖼️ Aus Galerie auswählen</button>
@@ -660,7 +660,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <input type="file" id="f-photo-gallery" accept="image/*" style="display:none;">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
-            <div class="gate-error" id="err-photo">Bitte ein Beweisfoto auswählen — dieses Feld ist Pflicht.</div>
+            <div class="gate-error" id="err-photo">Bitte ein Foto auswählen — dieses Feld ist Pflicht.</div>
           </div>
         </div>
         <div class="row" id="refuelFields" style="display:none;">
@@ -1474,7 +1474,7 @@ function updatePhotoRequiredUI(){
   const status = document.getElementById('photoStatus');
   if(!label || !status) return;
   const required = !state.settings || state.settings.requirePhoto !== false;
-  label.textContent = required ? 'Beweisfoto Bordcomputer / Tagesverbrauch *' : 'Beweisfoto Bordcomputer / Tagesverbrauch (optional)';
+  label.textContent = required ? 'Foto Bordcomputer / Tagesverbrauch *' : 'Foto Bordcomputer / Tagesverbrauch (optional)';
   if(!pendingPhotoDataUrl && !existingPhotoDataUrl){
     status.textContent = required
       ? 'Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.'
@@ -1835,7 +1835,7 @@ function renderEntriesTable(){
     html += '<td class="num">' + (flags.hasRefuel && e.liters ? fmtNum(e.liters, 1) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasRefuel && e.liters > 0 ? fmtNum(e.expense / e.liters, 2) : '—') + '</td>';
     html += '<td class="num">' + (flags.hasRefuel ? fmtCHF(e.expense) : '—') + '</td>';
-    html += '<td>' + (flags.hasUsage && e.photo ? '<img class="thumb" data-photo-id="' + e.id + '" src="' + e.photo + '" alt="Beweisfoto">' : '—') + '</td>';
+    html += '<td>' + (flags.hasUsage && e.photo ? '<img class="thumb" data-photo-id="' + e.id + '" src="' + e.photo + '" alt="Foto">' : '—') + '</td>';
     if(locked){ html += '<td><span class="locked-note">nur Admin</span></td>'; }
     else if(!isAdminUser && session.partyId && !usage.ids.includes(session.partyId) && !(paid && paid.ids.includes(session.partyId))){
       html += '<td><span class="locked-note">betrifft dich nicht</span></td>';
@@ -2770,9 +2770,9 @@ function renderAdminGeneralSection(){
     '<div class="admin-box">' +
       '<div class="toggle-row">' +
         '<label class="switch"><input type="checkbox" id="requirePhotoToggle"' + (state.settings.requirePhoto !== false ? ' checked' : '') + '><span class="slider"></span></label>' +
-        '<label for="requirePhotoToggle">Beweisfoto bei Nutzungseinträgen zwingend</label>' +
+        '<label for="requirePhotoToggle">Foto bei Nutzungseinträgen zwingend</label>' +
       '</div>' +
-      '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Beweisfoto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
+      '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Foto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<label>Export</label>' +
@@ -2946,7 +2946,7 @@ function renderAdminGeneralSection(){
 
   document.getElementById('requirePhotoToggle').addEventListener('change', async (ev) => {
     state.settings.requirePhoto = ev.target.checked;
-    logAudit('Beweisfoto-Pflicht ' + (ev.target.checked ? 'aktiviert' : 'deaktiviert'));
+    logAudit('Foto-Pflicht ' + (ev.target.checked ? 'aktiviert' : 'deaktiviert'));
     await saveShared();
     updatePhotoRequiredUI();
   });
