@@ -672,7 +672,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
           </div>
         </div>
-        <div id="liveWeatherWidget" style="flex-shrink:0; text-align:right;"></div>
       </div>
       <div class="hero-meta-row">
         <div class="meta" id="headerMeta">wird geladen …</div>
@@ -919,7 +918,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-18';
+const APP_VERSION = '2026-07-15-19';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1129,29 +1128,32 @@ function updateHeaderMeta(){
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
     strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between;">' +
-      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
-        (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
-        '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
-      '</div>' +
       '<div style="display:flex; align-items:center; gap:0.4rem;">' +
+        '<div id="liveWeatherWidget"></div>' +
         '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
         '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdose ausrufen">🍺</button>' +
         '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '</div>' +
+      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+        (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
+        '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
+      '</div>' +
     '</div>';
-    const btn = document.getElementById('logoutBtn');
-    if(btn) btn.addEventListener('click', logout);
-    const inboxBtn = document.getElementById('inboxBtn');
-    if(inboxBtn) inboxBtn.addEventListener('click', showInboxModal);
-    const beerBtn = document.getElementById('beerCallBtn');
-    if(beerBtn) beerBtn.addEventListener('click', () => {
-      const input = document.getElementById('beerPhotoInput');
-      if(input) input.click();
-    });
+    renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
 }
 setInterval(() => { if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); }, 30000);
+
+function handleAdminStripClick(ev){
+  if(ev.target.closest('#logoutBtn')){ logout(); return; }
+  if(ev.target.closest('#inboxBtn')){ showInboxModal(); return; }
+  if(ev.target.closest('#beerCallBtn')){
+    const input = document.getElementById('beerPhotoInput');
+    if(input) input.click();
+    return;
+  }
+}
 
 async function logout(){
   session = { partyCode: null, partyId: null, adminCode: null };
@@ -2041,9 +2043,15 @@ function updatePaidSplitTotal(){
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let weatherCache = {};
+let liveWeatherWidgetHtml = '';
 function renderLiveWeatherWidget(html){
+  liveWeatherWidgetHtml = html;
   const el = document.getElementById('liveWeatherWidget');
   if(el) el.innerHTML = html;
+}
+function renderLiveWeatherWidgetCache(){
+  const el = document.getElementById('liveWeatherWidget');
+  if(el) el.innerHTML = liveWeatherWidgetHtml;
 }
 async function fetchLiveWeatherWidget(){
   if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
@@ -4787,6 +4795,8 @@ async function init(){
   setupSeasonUI();
   fetchLiveWeatherWidget();
   setInterval(fetchLiveWeatherWidget, 15 * 60 * 1000);
+  const adminStripEl = document.getElementById('adminStrip');
+  if(adminStripEl) adminStripEl.addEventListener('click', handleAdminStripClick);
 }
 
 function renderSeasonEventsList(){
