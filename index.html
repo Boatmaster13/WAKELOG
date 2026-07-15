@@ -80,7 +80,7 @@ body{
 }
 .scene-strip{ position:fixed; left:0; right:0; bottom:0; height:150px; z-index:5; pointer-events:none; }
 .scene-strip svg{ width:100%; height:100%; display:block; }
-.hero-inner{ position:relative; z-index:1; }
+.hero-inner{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:0.8rem; }
 .hero-meta-row{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; margin-top:0.9rem; }
 .hero h1{
   font-family:'Big Shoulders Display', sans-serif;
@@ -151,6 +151,47 @@ body{
   padding:0 2px; border:1px solid var(--hull);
 }
 .instruments{ display:flex; gap:0.6rem; margin-top:1.5rem; position:relative; z-index:1; flex-wrap:wrap; }
+
+.weather-widget{
+  position:relative; overflow:hidden;
+  display:inline-flex; align-items:center; gap:0.3rem;
+  background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25);
+  border-radius:20px; padding:0.35rem 0.8rem; text-decoration:none; color:#fff;
+  font-family:'Inter', sans-serif; cursor:default;
+}
+.weather-icon{ font-size:1.15rem; line-height:1; position:relative; z-index:2; }
+.weather-temp{ font-weight:700; font-size:0.95rem; position:relative; z-index:2; }
+.weather-rain{ display:none; }
+.weather-sunny .weather-icon{ animation:weatherPulseGlow 2.2s ease-in-out infinite; }
+.weather-cloudy .weather-icon{ animation:weatherDrift 3.5s ease-in-out infinite; }
+.weather-stormy .weather-icon{ animation:weatherFlash 2.6s ease-in-out infinite; }
+.weather-rainy .weather-rain{
+  display:block; position:absolute; top:-6px; width:1.5px; height:10px;
+  background:rgba(120,170,220,0.8); border-radius:2px; z-index:1;
+  animation:weatherRainFall 0.9s linear infinite;
+}
+.weather-rainy .weather-rain:nth-child(3){ left:20%; animation-delay:0s; }
+.weather-rainy .weather-rain:nth-child(4){ left:50%; animation-delay:0.3s; }
+.weather-rainy .weather-rain:nth-child(5){ left:78%; animation-delay:0.6s; }
+@keyframes weatherRainFall{
+  0%{ transform:translateY(0); opacity:0; }
+  15%{ opacity:1; }
+  100%{ transform:translateY(38px); opacity:0; }
+}
+@keyframes weatherPulseGlow{
+  0%,100%{ filter:drop-shadow(0 0 0px rgba(255,210,120,0)); transform:scale(1); }
+  50%{ filter:drop-shadow(0 0 5px rgba(255,210,120,0.8)); transform:scale(1.1); }
+}
+@keyframes weatherDrift{
+  0%,100%{ transform:translateX(0); }
+  50%{ transform:translateX(3px); }
+}
+@keyframes weatherFlash{
+  0%,85%,100%{ opacity:1; }
+  90%{ opacity:0.3; }
+  92%{ opacity:1; }
+  94%{ opacity:0.4; }
+}
 .instrument{
   background:rgba(255,255,255,0.14);
   border:1px solid rgba(255,255,255,0.22);
@@ -631,6 +672,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
           </div>
         </div>
+        <div id="liveWeatherWidget" style="flex-shrink:0; text-align:right;"></div>
       </div>
       <div class="hero-meta-row">
         <div class="meta" id="headerMeta">wird geladen …</div>
@@ -741,7 +783,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="row" id="refuelFields" style="display:none;">
           <div class="field"><label for="f-liters">Liter Benzin</label><input type="number" id="f-liters" step="0.1" min="0" placeholder="0.0"></div>
-          <div class="field"><label for="f-expense">Ausgaben Tankfüllung (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
+          <div class="field"><label for="f-expense">Tankausgaben (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
           <div class="field" style="grid-column:1 / -1;">
             <label class="checkbox-item" style="display:inline-flex;"><input type="checkbox" id="giftToggle"> Ein Teil (oder alles) wurde von einer externen Person geschenkt</label>
             <div id="giftBody" style="display:none; margin-top:0.7rem;">
@@ -808,7 +850,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
           <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
           <div style="display:flex; gap:0.4rem; flex-shrink:0;">
-            <button class="btn" id="exportPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
             <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
           </div>
         </div>
@@ -819,7 +861,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:nowrap;">
           <h2 style="margin:0; white-space:nowrap;">Jahresvergleich</h2>
           <div style="display:flex; gap:0.4rem; flex-shrink:0;">
-            <button class="btn" id="exportComparisonPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportComparisonPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
             <button class="btn secondary" id="exportComparisonCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
           </div>
         </div>
@@ -837,6 +879,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 </div>
 
 <div id="printArea"></div>
+<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" style="display:none;">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -876,7 +919,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-12';
+const APP_VERSION = '2026-07-15-17';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1084,22 +1127,27 @@ function updateHeaderMeta(){
   el.innerHTML = html;
   const strip = document.getElementById('adminStrip');
   if(strip){
-    const unread = getUnreadNotifications().length;
-    const unreadChat = getUnreadChatCount();
-    strip.innerHTML = '<div class="admin-strip">' +
-      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
-      (todayWeatherCache ? '<span class="inbox-btn" style="cursor:default; font-size:0.9rem;" title="Heutiges Wetter">' + weatherEmoji(todayWeatherCache.code) + ' ' + Math.round(todayWeatherCache.temp) + '°</span>' : '') +
-      '<a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
-      '<button type="button" class="inbox-btn" id="chatHeaderBtn" title="Chat">💬' + (unreadChat > 0 ? '<span class="inbox-count">' + (unreadChat > 9 ? '9+' : unreadChat) + '</span>' : '') + '</button>' +
-      '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
-      '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
+    const unread = getUnreadNotifications().length + getUnreadChatCount();
+    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between;">' +
+      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+        (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
+        '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
+      '</div>' +
+      '<div style="display:flex; align-items:center; gap:0.4rem;">' +
+        '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
+        '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdose ausrufen">🍺</button>' +
+        '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
+      '</div>' +
     '</div>';
     const btn = document.getElementById('logoutBtn');
     if(btn) btn.addEventListener('click', logout);
     const inboxBtn = document.getElementById('inboxBtn');
     if(inboxBtn) inboxBtn.addEventListener('click', showInboxModal);
-    const chatBtn = document.getElementById('chatHeaderBtn');
-    if(chatBtn) chatBtn.addEventListener('click', showChatModal);
+    const beerBtn = document.getElementById('beerCallBtn');
+    if(beerBtn) beerBtn.addEventListener('click', () => {
+      const input = document.getElementById('beerPhotoInput');
+      if(input) input.click();
+    });
   }
   updateAppBadge();
 }
@@ -1765,6 +1813,7 @@ function showInboxModal(){
   overlay.innerHTML =
     '<div class="gate-card">' +
       '<h2>Posteingang</h2>' +
+      '<button class="btn secondary" id="openChatFromInboxBtn" style="width:100%; margin-bottom:1rem;">💬 Chat öffnen' + (getUnreadChatCount() > 0 ? ' (' + getUnreadChatCount() + ' neu)' : '') + '</button>' +
       '<div class="toggle-row" style="margin-bottom:1rem; padding-bottom:0.9rem; border-bottom:1px solid var(--line);">' +
         '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
         '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
@@ -1778,6 +1827,10 @@ function showInboxModal(){
       '<button class="btn" id="inboxCloseBtn">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
+  document.getElementById('openChatFromInboxBtn').addEventListener('click', () => {
+    overlay.remove();
+    showChatModal();
+  });
   document.getElementById('pushToggle').addEventListener('change', (ev) => {
     setPushEnabled(ev.target.checked);
     if(ev.target.checked) requestNotificationPermission();
@@ -1893,8 +1946,21 @@ function renderUsageSplitArea(){
   area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Gemeinsame Nutzung — Aufteilung der heutigen Motorstunden (muss 100% ergeben):</div>' +
     ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="usage-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
     '<div class="split-total" id="usageSplitTotal"></div>';
-  area.querySelectorAll('.usage-split-input').forEach(inp => inp.addEventListener('input', updateUsageSplitTotal));
+  area.querySelectorAll('.usage-split-input').forEach(inp => inp.addEventListener('input', () => {
+    autoFillLastSplit(area, '.usage-split-input', inp);
+    updateUsageSplitTotal();
+  }));
   updateUsageSplitTotal();
+}
+
+function autoFillLastSplit(area, selector, changedInput){
+  const inputs = Array.from(area.querySelectorAll(selector));
+  if(inputs.length < 2) return;
+  const last = inputs[inputs.length - 1];
+  if(changedInput === last) return;
+  const othersSum = inputs.slice(0, -1).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const remainder = Math.max(0, Math.min(100, 100 - othersSum));
+  last.value = (Math.round(remainder * 10) / 10);
 }
 
 function updateUsageSplitTotal(){
@@ -1975,18 +2041,30 @@ function updatePaidSplitTotal(){
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let weatherCache = {};
-let todayWeatherCache = null;
-async function fetchTodayWeather(){
-  if(!state.settings || typeof state.settings.weatherLat !== 'number' || typeof state.settings.weatherLon !== 'number') return;
-  try{
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + state.settings.weatherLat + '&longitude=' + state.settings.weatherLon + '&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
-    const res = await fetch(url);
-    const data = await res.json();
-    if(data.current){
-      todayWeatherCache = { temp: data.current.temperature_2m, code: data.current.weathercode };
-      updateHeaderMeta();
-    }
-  } catch(e){}
+function renderLiveWeatherWidget(html){
+  const el = document.getElementById('liveWeatherWidget');
+  if(el) el.innerHTML = html;
+}
+async function fetchLiveWeatherWidget(){
+  if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try{
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
+      const res = await fetch(url);
+      const data = await res.json();
+      if(data.current){
+        const cat = weatherCategory(data.current.weathercode);
+        renderLiveWeatherWidget(
+          '<div class="weather-widget weather-' + cat + '" title="Aktuelles Wetter an deinem Standort">' +
+            '<span class="weather-icon">' + weatherEmoji(data.current.weathercode) + '</span>' +
+            '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
+            '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
+          '</div>' +
+          '<div class="sub" style="font-size:0.6rem; margin-top:0.15rem; text-align:right;">MeteoSchweiz · dein Standort</div>'
+        );
+      }
+    } catch(e){ renderLiveWeatherWidget(''); }
+  }, () => { renderLiveWeatherWidget(''); }, { timeout: 8000 });
 }
 function weatherEmoji(code){
   if(code === 0) return '☀️';
@@ -1998,6 +2076,14 @@ function weatherEmoji(code){
   if(code >= 80 && code <= 82) return '🌧️';
   if(code >= 95) return '⛈️';
   return '🌡️';
+}
+function weatherCategory(code){
+  if(code === 0 || code <= 2) return 'sunny';
+  if(code === 3 || (code >= 45 && code <= 48)) return 'cloudy';
+  if((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rainy';
+  if(code >= 71 && code <= 77) return 'snowy';
+  if(code >= 95) return 'stormy';
+  return '';
 }
 async function fetchWeatherForYear(year){
   if(!state.settings || typeof state.settings.weatherLat !== 'number' || typeof state.settings.weatherLon !== 'number') return;
@@ -2036,7 +2122,7 @@ async function checkWindWarning(){
     const data = await res.json();
     if(!data.hourly || !data.hourly.windgusts_10m) return;
     const maxGust = Math.max(...data.hourly.windgusts_10m);
-    const officialLink = '<a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener">Offizielle Sturmwarnung prüfen ↗</a>';
+    const officialLink = '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener">Offizielle Sturmwarnung prüfen ↗</a>';
     if(maxGust >= 63){
       el.innerHTML = '<div class="notice warn">🌬️ Starke Böen bis ' + Math.round(maxGust) + ' km/h in den nächsten 48 Std. vorhergesagt (eigene Einschätzung anhand der Wetterdaten, keine offizielle Sturmwarnung). ' + officialLink + '</div>';
     } else if(maxGust >= 46){
@@ -2228,7 +2314,7 @@ function clearEntryErrors(){
   });
 }
 
-const BURP_SOUND_COUNT = 13;
+const BURP_SOUND_COUNT = 10;
 function playCheersSound(){
   try{
     const canOpen = new Audio('sounds/sound-can-open.mp3');
@@ -2288,12 +2374,7 @@ function showChatModal(){
   overlay.innerHTML =
     '<div class="gate-card" style="max-width:480px;">' +
       '<h2>Chat</h2>' +
-      '<div class="admin-box" style="margin-bottom:1rem;">' +
-        '<div class="hint" style="margin-bottom:0.7rem;">Spontan zur Ankerdose rufen — alle anderen Parteien bekommen sofort eine Mitteilung.</div>' +
-        '<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" style="display:none;">' +
-        '<button class="btn" id="beerCallBtn" style="background:#C9A227;">⚓ Ankerdose ausrufen!</button>' +
-      '</div>' +
-      '<div id="chatMessageList" style="max-height:40vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
+      '<div id="chatMessageList" style="max-height:45vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
         '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
         '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
@@ -2303,10 +2384,10 @@ function showChatModal(){
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<input type="file" id="chatPhotoInput" accept="image/*" style="display:none;">' +
-      '<div style="display:flex; gap:0.5rem; align-items:flex-end;">' +
-        '<div class="field" style="flex:1; margin:0;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
-        '<button type="button" class="btn secondary" id="chatPhotoBtn" style="flex-shrink:0;">📷</button>' +
-        '<button type="button" class="btn" id="chatSendBtn" style="flex-shrink:0;">Senden</button>' +
+      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+      '<div style="display:flex; gap:0.5rem;">' +
+        '<button type="button" class="btn secondary" id="chatPhotoBtn" style="flex:1;">📷 Foto</button>' +
+        '<button type="button" class="btn" id="chatSendBtn" style="flex:1;">Senden</button>' +
       '</div>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
     '</div>';
@@ -2365,24 +2446,6 @@ function showChatModal(){
     setChatLastSeen(Date.now());
     overlay.remove();
     updateHeaderMeta();
-  });
-
-  const beerPhotoInput = document.getElementById('beerPhotoInput');
-  document.getElementById('beerCallBtn').addEventListener('click', () => beerPhotoInput.click());
-  beerPhotoInput.addEventListener('change', async (ev) => {
-    const file = ev.target.files[0];
-    if(!file) return;
-    let photo = null;
-    try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
-    if(!state.chatMessages) state.chatMessages = [];
-    const name = session.partyId ? partyName(session.partyId) : 'Administrator';
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo, type: 'beer', toPartyIds: null });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-    playCheersSound();
-    await saveShared();
-    renderChatMessageListInto(document.getElementById('chatMessageList'));
-    updateHeaderMeta();
-    ev.target.value = '';
   });
 }
 
@@ -2735,10 +2798,28 @@ function settlementTransactions(rows){
   return tx;
 }
 
+function downloadCsv(filename, rows){
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
+  const bytes = new Uint8Array(csv.length);
+  for(let i=0;i<csv.length;i++){
+    const code = csv.charCodeAt(i);
+    bytes[i] = code <= 0xFF ? code : 0x3F;
+  }
+  const blob = new Blob([bytes], { type: 'text/csv;charset=windows-1252;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function exportYearOverviewCsv(year){
   const yearEntries = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => a.date.localeCompare(b.date));
   const hoursMap = computeHoursMap();
-  const rows = [['Datum','Partei(en)','Typ','Zaehlerstand','Std','Verbrauch l_h','Getankt l','Preis CHF_l','Ausgaben CHF']];
+  const rows = [['Datum','Partei(en)','Typ','Zaehlerstand [h]','Std. [h]','Ø-Rate [l/h]','Verbrauch [l]','Getankt [l]','Preis [CHF/l]','Ausgaben [CHF]']];
   yearEntries.forEach(e => {
     const flags = getEntryFlags(e);
     const usage = getEntryUsageSplit(e);
@@ -2755,16 +2836,7 @@ function exportYearOverviewCsv(year){
       flags.hasRefuel ? e.expense : ''
     ]);
   });
-  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'wakelog-' + year + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadCsv('wakelog-' + year + '.csv', rows);
 }
 
 function exportYearOverviewPdf(year){
@@ -3028,17 +3100,22 @@ function renderYearComparison(){
   }
 
   el.innerHTML =
-    '<div style="display:flex; gap:2rem; align-items:center; margin-bottom:0.9rem; flex-wrap:wrap;">' +
-      '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:var(--volt);"></span>Gesamtaufwand CHF</div>' +
-      '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#6E85A8;"></span>Motorstunden</div>' +
+    '<div class="cal-legend" style="margin-bottom:0.9rem;">' +
+      state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
     '</div>' +
-    '<div class="hint" style="margin-bottom:0.9rem;">Balken sind zusätzlich nach Partei eingefärbt (gleiche Farben wie im Kalender).</div>' +
+    '<div class="hint" style="margin-bottom:0.9rem;">Je zwei Balken pro Jahr: links Gesamtaufwand (CHF), rechts Motorstunden — beide nach Partei eingefärbt.</div>' +
     '<div style="display:flex; gap:1.2rem; align-items:flex-end; height:140px; padding:0 0.3rem;">' +
     perYear.map(p =>
       '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
-        '<div style="display:flex; gap:0.3rem; align-items:flex-end; height:100%;">' +
-          '<div style="width:18px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'total', p.total) + '</div>' +
-          '<div style="width:18px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam); opacity:0.75;">' + segments(p, 'hours', p.hours) + '</div>' +
+        '<div style="display:flex; gap:0.5rem; align-items:flex-end; height:100%;">' +
+          '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem; height:100%; justify-content:flex-end;">' +
+            '<div style="width:18px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'total', p.total) + '</div>' +
+            '<div class="hint" style="margin:0; font-size:0.62rem;">CHF</div>' +
+          '</div>' +
+          '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem; height:100%; justify-content:flex-end;">' +
+            '<div style="width:18px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'hours', p.hours) + '</div>' +
+            '<div class="hint" style="margin:0; font-size:0.62rem;">Std.</div>' +
+          '</div>' +
         '</div>' +
         '<div class="hint" style="margin:0;">' + p.year + (p.total === 0 && p.hours === 0 ? ' (keine Daten)' : '') + '</div>' +
       '</div>'
@@ -3048,22 +3125,13 @@ function renderYearComparison(){
 
 function exportYearComparisonCsv(){
   const perYear = getYearComparisonData();
-  const rows = [['Jahr','Partei','Gesamtaufwand_CHF_Anteil','Motorstunden_Anteil']];
+  const rows = [['Jahr','Partei','Anteil Gesamtaufwand [CHF]','Anteil Motorstunden [h]']];
   perYear.forEach(p => {
     p.rows.forEach(r => {
       rows.push([p.year, r.name, r.fairShare.toFixed(2), fmtNum(r.hours,1)]);
     });
   });
-  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'wakelog-jahresvergleich.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadCsv('wakelog-jahresvergleich.csv', rows);
 }
 
 function exportYearComparisonPdf(){
@@ -3661,7 +3729,7 @@ function renderAdminAuditSection(){
       '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:nowrap;">' +
         '<label style="margin:0;">Änderungsprotokoll</label>' +
         '<div style="display:flex; gap:0.4rem; flex-shrink:0;">' +
-          '<button type="button" class="btn" id="exportAuditPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+          '<button type="button" class="btn secondary" id="exportAuditPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
           '<button type="button" class="btn secondary" id="exportAuditCsvBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>' +
         '</div>' +
       '</div>' +
@@ -3688,16 +3756,7 @@ function exportAuditLogCsv(){
     const d = new Date(l.ts);
     rows.push([d.toLocaleDateString('de-CH') + ', ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr', l.actor, l.action]);
   });
-  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'wakelog-protokoll.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadCsv('wakelog-protokoll.csv', rows);
 }
 
 function exportAuditLogPdf(){
@@ -4059,7 +4118,6 @@ function renderAdminGeneralSection(){
     fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     weatherCache = {};
     renderEntriesTable();
-    fetchTodayWeather();
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
@@ -4136,10 +4194,10 @@ function renderPartyCodeList(){
   wrap.innerHTML = state.parties.map(p =>
     '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">' +
       '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + (isAdminUser ? escapeHtml(p.code || '') : '••••••') + '</span></div>' +
-      '<div class="party-code-actions">' +
-        '<button class="icon-btn" data-action="copy" data-id="' + p.id + '">📋 Kopieren</button>' +
-        '<button class="icon-btn" data-action="whatsapp" data-id="' + p.id + '">💬 WhatsApp</button>' +
-        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '">🔄 Neuer Code</button>' +
+      '<div class="party-code-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+        '<button class="icon-btn" data-action="copy" data-id="' + p.id + '" style="flex:none;">📋 Kopieren</button>' +
+        '<button class="icon-btn" data-action="whatsapp" data-id="' + p.id + '" style="flex:none;">💬 WhatsApp</button>' +
+        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '" style="flex:none; grid-column:1 / -1;">🔄 Neuer Code</button>' +
       '</div>' +
       '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
     '</div>'
@@ -4710,9 +4768,25 @@ async function init(){
   setupUpdateChecking();
   setupSceneStripTracking();
   setupChatUI();
+  const beerPhotoInput = document.getElementById('beerPhotoInput');
+  if(beerPhotoInput){
+    beerPhotoInput.addEventListener('change', async (ev) => {
+      const file = ev.target.files[0];
+      if(!file) return;
+      let photo = null;
+      try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
+      if(!state.chatMessages) state.chatMessages = [];
+      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo, type: 'beer', toPartyIds: null });
+      if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+      playCheersSound();
+      await saveShared();
+      updateHeaderMeta();
+      ev.target.value = '';
+    });
+  }
   setupSeasonUI();
-  fetchTodayWeather();
-  setInterval(fetchTodayWeather, 30 * 60 * 1000);
+  fetchLiveWeatherWidget();
+  setInterval(fetchLiveWeatherWidget, 15 * 60 * 1000);
 }
 
 function renderSeasonEventsList(){
