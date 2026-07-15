@@ -404,6 +404,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .cal-day:hover{ transform:scale(1.08); z-index:1; }
 .cal-day.empty{ background:transparent; cursor:default; visibility:hidden; }
 .cal-day.today{ border-color:var(--hull); border-width:2px; font-weight:700; }
+.cal-request-dot{
+  position:absolute; top:3px; right:3px; width:8px; height:8px; border-radius:50%;
+  background:#C0392B; border:1px solid #fff;
+}
 .cal-day.open{ background:repeating-linear-gradient(45deg, #e3e1db, #e3e1db 4px, #d3d1cb 4px, #d3d1cb 8px); color:var(--ink-faint); }
 .cal-day.drag-selected{ outline:2px solid var(--hull); outline-offset:-2px; }
 .cal-legend{ display:flex; flex-wrap:wrap; gap:0.6rem; }
@@ -772,7 +776,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -838,7 +842,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {} };
 }
 
 async function loadShared(){
@@ -855,6 +859,7 @@ async function loadShared(){
       state.auditLog = loaded.auditLog || [];
       state.priorityOverrides = loaded.priorityOverrides || {};
       state.yearResetBackups = loaded.yearResetBackups || {};
+      state.priorityRequests = loaded.priorityRequests || {};
     } else {
       state = defaultData();
     }
@@ -869,7 +874,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {} });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -888,6 +893,9 @@ function subscribeRealtime(){
       notifyNewGiveUps(state.priorityOverrides || {}, newOverrides);
       state.priorityOverrides = newOverrides;
       state.yearResetBackups = loaded.yearResetBackups || {};
+      const newRequests = loaded.priorityRequests || {};
+      notifyNewRequests(state.priorityRequests || {}, newRequests);
+      state.priorityRequests = newRequests;
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -919,6 +927,25 @@ function notifyNewGiveUps(oldOverrides, newOverrides){
     try{
       new Notification('WakeLog — Vorrechtstag abgegeben', {
         body: partyName(ov.givenUpBy) + ' hat den Vorrechtstag am ' + dateLabel + ' abgegeben.' + (state.parties.length > 2 ? ' Frei zum Übernehmen!' : ''),
+        icon: 'icon-192.png'
+      });
+    } catch(e){}
+  });
+}
+
+function notifyNewRequests(oldRequests, newRequests){
+  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if(!accessGranted || isAdminUser || !session.partyId) return;
+  Object.keys(newRequests).forEach(dateStr => {
+    const req = newRequests[dateStr];
+    const prev = oldRequests[dateStr];
+    if(!req || prev) return;
+    const eff = effectivePriority(dateStr);
+    if(eff.partyId !== session.partyId) return;
+    const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' });
+    try{
+      new Notification('WakeLog — Anfrage erhalten', {
+        body: partyName(req.requestedBy) + ' möchte deinen Vorrechtstag am ' + dateLabel + ' übernehmen.',
         icon: 'icon-192.png'
       });
     } catch(e){}
@@ -1043,6 +1070,20 @@ function getPendingDecisionsForMe(){
     result.push(dateStr);
   });
   return result.sort();
+}
+
+function respondToRequest(dateStr, accept){
+  const req = state.priorityRequests ? state.priorityRequests[dateStr] : null;
+  if(!req) return;
+  const eff = effectivePriority(dateStr);
+  if(accept){
+    if(!state.priorityOverrides) state.priorityOverrides = {};
+    state.priorityOverrides[dateStr] = { givenUpBy: eff.base, claimedBy: req.requestedBy, declinedBy: [] };
+    logAudit(partyName(eff.base) + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + dateStr + ' angenommen');
+  } else {
+    logAudit(partyName(eff.base || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + dateStr + ' abgelehnt');
+  }
+  delete state.priorityRequests[dateStr];
 }
 
 function respondToPendingDay(dateStr, accept){
@@ -1200,6 +1241,7 @@ function renderCalendarLegend(){
   el.innerHTML = '<div class="cal-legend">' +
     state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
     (state.parties.length >= 2 ? '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Angeboten, noch nicht bestätigt</div>' : '') +
+    '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#C0392B;"></span>Anfrage pendent</div>' +
   '</div>';
 }
 
@@ -1249,7 +1291,9 @@ function renderCalendarTab(){
       if(dateStr === todayStr) cls += ' today';
       if(eff.open) cls += ' open';
       else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
-      html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + '</div>';
+      const hasRequest = state.priorityRequests && state.priorityRequests[dateStr];
+      const requestDot = hasRequest ? '<span class="cal-request-dot" title="Anfrage pendent"></span>' : '';
+      html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + requestDot + '</div>';
     }
   }
   grid.innerHTML = html;
@@ -1289,7 +1333,10 @@ function renderCalendarDayPanel(){
   const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
 
   if(calendarShareOffer && calendarShareOffer.dateStr === dateStr){
-    const msg = 'Hinweis von WakeLog: ' + partyName(calendarShareOffer.actingId) + ' hat den Vorrechtstag am ' + dateLabel + ' abgegeben. Schaut gerne im Kalender vorbei!';
+    const isReq = calendarShareOffer.type === 'request';
+    const msg = isReq ?
+      ('Hinweis von WakeLog: ' + partyName(calendarShareOffer.actingId) + ' möchte den Vorrechtstag am ' + dateLabel + ' gerne übernehmen. Schaut gerne im Kalender vorbei, um zuzusagen oder abzulehnen!') :
+      ('Hinweis von WakeLog: ' + partyName(calendarShareOffer.actingId) + ' hat den Vorrechtstag am ' + dateLabel + ' abgegeben. Schaut gerne im Kalender vorbei!');
     panel.innerHTML =
       '<div class="admin-box">' +
         '<label>Erledigt ✓</label>' +
@@ -1320,12 +1367,37 @@ function renderCalendarDayPanel(){
 
   const myId = session.partyId;
 
+  const pendingRequest = state.priorityRequests ? state.priorityRequests[dateStr] : null;
+  if(pendingRequest && (isAdminUser || eff.partyId === myId) && !(calendarPendingAction && calendarPendingAction.dateStr === dateStr)){
+    panel.innerHTML =
+      '<div class="admin-box">' +
+        '<label>' + dateLabel + '</label>' +
+        '<div style="margin:0.5rem 0 0.9rem;"><b>' + escapeHtml(partyName(pendingRequest.requestedBy)) + '</b> möchte diesen Tag gerne übernehmen. Einverstanden?</div>' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+          '<button class="btn" id="calReqYesBtn">Ja, zusagen</button>' +
+          '<button class="btn secondary" id="calReqNoBtn">Nein, ablehnen</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('calReqYesBtn').addEventListener('click', async () => {
+      respondToRequest(dateStr, true);
+      await saveShared();
+      renderCalendarTab(); renderInstruments();
+    });
+    document.getElementById('calReqNoBtn').addEventListener('click', async () => {
+      respondToRequest(dateStr, false);
+      await saveShared();
+      renderCalendarTab(); renderInstruments();
+    });
+    return;
+  }
+
   if(calendarPendingAction && calendarPendingAction.dateStr === dateStr){
     const actingId = calendarPendingAction.actingId;
     const pendingLabels = {
       giveup: 'Soll ' + escapeHtml(partyName(actingId)) + ' den Vorrechtstag am ' + dateLabel + ' wirklich abgeben?',
       undo: 'Soll die Abgabe von ' + escapeHtml(partyName(actingId)) + ' am ' + dateLabel + ' wirklich rückgängig gemacht werden?',
-      claim: 'Soll ' + escapeHtml(partyName(actingId)) + ' den freien Vorrechtstag am ' + dateLabel + ' wirklich übernehmen?'
+      claim: 'Soll ' + escapeHtml(partyName(actingId)) + ' den freien Vorrechtstag am ' + dateLabel + ' wirklich übernehmen?',
+      request: 'Soll ' + escapeHtml(partyName(actingId)) + ' den Vorrechtstag am ' + dateLabel + ' wirklich bei der aktuellen Partei anfragen?'
     };
     panel.innerHTML =
       '<div class="admin-box">' +
@@ -1347,6 +1419,7 @@ function renderCalendarDayPanel(){
       const fb = document.getElementById('calFeedback');
       const action = calendarPendingAction.type;
       let justGaveUp = false;
+      let justRequested = false;
       if(action === 'giveup'){
         if(!state.priorityOverrides) state.priorityOverrides = {};
         state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
@@ -1365,9 +1438,21 @@ function renderCalendarDayPanel(){
         }
         state.priorityOverrides[dateStr].claimedBy = actingId;
         logAudit(partyName(actingId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen' + (isAdminUser ? ' (durch Administrator)' : ''));
+      } else if(action === 'request'){
+        if(state.priorityRequests && state.priorityRequests[dateStr]){
+          fb.style.color = '#C0392B'; fb.textContent = 'Für diesen Tag liegt bereits eine Anfrage vor.'; fb.classList.add('show');
+          calendarPendingAction = null;
+          renderCalendarTab();
+          return;
+        }
+        if(!state.priorityRequests) state.priorityRequests = {};
+        state.priorityRequests[dateStr] = { requestedBy: actingId, createdAt: Date.now() };
+        logAudit(partyName(actingId) + ' hat den Vorrechtstag am ' + dateStr + ' angefragt');
+        justRequested = true;
       }
       calendarPendingAction = null;
-      if(justGaveUp) calendarShareOffer = { dateStr, actingId };
+      if(justGaveUp) calendarShareOffer = { dateStr, actingId, type: 'giveup' };
+      if(justRequested) calendarShareOffer = { dateStr, actingId, type: 'request' };
       await saveShared();
       renderCalendarTab(); renderInstruments();
     });
@@ -1393,6 +1478,14 @@ function renderCalendarDayPanel(){
     }
     if(ov && !ov.claimedBy && (isAdminUser || ov.givenUpBy === myId)){
       actions += '<button class="btn secondary" id="calUndoBtn">Abgabe rückgängig machen</button>';
+    }
+    if(!ov && myId && eff.partyId !== myId){
+      const existingReq = state.priorityRequests ? state.priorityRequests[dateStr] : null;
+      if(existingReq){
+        statusLine += ' <span class="hint" style="display:block; margin-top:0.3rem;">Anfrage von ' + escapeHtml(partyName(existingReq.requestedBy)) + ' bereits gestellt — wartet auf Antwort von ' + escapeHtml(partyName(eff.partyId)) + '.</span>';
+      } else {
+        actions += '<button class="btn secondary" id="calRequestBtn">Diesen Tag anfragen</button>';
+      }
     }
   }
 
@@ -1421,6 +1514,12 @@ function renderCalendarDayPanel(){
   if(claimBtn) claimBtn.addEventListener('click', () => {
     const partySelect = document.getElementById('calClaimPartySelect');
     calendarPendingAction = { type: 'claim', dateStr, actingId: partySelect ? partySelect.value : myId };
+    renderCalendarDayPanel();
+  });
+
+  const requestBtn = document.getElementById('calRequestBtn');
+  if(requestBtn) requestBtn.addEventListener('click', () => {
+    calendarPendingAction = { type: 'request', dateStr, actingId: myId };
     renderCalendarDayPanel();
   });
 }
