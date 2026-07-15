@@ -799,7 +799,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-01';
+const APP_VERSION = '2026-07-15-02';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1290,6 +1290,7 @@ function renderCalendarLegend(){
   if(!el) return;
   el.innerHTML = '<div class="cal-legend">' +
     state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
+    (state.parties.length >= 2 ? '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Frei</div>' : '') +
     '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#C0392B;"></span>Anfrage pendent</div>' +
   '</div>';
 }
