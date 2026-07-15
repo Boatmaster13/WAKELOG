@@ -531,10 +531,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   <svg viewBox="0 0 1400 180" preserveAspectRatio="none">
     <!-- Hintere Wellenschicht -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105 L1400,180 L0,180 Z"
-          fill="var(--ink)" fill-opacity="0.22"/>
+          fill="var(--ink)" fill-opacity="0.35"/>
     <!-- Vordere Wellenschicht (durchgehend) -->
     <path d="M0,125 Q100,100 200,125 Q300,150 400,125 Q500,100 600,125 Q700,150 800,125 Q900,100 1000,125 Q1100,150 1200,125 Q1300,100 1400,125 L1400,180 L0,180 Z"
-          fill="var(--ink)" fill-opacity="0.42"/>
+          fill="var(--ink)" fill-opacity="0.62"/>
 
     <!-- Bronze-Akzente: Wellenkämme -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105"
@@ -606,6 +606,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <h2>Vorrechts-Kalender</h2>
         <div id="calendarLegend" style="margin-bottom:1rem;"></div>
+        <div id="calendarPendingBtnArea" style="margin-bottom:1rem;"></div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
           <button class="btn secondary" id="calPrevBtn">‹</button>
           <div id="calMonthLabel" style="font-family:'Big Shoulders Display', sans-serif; font-size:1.2rem; font-weight:700;"></div>
@@ -1027,15 +1028,113 @@ function basePriorityPartyId(dateStr){
   return null;
 }
 
+function getPendingDecisionsForMe(){
+  if(isAdminUser || !session.partyId || !state.priorityOverrides) return [];
+  const myId = session.partyId;
+  const result = [];
+  Object.keys(state.priorityOverrides).forEach(dateStr => {
+    const ov = state.priorityOverrides[dateStr];
+    if(!ov || ov.claimedBy) return;
+    if(ov.givenUpBy === myId) return;
+    const declined = ov.declinedBy || [];
+    if(declined.includes(myId)) return;
+    const eff = effectivePriority(dateStr);
+    if(!eff.open) return;
+    result.push(dateStr);
+  });
+  return result.sort();
+}
+
+function respondToPendingDay(dateStr, accept){
+  const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+  if(!ov) return;
+  const myId = session.partyId;
+  if(accept){
+    ov.claimedBy = myId;
+    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + dateStr + ' übernommen');
+  } else {
+    if(!ov.declinedBy) ov.declinedBy = [];
+    if(!ov.declinedBy.includes(myId)) ov.declinedBy.push(myId);
+    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + dateStr + ' abgelehnt');
+    const otherPartyCount = state.parties.length - 1;
+    if(ov.declinedBy.length >= otherPartyCount){
+      delete state.priorityOverrides[dateStr];
+    }
+  }
+}
+
+function showPendingDecisionsQueue(){
+  const dates = getPendingDecisionsForMe();
+  if(!dates.length) return;
+  let queue = dates.slice();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  document.body.appendChild(overlay);
+
+  function renderNext(){
+    if(!queue.length){ overlay.remove(); return; }
+    const dateStr = queue[0];
+    const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
+    if(!ov || ov.claimedBy || (ov.declinedBy || []).includes(session.partyId)){
+      queue.shift();
+      renderNext();
+      return;
+    }
+    const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+    overlay.innerHTML =
+      '<div class="gate-card">' +
+        '<h2>Vorrecht angeboten</h2>' +
+        '<p>' + escapeHtml(partyName(ov.givenUpBy)) + ' hat den Vorrechtstag am <b>' + dateLabel + '</b> abgegeben. Möchtest du ihn übernehmen?' + (queue.length > 1 ? ' (noch ' + (queue.length - 1) + ' weitere' + (queue.length - 1 === 1 ? 'r Tag' : ' Tage') + ' danach)' : '') + '</p>' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1rem;">' +
+          '<button class="btn" id="pendingYesBtn">Ja, übernehmen</button>' +
+          '<button class="btn secondary" id="pendingNoBtn">Nein, danke</button>' +
+        '</div>' +
+        (queue.length > 1 ? '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:0.9rem;">' +
+          '<button class="btn secondary" id="pendingAllYesBtn">Alle ' + queue.length + ' übernehmen</button>' +
+          '<button class="btn secondary" id="pendingAllNoBtn">Alle ' + queue.length + ' ablehnen</button>' +
+        '</div>' : '');
+
+    document.getElementById('pendingYesBtn').addEventListener('click', async () => {
+      respondToPendingDay(dateStr, true);
+      await saveShared();
+      queue.shift();
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+    document.getElementById('pendingNoBtn').addEventListener('click', async () => {
+      respondToPendingDay(dateStr, false);
+      await saveShared();
+      queue.shift();
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+    const allYesBtn = document.getElementById('pendingAllYesBtn');
+    if(allYesBtn) allYesBtn.addEventListener('click', async () => {
+      queue.forEach(d => respondToPendingDay(d, true));
+      await saveShared();
+      queue = [];
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+    const allNoBtn = document.getElementById('pendingAllNoBtn');
+    if(allNoBtn) allNoBtn.addEventListener('click', async () => {
+      queue.forEach(d => respondToPendingDay(d, false));
+      await saveShared();
+      queue = [];
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+  }
+  renderNext();
+}
+
 function effectivePriority(dateStr){
   const base = basePriorityPartyId(dateStr);
   if(!base) return { partyId: null, open: false, base: null };
   const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
   if(!ov || ov.givenUpBy !== base) return { partyId: base, open: false, base };
-  if(state.parties.length === 2){
-    const other = state.parties.find(p => p.id !== base);
-    return { partyId: other ? other.id : null, open: false, base };
-  }
   if(ov.claimedBy) return { partyId: ov.claimedBy, open: false, base };
   return { partyId: null, open: true, base };
 }
@@ -1104,13 +1203,21 @@ function renderCalendarLegend(){
   if(!el) return;
   el.innerHTML = '<div class="cal-legend">' +
     state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
-    (state.parties.length > 2 ? '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Frei (abgegeben, noch nicht übernommen)</div>' : '') +
+    (state.parties.length >= 2 ? '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#d3d1cb;"></span>Angeboten, noch nicht bestätigt</div>' : '') +
   '</div>';
 }
 
 function renderCalendarTab(){
   if(!document.getElementById('calendarGrid')) return;
   renderCalendarLegend();
+  const pendingBtnArea = document.getElementById('calendarPendingBtnArea');
+  if(pendingBtnArea){
+    const pendingCount = getPendingDecisionsForMe().length;
+    pendingBtnArea.innerHTML = pendingCount > 0 ?
+      '<button class="btn secondary" id="reviewPendingBtn">📥 ' + pendingCount + ' offene Anfrage' + (pendingCount === 1 ? '' : 'n') + ' ansehen</button>' : '';
+    const reviewBtn = document.getElementById('reviewPendingBtn');
+    if(reviewBtn) reviewBtn.addEventListener('click', showPendingDecisionsQueue);
+  }
   const rangePartySel = document.getElementById('calRangeParty');
   if(rangePartySel && isAdminUser){
     const prevVal = rangePartySel.value;
@@ -1177,13 +1284,38 @@ function renderCalendarTab(){
 }
 
 let calendarPendingAction = null;
+let calendarShareOffer = null;
 
 function renderCalendarDayPanel(){
   const panel = document.getElementById('calendarDayPanel');
   if(!panel || !calendarSelectedDate) return;
   const dateStr = calendarSelectedDate;
-  const eff = effectivePriority(dateStr);
   const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+
+  if(calendarShareOffer && calendarShareOffer.dateStr === dateStr){
+    const msg = 'Hinweis von WakeLog: ' + partyName(calendarShareOffer.actingId) + ' hat den Vorrechtstag am ' + dateLabel + ' abgegeben. Schaut gerne im Kalender vorbei!';
+    panel.innerHTML =
+      '<div class="admin-box">' +
+        '<label>Erledigt ✓</label>' +
+        '<div style="margin:0.5rem 0 0.9rem;">Möchtest du die anderen Parteien per WhatsApp informieren?</div>' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+          '<button class="btn secondary" id="calShareWhatsappBtn">💬 Per WhatsApp mitteilen</button>' +
+          '<button class="btn secondary" id="calShareDismissBtn">Nicht jetzt</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('calShareWhatsappBtn').addEventListener('click', () => {
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+      calendarShareOffer = null;
+      renderCalendarDayPanel();
+    });
+    document.getElementById('calShareDismissBtn').addEventListener('click', () => {
+      calendarShareOffer = null;
+      renderCalendarDayPanel();
+    });
+    return;
+  }
+
+  const eff = effectivePriority(dateStr);
 
   if(!eff.base){
     panel.innerHTML = '<div class="hint">Für diesen Tag ist keine Vorrangregel hinterlegt.</div>';
@@ -1218,10 +1350,12 @@ function renderCalendarDayPanel(){
     document.getElementById('calConfirmBtn').addEventListener('click', async () => {
       const fb = document.getElementById('calFeedback');
       const action = calendarPendingAction.type;
+      let justGaveUp = false;
       if(action === 'giveup'){
         if(!state.priorityOverrides) state.priorityOverrides = {};
-        state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null };
+        state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
         logAudit(partyName(actingId) + ' hat Vorrecht am ' + dateStr + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
+        justGaveUp = true;
       } else if(action === 'undo'){
         if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
         logAudit('Abgabe des Vorrechts von ' + partyName(actingId) + ' am ' + dateStr + ' rückgängig gemacht' + (isAdminUser ? ' (durch Administrator)' : ''));
@@ -1237,6 +1371,7 @@ function renderCalendarDayPanel(){
         logAudit(partyName(actingId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen' + (isAdminUser ? ' (durch Administrator)' : ''));
       }
       calendarPendingAction = null;
+      if(justGaveUp) calendarShareOffer = { dateStr, actingId };
       await saveShared();
       renderCalendarTab(); renderInstruments();
     });
@@ -2507,7 +2642,7 @@ function showRecoveryCodeOnce(recoveryCode, totpSecret){
   const btn = document.getElementById('recoveryConfirmBtn');
   checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
   btn.addEventListener('click', () => {
-    hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission();
+    hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
   });
 }
 
@@ -2649,7 +2784,7 @@ function renderGate(){
           errEl.textContent = 'Zugangscode ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.'; errEl.classList.add('show'); return;
         }
       }
-      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission();
+      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
     document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
@@ -3431,11 +3566,22 @@ async function init(){
     const btn = document.getElementById('calRangeSubmitBtn');
     if(rangePendingDates && rangePendingDates.confirming){
       if(!state.priorityOverrides) state.priorityOverrides = {};
-      rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null }; });
+      rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
       logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + startVal + ' bis ' + endVal + ')');
       await saveShared();
       fb.style.color = '#1C9A64'; fb.textContent = rangePendingDates.dates.length + ' Tag(e) abgegeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
       btn.textContent = 'Zeitraum abgeben';
+      const startLabel = new Date(startVal + 'T00:00:00').toLocaleDateString('de-CH');
+      const endLabel = new Date(endVal + 'T00:00:00').toLocaleDateString('de-CH');
+      const shareMsg = 'Hinweis von WakeLog: ' + partyName(targetParty) + ' hat die Vorrechtstage vom ' + startLabel + ' bis ' + endLabel + ' abgegeben. Schaut gerne im Kalender vorbei!';
+      const rangeShareArea = document.createElement('div');
+      rangeShareArea.style.marginTop = '0.8rem';
+      rangeShareArea.innerHTML = '<button class="btn secondary" id="calRangeShareBtn">💬 Per WhatsApp mitteilen</button>';
+      fb.insertAdjacentElement('afterend', rangeShareArea);
+      document.getElementById('calRangeShareBtn').addEventListener('click', () => {
+        window.open('https://wa.me/?text=' + encodeURIComponent(shareMsg), '_blank');
+        rangeShareArea.remove();
+      });
       rangePendingDates = null;
       renderCalendarTab(); renderInstruments();
       return;
@@ -3534,7 +3680,7 @@ async function init(){
   document.getElementById('f-expense').addEventListener('input', updatePaidSplitTotal);
 
   if(!state.settings || !accessGranted){ showGate(); }
-  else { hideGate(); renderAll(); requestNotificationPermission(); }
+  else { hideGate(); renderAll(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600); }
   startPolling();
   setupInactivityTracking();
   setupSceneStripTracking();
