@@ -919,7 +919,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-17';
+const APP_VERSION = '2026-07-15-18';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -2317,9 +2317,9 @@ function clearEntryErrors(){
 const BURP_SOUND_COUNT = 10;
 function playCheersSound(){
   try{
-    const canOpen = new Audio('sounds/sound-can-open.mp3');
+    const canOpen = new Audio('sound-can-open.mp3');
     const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
-    const burp = new Audio('sounds/sound-burp-' + burpIndex + '.mp3');
+    const burp = new Audio('sound-burp-' + burpIndex + '.mp3');
     canOpen.addEventListener('ended', () => { burp.play().catch(() => {}); });
     canOpen.play().catch(() => {});
   } catch(e){}
