@@ -36,6 +36,7 @@
   --surf-bg:#EFE3CD;
   --line: rgba(24,23,21,0.10);
   --line-strong: rgba(24,23,21,0.20);
+  --bronze-line: rgba(184,130,59,0.4);
   --radius-sm:10px;
   --radius:16px;
   --radius-lg:24px;
@@ -133,6 +134,22 @@ body{
   transition:background 0.15s ease;
 }
 .logout-btn:hover{ background:rgba(255,255,255,0.22); }
+.inbox-btn{
+  position:relative;
+  font-size:1rem;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.25);
+  border-radius:50%;
+  width:32px; height:32px;
+  cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.inbox-count{
+  position:absolute; top:-4px; right:-4px; background:#C0392B; color:#fff;
+  font-family:'Inter', sans-serif; font-size:0.6rem; font-weight:700;
+  border-radius:50%; min-width:16px; height:16px; display:flex; align-items:center; justify-content:center;
+  padding:0 2px; border:1px solid var(--hull);
+}
 .instruments{ display:flex; gap:0.6rem; margin-top:1.5rem; position:relative; z-index:1; flex-wrap:wrap; }
 .instrument{
   background:rgba(255,255,255,0.14);
@@ -231,10 +248,10 @@ label{
 input, select{
   width:100%;
   font-family:'JetBrains Mono', monospace;
-  font-size:0.9rem;
+  font-size:1rem;
   color:var(--ink);
   background:var(--foam);
-  border:1.5px solid var(--line-strong);
+  border:1.5px solid var(--bronze-line);
   border-radius:var(--radius-sm);
   padding:0.6rem 0.7rem;
   transition:border-color 0.15s ease;
@@ -244,6 +261,32 @@ input:focus, select:focus{
   outline:none;
   border-color:var(--surf);
   background:#fff;
+}
+input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none;
+  width:22px; height:22px; min-width:22px;
+  border:2px solid var(--volt);
+  border-radius:50%;
+  background:#fff;
+  cursor:pointer;
+  position:relative;
+  flex-shrink:0;
+  padding:0;
+  display:inline-block;
+  vertical-align:middle;
+}
+input[type="checkbox"]:checked{
+  background:var(--volt);
+  border-color:var(--volt);
+}
+input[type="checkbox"]:checked::after{
+  content:"";
+  position:absolute;
+  left:50%; top:44%;
+  width:6px; height:10px;
+  border:solid var(--hull);
+  border-width:0 2px 2px 0;
+  transform:translate(-50%,-50%) rotate(45deg);
 }
 input:disabled, select:disabled{
   color:var(--ink-soft);
@@ -363,7 +406,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
 /* ---------- Pegel-Balken (Saldo) ---------- */
 .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.7rem; margin-bottom:1.4rem; }
-.stat{ background:var(--foam); border-radius:var(--radius-sm); padding:0.8rem 0.95rem; text-align:center; }
+.stat{ background:var(--foam); border-radius:var(--radius-sm); padding:0.8rem 0.95rem; text-align:center; border:1.5px solid var(--bronze-line); }
+.stat-highlight{ background:#3a3733; }
+.stat-highlight .num{ color:#fff; }
+.stat-highlight .lbl{ color:rgba(255,255,255,0.65); }
 .stat .num{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.4rem; color:var(--hull); text-align:center; }
 .stat .lbl{ font-size:0.66rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.05em; margin-top:0.1rem; }
 
@@ -374,7 +420,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .amt.pos{ color:#1C9A64; }
 .amt.neg{ color:var(--flare); }
 .balance-meta{ display:grid; grid-template-columns:repeat(auto-fit, minmax(105px,1fr)); gap:0.5rem; margin-bottom:0.7rem; }
-.meta-chip{ background:var(--foam); border-radius:var(--radius-sm); padding:0.45rem 0.6rem; text-align:center; }
+.meta-chip{ background:var(--foam); border-radius:var(--radius-sm); padding:0.45rem 0.6rem; text-align:center; border:1.5px solid var(--bronze-line); }
 .meta-chip .lbl{ display:block; font-family:'Inter', sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-faint); margin-bottom:0.15rem; }
 .meta-chip .val{ display:block; font-family:'JetBrains Mono', monospace; font-size:0.86rem; color:var(--ink); font-weight:600; }
 .gauge{ height:12px; border-radius:8px; background:var(--foam); position:relative; overflow:hidden; border:1px solid var(--line); }
@@ -439,7 +485,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .add-party-form input{ flex:1 1 200px; min-width:0; font-family:'Inter', sans-serif; }
 .add-party-form button{ flex-shrink:0; }
 .checkbox-list{ display:flex; flex-direction:column; gap:0.5rem; }
-.checkbox-item{ display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.7rem; background:var(--foam); border-radius:var(--radius-sm); }
+.checkbox-item{ display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.7rem; background:var(--foam); border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); }
 .checkbox-item input{ width:auto; flex:none; }
 .checkbox-item.disabled{ opacity:0.65; }
 .split-row{ display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
@@ -457,7 +503,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .gate-error{ color:var(--flare); font-size:0.78rem; margin-top:0.5rem; display:none; font-weight:600; }
 .gate-error.show{ display:block; }
 
-.admin-box{ border:1px solid var(--line); border-radius:var(--radius-sm); padding:1.1rem 1.2rem; margin-bottom:1.2rem; background:var(--foam); }
+.admin-box{ border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:1.1rem 1.2rem; margin-bottom:1.2rem; background:var(--foam); }
 .admin-box .code-display{
   font-family:'JetBrains Mono', monospace; font-size:1.2rem; letter-spacing:0.08em;
   background:var(--hull); color:var(--volt); border-radius:var(--radius-sm);
@@ -498,7 +544,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 }
 @media (min-width: 720px){
   .row{ grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
-  .stat-row{ grid-template-columns:repeat(3, 1fr); }
+  .stat-row{ grid-template-columns:repeat(4, 1fr); }
   .stamp{ width:172px; }
 }
 @media (min-width: 1200px){
@@ -619,14 +665,18 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div id="calendarGrid" class="cal-grid"></div>
         <div id="calendarDayPanel" style="margin-top:1.1rem;"></div>
         <div class="admin-box" style="margin-top:1.1rem;">
-          <label>Mehrere Tage auf einmal abgeben</label>
-          <div class="hint" style="margin-bottom:0.7rem;">Praktisch z. B. für Ferien: gib einen ganzen Zeitraum ab, statt jeden Tag einzeln.</div>
+          <label>Mehrere Tage auf einmal</label>
+          <div class="hint" style="margin-bottom:0.7rem;">Praktisch z. B. für Ferien: einen ganzen Zeitraum abgeben oder anfragen, statt jeden Tag einzeln.</div>
+          <div class="type-toggle" id="calRangeModeToggle" style="margin-bottom:0.9rem;">
+            <button type="button" data-mode="giveup" class="active">Abgeben</button>
+            <button type="button" data-mode="request">Anfragen</button>
+          </div>
           <div class="row">
             <div class="field" id="calRangePartyField" style="display:none;"><label for="calRangeParty">Für welche Partei</label><select id="calRangeParty"></select></div>
             <div class="field"><label for="calRangeStart">Von</label><input type="date" id="calRangeStart"></div>
             <div class="field"><label for="calRangeEnd">Bis</label><input type="date" id="calRangeEnd"></div>
           </div>
-          <button class="btn secondary" id="calRangeSubmitBtn">Zeitraum abgeben</button>
+          <button class="btn" id="calRangeSubmitBtn">Zeitraum abgeben</button>
           <div class="gate-error" id="calRangeFeedback" style="color:#1C9A64;"></div>
         </div>
       </div>
@@ -653,7 +703,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="row" id="usageFields">
           <div class="field">
-            <label for="f-reading">Motorenstundenstand *</label>
+            <label for="f-reading">Stundenstand *</label>
             <input type="number" id="f-reading" step="0.1" min="0" placeholder="z. B. 1234.5" required>
             <div class="hint">Der aktuelle Stand des Motorenstundenzählers (wie der km-Stand beim Auto) — die gefahrenen Stunden werden automatisch aus der Differenz zum letzten Eintrag berechnet. Bei mehreren Parteien werden die Stunden gemäss Aufteilung oben verteilt.</div>
             <div class="gate-error" id="err-reading"></div>
@@ -665,10 +715,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label id="photoLabel">Foto Bordcomputer / Tagesverbrauch *</label>
-            <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
-              <button type="button" class="btn secondary" id="photoCameraBtn">📷 Foto aufnehmen</button>
-              <button type="button" class="btn secondary" id="photoGalleryBtn">🖼️ Aus Galerie auswählen</button>
+            <label id="photoLabel">Foto Bordcomputer (Tagesverbrauch) *</label>
+            <div style="display:flex; gap:0.4rem; flex-wrap:nowrap;">
+              <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
+              <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
             </div>
             <input type="file" id="f-photo-camera" accept="image/*" capture="environment" style="display:none;">
             <input type="file" id="f-photo-gallery" accept="image/*" style="display:none;">
@@ -723,7 +773,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div class="field"><label for="spDate">Datum *</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div id="spQrArea" style="margin-top:0.7rem;"></div>
-        <button class="btn secondary" id="addSettlementPaymentBtn">Zahlung erfassen</button>
+        <button class="btn" id="addSettlementPaymentBtn" style="margin-top:1rem;">Zahlung erfassen</button>
         <div class="gate-error" id="err-sp-general" style="color:#1C9A64;"></div>
       </div>
       <div class="card">
@@ -744,7 +794,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
           <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
-          <button class="btn secondary" id="exportPdfBtn" style="white-space:nowrap; flex-shrink:0;">📄 PDF-Export</button>
+          <button class="btn" id="exportPdfBtn" style="white-space:nowrap; flex-shrink:0;">📄 PDF-Export</button>
         </div>
         <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
         <div id="settlementContent"></div>
@@ -789,7 +839,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [] };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -799,7 +849,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-02';
+const APP_VERSION = '2026-07-15-04';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -856,7 +906,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [] };
 }
 
 async function loadShared(){
@@ -875,6 +925,7 @@ async function loadShared(){
       state.yearResetBackups = loaded.yearResetBackups || {};
       state.priorityRequests = loaded.priorityRequests || {};
       state.partyQrCodes = loaded.partyQrCodes || {};
+      state.notifications = loaded.notifications || [];
     } else {
       state = defaultData();
     }
@@ -889,7 +940,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200) });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -910,6 +961,7 @@ function subscribeRealtime(){
       state.yearResetBackups = loaded.yearResetBackups || {};
       const newRequests = loaded.priorityRequests || {};
       state.partyQrCodes = loaded.partyQrCodes || {};
+      state.notifications = loaded.notifications || [];
       notifyNewRequests(state.priorityRequests || {}, newRequests);
       state.priorityRequests = newRequests;
     evaluateAccess();
@@ -999,13 +1051,18 @@ function updateHeaderMeta(){
   el.innerHTML = html;
   const strip = document.getElementById('adminStrip');
   if(strip){
+    const unread = getUnreadNotifications().length;
     strip.innerHTML = '<div class="admin-strip">' +
-      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; gap:0.35rem;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + ';"></span>User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
+      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; text-align:center;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + ';"></span>User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
+      '<button type="button" class="inbox-btn" id="inboxBtn">📥' + (unread > 0 ? '<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '') + '</button>' +
       '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
     '</div>';
     const btn = document.getElementById('logoutBtn');
     if(btn) btn.addEventListener('click', logout);
+    const inboxBtn = document.getElementById('inboxBtn');
+    if(inboxBtn) inboxBtn.addEventListener('click', showInboxModal);
   }
+  updateAppBadge();
 }
 setInterval(() => { if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); }, 30000);
 
@@ -1048,7 +1105,7 @@ let updateBannerShown = false;
 async function checkForUpdate(){
   if(updateBannerShown) return;
   try{
-    const res = await fetch(location.href.split('?')[0] + '?_check=' + Date.now(), { cache: 'no-store' });
+    const res = await fetch(location.href.split('?')[0] + '?_check=' + Date.now() + Math.random(), { cache: 'reload', credentials: 'omit' });
     const text = await res.text();
     const match = text.match(/const APP_VERSION = '([^']+)'/);
     if(match && match[1] !== APP_VERSION){
@@ -1070,11 +1127,13 @@ function showUpdateBanner(){
   document.body.appendChild(banner);
 }
 function setupUpdateChecking(){
-  setTimeout(checkForUpdate, 3000);
-  setInterval(checkForUpdate, 5 * 60 * 1000);
+  setTimeout(checkForUpdate, 1500);
+  setInterval(checkForUpdate, 2 * 60 * 1000);
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible') checkForUpdate();
   });
+  window.addEventListener('pageshow', () => { checkForUpdate(); });
+  window.addEventListener('focus', () => { checkForUpdate(); });
 }
 
 function setupInactivityTracking(){
@@ -1129,9 +1188,11 @@ function respondToRequest(dateStr, accept){
   if(accept){
     if(!state.priorityOverrides) state.priorityOverrides = {};
     state.priorityOverrides[dateStr] = { givenUpBy: currentHolder, claimedBy: req.requestedBy, declinedBy: [] };
-    logAudit(partyName(currentHolder) + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + dateStr + ' angenommen');
+    logAudit(partyName(currentHolder) + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' angenommen');
+    pushNotification(partyName(currentHolder) + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' angenommen 🎉', req.requestedBy);
   } else {
-    logAudit(partyName(currentHolder || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + dateStr + ' abgelehnt');
+    logAudit(partyName(currentHolder || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' abgelehnt');
+    pushNotification(partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt', req.requestedBy);
   }
   delete state.priorityRequests[dateStr];
 }
@@ -1142,11 +1203,11 @@ function respondToPendingDay(dateStr, accept){
   const myId = session.partyId;
   if(accept){
     ov.claimedBy = myId;
-    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + dateStr + ' übernommen');
+    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + fmtDateCH(dateStr) + ' übernommen');
   } else {
     if(!ov.declinedBy) ov.declinedBy = [];
     if(!ov.declinedBy.includes(myId)) ov.declinedBy.push(myId);
-    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + dateStr + ' abgelehnt');
+    logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + fmtDateCH(dateStr) + ' abgelehnt');
   }
 }
 
@@ -1263,9 +1324,17 @@ function finalizeCalendarDrag(){
   const lo = calendarDragStart <= calendarDragCurrent ? calendarDragStart : calendarDragCurrent;
   const hi = calendarDragStart <= calendarDragCurrent ? calendarDragCurrent : calendarDragStart;
   if(lo === hi){
-    calendarSelectedDate = lo;
-    calendarPendingAction = null;
-    renderCalendarDayPanel();
+    if(calendarSelectedDate === lo){
+      calendarSelectedDate = null;
+      calendarPendingAction = null;
+      const panel = document.getElementById('calendarDayPanel');
+      if(panel) panel.innerHTML = '';
+      renderCalendarTab();
+    } else {
+      calendarSelectedDate = lo;
+      calendarPendingAction = null;
+      renderCalendarDayPanel();
+    }
   } else {
     const startField = document.getElementById('calRangeStart');
     const endField = document.getElementById('calRangeEnd');
@@ -1276,7 +1345,7 @@ function finalizeCalendarDrag(){
       const fb = document.getElementById('calRangeFeedback');
       if(fb){
         fb.style.color = '#1C9A64';
-        fb.textContent = 'Zeitraum ' + lo + ' bis ' + hi + ' übernommen — unten "Zeitraum abgeben" klicken.';
+        fb.textContent = 'Zeitraum ' + fmtDateCH(lo) + ' bis ' + fmtDateCH(hi) + ' übernommen — unten "Zeitraum abgeben" oder "Zeitraum anfragen" klicken.';
         fb.classList.add('show');
       }
     }
@@ -1473,11 +1542,12 @@ function renderCalendarDayPanel(){
       if(action === 'giveup'){
         if(!state.priorityOverrides) state.priorityOverrides = {};
         state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
-        logAudit(partyName(actingId) + ' hat Vorrecht am ' + dateStr + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
+        logAudit(partyName(actingId) + ' hat Vorrecht am ' + fmtDateCH(dateStr) + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
+        pushNotification(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' abgegeben', null);
         justGaveUp = true;
       } else if(action === 'undo'){
         if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
-        logAudit('Abgabe des Vorrechts von ' + partyName(actingId) + ' am ' + dateStr + ' rückgängig gemacht' + (isAdminUser ? ' (durch Administrator)' : ''));
+        logAudit('Abgabe des Vorrechts von ' + partyName(actingId) + ' am ' + fmtDateCH(dateStr) + ' rückgängig gemacht' + (isAdminUser ? ' (durch Administrator)' : ''));
       } else if(action === 'claim'){
         const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
         if(!ov || ov.claimedBy){
@@ -1487,7 +1557,7 @@ function renderCalendarDayPanel(){
           return;
         }
         state.priorityOverrides[dateStr].claimedBy = actingId;
-        logAudit(partyName(actingId) + ' hat das freie Vorrecht am ' + dateStr + ' übernommen' + (isAdminUser ? ' (durch Administrator)' : ''));
+        logAudit(partyName(actingId) + ' hat das freie Vorrecht am ' + fmtDateCH(dateStr) + ' übernommen' + (isAdminUser ? ' (durch Administrator)' : ''));
       } else if(action === 'request'){
         if(state.priorityRequests && state.priorityRequests[dateStr]){
           fb.style.color = '#C0392B'; fb.textContent = 'Für diesen Tag liegt bereits eine Anfrage vor.'; fb.classList.add('show');
@@ -1497,7 +1567,9 @@ function renderCalendarDayPanel(){
         }
         if(!state.priorityRequests) state.priorityRequests = {};
         state.priorityRequests[dateStr] = { requestedBy: actingId, createdAt: Date.now() };
-        logAudit(partyName(actingId) + ' hat den Vorrechtstag am ' + dateStr + ' angefragt');
+        logAudit(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' angefragt');
+        const holderId = effectivePriority(dateStr).partyId;
+        pushNotification(partyName(actingId) + ' möchte deinen Vorrechtstag am ' + fmtDateCH(dateStr) + ' übernehmen', holderId);
         justRequested = true;
       }
       calendarPendingAction = null;
@@ -1589,6 +1661,65 @@ function logAudit(action){
   const actor = isAdminUser ? 'Administrator' : (session.partyId ? partyName(session.partyId) : 'Unbekannt');
   state.auditLog.unshift({ id: uid(), ts: Date.now(), actor, action });
   if(state.auditLog.length > 300) state.auditLog.length = 300;
+}
+function pushNotification(message, targetPartyId){
+  if(!state.notifications) state.notifications = [];
+  state.notifications.unshift({ id: uid(), ts: Date.now(), message, targetPartyId: targetPartyId || null, fromPartyId: session.partyId || null });
+  if(state.notifications.length > 200) state.notifications.length = 200;
+}
+
+const INBOX_SEEN_KEY = 'wakelog-inbox-seen';
+function getInboxLastSeen(){
+  try{ return parseInt(localStorage.getItem(INBOX_SEEN_KEY)) || 0; } catch(e){ return 0; }
+}
+function setInboxLastSeen(ts){
+  try{ localStorage.setItem(INBOX_SEEN_KEY, String(ts)); } catch(e){}
+}
+function getRelevantNotifications(){
+  if(!state.notifications) return [];
+  return state.notifications.filter(n => {
+    if(n.fromPartyId && n.fromPartyId === session.partyId) return false;
+    if(n.targetPartyId === null) return true;
+    return n.targetPartyId === session.partyId;
+  });
+}
+function getUnreadNotifications(){
+  if(isAdminUser && !session.partyId){
+    return getRelevantNotifications().filter(n => n.ts > getInboxLastSeen());
+  }
+  if(!session.partyId) return [];
+  return getRelevantNotifications().filter(n => n.ts > getInboxLastSeen());
+}
+function updateAppBadge(){
+  if(!navigator.setAppBadge) return;
+  const count = getUnreadNotifications().length;
+  try{
+    if(count > 0) navigator.setAppBadge(count);
+    else navigator.clearAppBadge();
+  } catch(e){}
+}
+function showInboxModal(){
+  const items = getRelevantNotifications();
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML =
+    '<div class="gate-card">' +
+      '<h2>Posteingang</h2>' +
+      (items.length ? '<div style="max-height:55vh; overflow-y:auto; margin-bottom:1rem;">' +
+        items.map(n => '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
+          '<div>' + escapeHtml(n.message) + '</div>' +
+          '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ' ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+        '</div>').join('') +
+      '</div>' : '<div class="empty">Noch keine Mitteilungen.</div>') +
+      '<button class="btn" id="inboxCloseBtn">Schliessen</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('inboxCloseBtn').addEventListener('click', () => {
+    setInboxLastSeen(Date.now());
+    overlay.remove();
+    updateHeaderMeta();
+  });
 }
 function initials(name){ return name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
 
@@ -1776,13 +1907,17 @@ function updatePaidSplitTotal(){
 }
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fmtDateCH(dateStr){
+  if(!dateStr) return '';
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
 
 function updatePhotoRequiredUI(){
   const label = document.getElementById('photoLabel');
   const status = document.getElementById('photoStatus');
   if(!label || !status) return;
   const required = !state.settings || state.settings.requirePhoto !== false;
-  label.textContent = required ? 'Foto Bordcomputer / Tagesverbrauch *' : 'Foto Bordcomputer / Tagesverbrauch (optional)';
+  label.textContent = required ? 'Foto Bordcomputer (Tagesverbrauch) *' : 'Foto Bordcomputer (Tagesverbrauch)';
   if(!pendingPhotoDataUrl && !existingPhotoDataUrl){
     status.textContent = required
       ? 'Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.'
@@ -2110,7 +2245,7 @@ function renderEntriesTable(){
 
   let html = '<table><thead><tr>' +
     '<th>Datum</th><th class="name-cell">Partei</th><th class="type-cell">Typ</th>' +
-    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">l/h</th><th class="num">Gesch. Verbrauch (l)</th><th class="num">Getankt l</th><th class="num">CHF/l</th><th class="num">Ausgaben</th><th>Foto</th><th></th>' +
+    '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">Verbrauch [l/h]</th><th class="num">Mutm. Verbrauch [l]</th><th class="num">Getankt [l]</th><th class="num">Preis [CHF/l]</th><th class="num">Ausgaben [CHF]</th><th>Foto</th><th></th>' +
     '</tr></thead><tbody>';
 
   rows.forEach(e => {
@@ -2133,7 +2268,7 @@ function renderEntriesTable(){
       partyCell += '<div class="hint" style="margin:0.2rem 0 0;">🎁 Geschenk von ' + escapeHtml(e.giftName || '') + ': ' + fmtCHF(e.giftAmount) + '</div>';
     }
     html += '<tr>';
-    html += '<td>' + e.date + '</td>';
+    html += '<td>' + fmtDateCH(e.date) + '</td>';
     html += '<td class="name-cell">' + partyCell + '</td>';
     html += '<td class="type-cell">' + tags + '</td>';
     html += '<td class="num">' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading, 1) : '—') + '</td>';
@@ -2148,7 +2283,7 @@ function renderEntriesTable(){
     else if(!isAdminUser && session.partyId && !usage.ids.includes(session.partyId) && !(paid && paid.ids.includes(session.partyId))){
       html += '<td><span class="locked-note">betrifft dich nicht</span></td>';
     }
-    else { html += '<td><button class="del-btn" data-edit="' + e.id + '">bearbeiten</button> · <button class="del-btn" data-id="' + e.id + '">löschen</button></td>'; }
+    else { html += '<td><button class="del-btn" data-edit="' + e.id + '" style="display:block; margin-bottom:0.25rem;">bearbeiten</button><button class="del-btn" data-id="' + e.id + '" style="display:block;">löschen</button></td>'; }
     html += '</tr>';
   });
   html += '</tbody></table>';
@@ -2360,6 +2495,7 @@ function renderSettlement(){
     '<div class="stat"><div class="num">' + fmtNum(rows.reduce((a,r)=>a+r.hours,0),1) + '</div><div class="lbl">Motorstunden</div></div>' +
     '<div class="stat"><div class="num">' + fmtCHF(totalFuelExpense) + '</div><div class="lbl">Benzin gesamt</div></div>' +
     '<div class="stat"><div class="num">' + fmtCHF(totalAnnual) + '</div><div class="lbl">Fixkosten gesamt</div></div>' +
+    '<div class="stat stat-highlight"><div class="num">' + fmtCHF(totalFuelExpense + totalAnnual) + '</div><div class="lbl">Gesamtaufwand</div></div>' +
   '</div>';
 
   html += '<h3>Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
@@ -2757,7 +2893,7 @@ function renderPriorityRuleBody(){
       '</div>' +
       '<div id="prioCustomBody" style="display:' + (mode === 'custom' ? 'block' : 'none') + ';">' +
         '<div class="hint" style="margin-bottom:0.7rem;">Beschreibe die Vorrangregel für ' + year + ' hier frei als Text.</div>' +
-        '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A, Partei B, Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
+        '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A, Partei B, Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
         '<button class="btn secondary" style="margin-top:0.7rem;" id="savePrioTextBtn">Text für ' + year + ' speichern</button>' +
       '</div>' +
       '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
@@ -3057,8 +3193,11 @@ function renderAdminAuditSection(){
   const logEntries = state.auditLog || [];
   content.innerHTML =
     '<div class="admin-box">' +
-      '<label>Änderungsprotokoll</label>' +
-      '<div class="hint" style="margin-bottom:0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap;">' +
+        '<label style="margin:0;">Änderungsprotokoll</label>' +
+        '<button type="button" class="btn" id="exportAuditPdfBtn">📄 PDF-Export</button>' +
+      '</div>' +
+      '<div class="hint" style="margin:0.6rem 0 0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
       (logEntries.length ? logEntries.map(l => {
         const d = new Date(l.ts);
         const dateStr = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
@@ -3068,6 +3207,28 @@ function renderAdminAuditSection(){
         '</div>';
       }).join('') : '<div class="empty">Noch keine Änderungen protokolliert.</div>') +
     '</div>';
+  const exportBtn = document.getElementById('exportAuditPdfBtn');
+  if(exportBtn) exportBtn.addEventListener('click', exportAuditLogPdf);
+}
+
+function exportAuditLogPdf(){
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+  const logEntries = state.auditLog || [];
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Änderungsprotokoll</div></div>' +
+    '</div>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + ' · ' + logEntries.length + ' Einträge</div>';
+  html += '<table><tr><th>Datum</th><th>Wer</th><th>Was</th></tr>';
+  logEntries.forEach(l => {
+    const d = new Date(l.ts);
+    const dateStr = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
+    html += '<tr><td>' + dateStr + '</td><td>' + escapeHtml(l.actor) + '</td><td>' + escapeHtml(l.action) + '</td></tr>';
+  });
+  html += '</table>';
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
 }
 
 function renderAdminPartiesSection(){
@@ -3078,7 +3239,7 @@ function renderAdminPartiesSection(){
       '<div id="partyList"></div>' +
       '<div class="add-party-form">' +
         '<input type="text" id="newPartyName" placeholder="Name der neuen Partei">' +
-        '<button class="btn secondary" id="addPartyBtn">Hinzufügen</button>' +
+        '<button class="btn" id="addPartyBtn">Hinzufügen</button>' +
       '</div>' +
     '</div>' +
     '<div class="admin-box">' +
@@ -3119,7 +3280,7 @@ function renderAdminCostsSection(){
         '<div class="field"><label for="acDate">Datum *</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
       '</div>' +
       '<div class="field"><label>Wer hat bezahlt / vorgeschossen? *</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
-      '<button class="btn secondary" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
+      '<button class="btn" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
       '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
 
@@ -3133,21 +3294,21 @@ function renderAdminGeneralSection(){
       '<label>Administrator-Code ändern</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Aus Sicherheitsgründen wird dein aktueller Code hier nirgends angezeigt. Beim Ändern wird ausserdem ein neuer Wiederherstellungscode erzeugt (der alte wird ungültig) — notiere ihn dir danach wieder sicher.</div>' +
       '<input id="newAdminCodeField" type="text" placeholder="Neuer Administrator-Code" style="margin-bottom:0.7rem;">' +
-      '<button class="btn secondary" id="changeAdminCodeBtn">Code ändern</button>' +
+      '<button class="btn" id="changeAdminCodeBtn">Code ändern</button>' +
       '<div class="gate-error" id="adminCodeFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<label>Authenticator-App einrichten</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Richte Google Authenticator (oder eine ähnliche App) als zusätzlichen Weg ein, um den Administrator-Code zurückzusetzen, falls du ihn vergisst — unabhängig vom Wiederherstellungscode. ' + (state.settings.totpSecret ? 'Es ist bereits eine Authenticator-App eingerichtet — ein neuer Schlüssel ersetzt die bisherige Einrichtung.' : 'Aktuell ist noch keine Authenticator-App eingerichtet.') + '</div>' +
-      '<button class="btn secondary" id="setupTotpBtn">Authenticator-App ' + (state.settings.totpSecret ? 'neu ' : '') + 'einrichten</button>' +
+      '<button class="btn" id="setupTotpBtn">Authenticator-App ' + (state.settings.totpSecret ? 'neu ' : '') + 'einrichten</button>' +
     '</div>' +
     '<div class="admin-box">' +
       '<label>Freigabe-Link</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Trage hier einmalig den echten Link ein, den du siehst, wenn du oben in Claude auf "Veröffentlichen" klickst und die Adresse aus der Adresszeile/dem Teilen-Dialog kopierst. Die App kann diesen Link technisch nicht selbst erkennen — er muss von Hand eingetragen werden.</div>' +
       '<input id="shareLinkField" type="text" placeholder="https://claude.ai/public/artifacts/..." value="' + escapeHtml(state.settings.shareLink || '') + '" style="margin-bottom:0.7rem;">' +
       '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
-        '<button class="btn secondary" id="saveLinkBtn">Link speichern</button>' +
-        '<button class="btn secondary" id="copyLinkBtn">Link kopieren</button>' +
+        '<button class="btn" id="saveLinkBtn">Link speichern</button>' +
+        '<button class="btn" id="copyLinkBtn">Link kopieren</button>' +
       '</div>' +
       '<div class="gate-error" id="copyFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -3155,7 +3316,7 @@ function renderAdminGeneralSection(){
       '<label>Anfangsstand Motorenstundenzähler</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der Stand des Motorenstundenzählers, bevor mit WakeLog zu rechnen begonnen wurde (0, falls die Zählung bei diesem Logbuch beginnt). Alle künftigen Einträge berechnen die gefahrenen Stunden als Differenz zum jeweils letzten Stand — beim allerersten Eintrag zu diesem Wert.</div>' +
       '<input id="initialReadingField" type="number" step="0.1" placeholder="z. B. 0" value="' + (typeof state.settings.initialReading === 'number' ? state.settings.initialReading : '') + '" style="margin-bottom:0.7rem;">' +
-      '<button class="btn secondary" id="saveInitialReadingBtn">Anfangsstand speichern</button>' +
+      '<button class="btn" id="saveInitialReadingBtn">Anfangsstand speichern</button>' +
       '<div class="gate-error" id="initialReadingFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
@@ -3175,9 +3336,9 @@ function renderAdminGeneralSection(){
     '<div class="admin-box">' +
       '<label>Export</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup. Der PDF-Export der Jahresübersicht steht allen Parteien direkt im Abrechnung-Tab zur Verfügung.</div>' +
-      '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
-        '<button class="btn secondary" id="exportCodeBtn">💾 Code exportieren</button>' +
-        '<button class="btn secondary" id="copyCodeBtn">📋 Code kopieren</button>' +
+      '<div style="display:flex; gap:0.5rem; flex-wrap:nowrap;">' +
+        '<button class="btn" id="exportCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">💾 Exportieren</button>' +
+        '<button class="btn" id="copyCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📋 Kopieren</button>' +
       '</div>' +
       '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -3749,6 +3910,16 @@ async function init(){
   document.getElementById('logYearFilter').addEventListener('change', renderEntriesTable);
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
   document.addEventListener('mouseup', finalizeCalendarDrag);
+  document.addEventListener('click', (ev) => {
+    if(!calendarSelectedDate) return;
+    const insideCalendar = ev.target.closest('#calendarGrid') || ev.target.closest('#calendarDayPanel');
+    if(!insideCalendar){
+      calendarSelectedDate = null;
+      calendarPendingAction = null;
+      const panel = document.getElementById('calendarDayPanel');
+      if(panel) panel.innerHTML = '';
+    }
+  });
   document.addEventListener('touchend', finalizeCalendarDrag);
   document.addEventListener('touchmove', (ev) => {
     if(!calendarIsDragging) return;
@@ -3783,6 +3954,17 @@ async function init(){
     calRangePartyField.style.display = 'block';
   }
   let rangePendingDates = null;
+  let rangeMode = 'giveup';
+  document.querySelectorAll('#calRangeModeToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      rangeMode = btn.dataset.mode;
+      document.querySelectorAll('#calRangeModeToggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      rangePendingDates = null;
+      document.getElementById('calRangeSubmitBtn').textContent = rangeMode === 'giveup' ? 'Zeitraum abgeben' : 'Zeitraum anfragen';
+      document.getElementById('calRangeFeedback').classList.remove('show');
+    });
+  });
   document.getElementById('calRangeSubmitBtn').addEventListener('click', async () => {
     const fb = document.getElementById('calRangeFeedback');
     fb.classList.remove('show');
@@ -3797,15 +3979,26 @@ async function init(){
     }
     const btn = document.getElementById('calRangeSubmitBtn');
     if(rangePendingDates && rangePendingDates.confirming){
-      if(!state.priorityOverrides) state.priorityOverrides = {};
-      rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
-      logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + startVal + ' bis ' + endVal + ')');
+      if(rangeMode === 'giveup'){
+        if(!state.priorityOverrides) state.priorityOverrides = {};
+        rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
+        logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
+        pushNotification(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')', null);
+      } else {
+        if(!state.priorityRequests) state.priorityRequests = {};
+        rangePendingDates.dates.forEach(d => { state.priorityRequests[d] = { requestedBy: targetParty, createdAt: Date.now() }; });
+        logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage angefragt (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
+        pushNotification(partyName(targetParty) + ' möchte ' + rangePendingDates.dates.length + ' Vorrechtstage übernehmen (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')', null);
+      }
       await saveShared();
-      fb.style.color = '#1C9A64'; fb.textContent = rangePendingDates.dates.length + ' Tag(e) abgegeben.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
-      btn.textContent = 'Zeitraum abgeben';
-      const startLabel = new Date(startVal + 'T00:00:00').toLocaleDateString('de-CH');
-      const endLabel = new Date(endVal + 'T00:00:00').toLocaleDateString('de-CH');
-      const shareMsg = 'Hinweis von WakeLog: ' + partyName(targetParty) + ' hat die Vorrechtstage vom ' + startLabel + ' bis ' + endLabel + ' abgegeben. Schaut gerne im Kalender vorbei!';
+      const actionWord = rangeMode === 'giveup' ? 'abgegeben' : 'angefragt';
+      fb.style.color = '#1C9A64'; fb.textContent = rangePendingDates.dates.length + ' Tag(e) ' + actionWord + '.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
+      btn.textContent = rangeMode === 'giveup' ? 'Zeitraum abgeben' : 'Zeitraum anfragen';
+      const startLabel = fmtDateCH(startVal);
+      const endLabel = fmtDateCH(endVal);
+      const shareMsg = rangeMode === 'giveup' ?
+        ('Hinweis von WakeLog: ' + partyName(targetParty) + ' hat die Vorrechtstage vom ' + startLabel + ' bis ' + endLabel + ' abgegeben. Schaut gerne im Kalender vorbei!') :
+        ('Hinweis von WakeLog: ' + partyName(targetParty) + ' möchte die Vorrechtstage vom ' + startLabel + ' bis ' + endLabel + ' gerne übernehmen. Schaut gerne im Kalender vorbei, um zuzusagen!');
       const rangeShareArea = document.createElement('div');
       rangeShareArea.style.marginTop = '0.8rem';
       rangeShareArea.innerHTML = '<button class="btn secondary" id="calRangeShareBtn">💬 Per WhatsApp mitteilen</button>';
@@ -3824,18 +4017,27 @@ async function init(){
     while(d <= endD){
       const dStr = d.toISOString().slice(0,10);
       const eff = effectivePriority(dStr);
-      if(!eff.open && eff.base === targetParty && eff.partyId === targetParty){
-        const ov = state.priorityOverrides ? state.priorityOverrides[dStr] : null;
-        if(!ov) dates.push(dStr);
+      if(rangeMode === 'giveup'){
+        if(!eff.open && eff.base === targetParty && eff.partyId === targetParty){
+          const ov = state.priorityOverrides ? state.priorityOverrides[dStr] : null;
+          if(!ov) dates.push(dStr);
+        }
+      } else {
+        if(!eff.open && eff.partyId && eff.partyId !== targetParty){
+          const existingReq = state.priorityRequests ? state.priorityRequests[dStr] : null;
+          if(!existingReq) dates.push(dStr);
+        }
       }
       d.setDate(d.getDate() + 1);
     }
     if(!dates.length){
-      fb.style.color = '#C0392B'; fb.textContent = 'In diesem Zeitraum gibt es keine eigenen Vorrechtstage zum Abgeben.'; fb.classList.add('show'); return;
+      const noneMsg = rangeMode === 'giveup' ? 'In diesem Zeitraum gibt es keine eigenen Vorrechtstage zum Abgeben.' : 'In diesem Zeitraum gibt es keine anfragbaren Tage (bereits eigene, offen oder schon angefragt).';
+      fb.style.color = '#C0392B'; fb.textContent = noneMsg; fb.classList.add('show'); return;
     }
     rangePendingDates = { dates, confirming: true };
+    const actionWord = rangeMode === 'giveup' ? 'abgeben' : 'anfragen';
     fb.style.color = '#1C9A64'; fb.textContent = dates.length + ' Tag(e) betroffen — nochmals klicken zum Bestätigen.'; fb.classList.add('show');
-    btn.textContent = 'Bestätigen und speichern (' + dates.length + ' Tage)';
+    btn.textContent = 'Bestätigen und speichern (' + dates.length + ' Tage ' + actionWord + ')';
   });
   ['calRangeStart','calRangeEnd','calRangeParty'].forEach(id => {
     const el = document.getElementById(id);
