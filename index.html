@@ -1056,10 +1056,6 @@ function respondToPendingDay(dateStr, accept){
     if(!ov.declinedBy) ov.declinedBy = [];
     if(!ov.declinedBy.includes(myId)) ov.declinedBy.push(myId);
     logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + dateStr + ' abgelehnt');
-    const otherPartyCount = state.parties.length - 1;
-    if(ov.declinedBy.length >= otherPartyCount){
-      delete state.priorityOverrides[dateStr];
-    }
   }
 }
 
