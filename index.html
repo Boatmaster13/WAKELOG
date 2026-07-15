@@ -384,7 +384,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
 
 /* ---------- Rundstempel Ausgleich ---------- */
-.cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:0.25rem; }
+.cal-grid{ display:grid; grid-template-columns:1.6em repeat(7, 1fr); gap:0.25rem; }
+.cal-kw-col{ display:flex; align-items:center; justify-content:center; font-size:0.62rem; color:var(--ink-faint); }
+.cal-kw-label{ font-family:'JetBrains Mono', monospace; font-weight:600; }
 .cal-weekday{
   text-align:center; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
   color:#fff; background:var(--hull); padding:0.4rem 0; border-radius:4px;
@@ -561,7 +563,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
     </div>
     <div class="hero-container">
       <div class="hero-inner">
-        <div style="display:flex; align-items:center; gap:0.9rem;">
+        <div id="heroHomeLink" style="display:flex; align-items:center; gap:0.9rem; cursor:pointer;">
           <img src="header-logo.png" alt="WakeLog Logo" style="width:56px; height:56px; flex-shrink:0;">
           <div>
             <h1>WakeLog</h1>
@@ -935,7 +937,13 @@ function updateHeaderMeta(){
   const el = document.getElementById('headerMeta');
   if(!el) return;
   const now = new Date();
-  el.innerHTML = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
+  const todayStr = now.toISOString().slice(0,10);
+  let html = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr · KW ' + isoWeekNumber(todayStr);
+  const prio = currentPriorityLabel();
+  if(prio){
+    html += ' · <span style="display:inline-flex; align-items:center; gap:0.35rem; vertical-align:middle;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>';
+  }
+  el.innerHTML = html;
   const strip = document.getElementById('adminStrip');
   if(strip){
     strip.innerHTML = '<div class="admin-strip">' +
@@ -1013,15 +1021,8 @@ function currentPriorityLabel(){
   const todayStr = now.toISOString().slice(0,10);
   const eff = effectivePriority(todayStr);
   if(!eff.base) return null;
-  let label;
-  if(rule.mode === 'evenodd'){
-    const dayNum = now.getDate();
-    label = (dayNum % 2 === 0 ? 'Gerader Tag' : 'Ungerader Tag');
-  } else {
-    label = 'KW ' + isoWeekNumber(todayStr);
-  }
-  if(eff.open) return { label: label, party: 'Frei — noch nicht übernommen', color: '#999' };
-  return { label: label, party: partyName(eff.partyId), color: partyColor(eff.partyId) };
+  if(eff.open) return { party: 'Frei — noch nicht übernommen', color: '#999' };
+  return { party: partyName(eff.partyId), color: partyColor(eff.partyId) };
 }
 
 let calendarViewYear = new Date().getFullYear();
@@ -1098,16 +1099,27 @@ function renderCalendarTab(){
   const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
   const todayStr = new Date().toISOString().slice(0,10);
 
-  let html = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => '<div class="cal-weekday">' + d + '</div>').join('');
-  for(let i=0;i<startOffset;i++) html += '<div class="cal-day empty"></div>';
-  for(let d=1; d<=daysInMonth; d++){
-    const dateStr = calendarViewYear + '-' + String(calendarViewMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    const eff = effectivePriority(dateStr);
-    let style = '', cls = 'cal-day';
-    if(dateStr === todayStr) cls += ' today';
-    if(eff.open) cls += ' open';
-    else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
-    html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + '</div>';
+  const cells = [];
+  for(let i=0;i<startOffset;i++) cells.push(null);
+  for(let d=1; d<=daysInMonth; d++) cells.push(d);
+  while(cells.length % 7 !== 0) cells.push(null);
+
+  let html = '<div class="cal-weekday cal-kw-col">KW</div>' + ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => '<div class="cal-weekday">' + d + '</div>').join('');
+  for(let row=0; row<cells.length/7; row++){
+    const rowMonday = new Date(calendarViewYear, calendarViewMonth, 1 - startOffset + row*7);
+    const rowMondayStr = rowMonday.getFullYear() + '-' + String(rowMonday.getMonth()+1).padStart(2,'0') + '-' + String(rowMonday.getDate()).padStart(2,'0');
+    html += '<div class="cal-kw-col cal-kw-label">' + isoWeekNumber(rowMondayStr) + '</div>';
+    for(let col=0; col<7; col++){
+      const d = cells[row*7+col];
+      if(d === null){ html += '<div class="cal-day empty"></div>'; continue; }
+      const dateStr = calendarViewYear + '-' + String(calendarViewMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const eff = effectivePriority(dateStr);
+      let style = '', cls = 'cal-day';
+      if(dateStr === todayStr) cls += ' today';
+      if(eff.open) cls += ' open';
+      else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
+      html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + '</div>';
+    }
   }
   grid.innerHTML = html;
 
@@ -1255,15 +1267,8 @@ function renderCalendarDayPanel(){
 }
 
 function renderInstruments(){
-  const prio = currentPriorityLabel();
-  document.getElementById('instruments').innerHTML = prio ?
-    '<div class="instrument" style="border-color:' + prio.color + '66; flex:1; width:100%; padding:0.7rem 1.1rem;">' +
-      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
-        '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:' + prio.color + ';"></span>' +
-        '<span class="num" style="font-size:1.05rem; line-height:1.2;">' + escapeHtml(prio.party) + '</span>' +
-      '</div>' +
-      '<div class="lbl">' + escapeHtml(prio.label) + ' — Vorrecht heute</div>' +
-    '</div>' : '';
+  const el = document.getElementById('instruments');
+  if(el) el.innerHTML = '';
 }
 
 function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currency:'CHF', minimumFractionDigits:2, maximumFractionDigits:2 }); }
@@ -3279,6 +3284,15 @@ function setupTabs(){
   requestAnimationFrame(() => requestAnimationFrame(positionActiveNow));
   if(document.fonts && document.fonts.ready){ document.fonts.ready.then(positionActiveNow); }
   setTimeout(positionActiveNow, 300);
+
+  const homeLink = document.getElementById('heroHomeLink');
+  if(homeLink){
+    homeLink.addEventListener('click', () => {
+      const logTab = document.querySelector('.tab[data-tab="log"]');
+      if(logTab) logTab.click();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
 }
 
 function updateTabVisibility(){
