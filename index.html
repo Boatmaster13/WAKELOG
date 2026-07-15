@@ -501,13 +501,17 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 @media print{
   body *{ visibility:hidden; }
   #printArea, #printArea *{ visibility:visible; }
-  #printArea{ display:block; position:absolute; top:0; left:0; width:100%; padding:1.5rem; }
-  #printArea h1{ font-family:'Big Shoulders Display', sans-serif; font-size:1.8rem; margin-bottom:0.2rem; }
-  #printArea h2{ font-family:'Big Shoulders Display', sans-serif; font-size:1.3rem; margin:1.4rem 0 0.6rem; border-bottom:2px solid #000; padding-bottom:0.2rem; }
+  #printArea{ display:block; position:absolute; top:0; left:0; width:100%; padding:1.5rem; background:#fff; }
+  #printArea .print-header{ display:flex; align-items:center; gap:0.8rem; border-bottom:3px solid var(--volt); padding-bottom:0.7rem; margin-bottom:0.4rem; }
+  #printArea .print-logo{ width:44px; height:44px; }
+  #printArea h1{ font-family:'Big Shoulders Display', sans-serif; font-size:1.6rem; margin:0; color:var(--hull); text-transform:uppercase; }
+  #printArea .print-subtitle{ font-family:'Inter', sans-serif; font-size:0.85rem; color:var(--ink-soft); margin-top:0.1rem; }
+  #printArea h2{ font-family:'Big Shoulders Display', sans-serif; font-size:1.2rem; margin:1.3rem 0 0.5rem; color:var(--hull); border-bottom:1.5px solid var(--volt); padding-bottom:0.2rem; }
   #printArea table{ width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:1rem; }
-  #printArea th, #printArea td{ border:1px solid #999; padding:0.35rem 0.5rem; text-align:left; }
-  #printArea .print-balance{ margin-bottom:0.8rem; padding:0.6rem 0.8rem; border:1px solid #999; }
-  #printArea .print-meta{ color:#555; font-size:0.8rem; margin-bottom:1rem; }
+  #printArea th{ background:#F2E6D3; color:var(--hull); border:1px solid #D8C4A0; padding:0.35rem 0.5rem; text-align:left; }
+  #printArea td{ border:1px solid #ddd; padding:0.35rem 0.5rem; text-align:left; }
+  #printArea .print-balance{ margin-bottom:0.6rem; padding:0.5rem 0.7rem; border-left:3px solid var(--volt); background:#FAF6EF; }
+  #printArea .print-meta{ color:#777; font-size:0.78rem; margin:0.6rem 0 1rem; }
 }
 </style>
 </head>
@@ -519,8 +523,14 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
 <div class="scene-strip" aria-hidden="true">
   <svg viewBox="0 0 1400 180" preserveAspectRatio="none">
-    <!-- Garantiert deckende Basis ganz unten (Bildschirmkante / Safari-Werkzeugleiste) -->
-    <rect x="0" y="150" width="1400" height="30" fill="var(--hull)"/>
+    <defs>
+      <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--hull)" stop-opacity="0"/>
+        <stop offset="100%" stop-color="var(--hull)" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <!-- Weicher Verlauf zu deckendem Dunkel ganz unten (Bildschirmkante / Safari-Werkzeugleiste) -->
+    <rect x="0" y="120" width="1400" height="60" fill="url(#bottomFade)"/>
     <!-- Hintere Wellenschicht -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105 L1400,180 L0,180 Z"
           fill="var(--ink)" fill-opacity="0.22"/>
@@ -971,6 +981,25 @@ function resetInactivityTimer(){
   if(inactivityTimer) clearTimeout(inactivityTimer);
   if(!accessGranted || !isAdminUser) return;
   inactivityTimer = setTimeout(() => { logout(); }, INACTIVITY_LIMIT_MS);
+}
+
+function updateSceneStripPosition(){
+  const strip = document.querySelector('.scene-strip');
+  if(!strip) return;
+  if(window.visualViewport){
+    const vv = window.visualViewport;
+    const offsetBottom = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+    strip.style.bottom = offsetBottom + 'px';
+  }
+}
+function setupSceneStripTracking(){
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', updateSceneStripPosition);
+    window.visualViewport.addEventListener('scroll', updateSceneStripPosition);
+  }
+  window.addEventListener('scroll', updateSceneStripPosition, { passive: true });
+  window.addEventListener('resize', updateSceneStripPosition);
+  updateSceneStripPosition();
 }
 
 function setupInactivityTracking(){
@@ -1963,7 +1992,10 @@ function exportYearOverviewPdf(year){
   const yearEntries = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => a.date.localeCompare(b.date));
   const hoursMap = computeHoursMap();
 
-  let html = '<h1>WakeLog — Jahresübersicht ' + year + '</h1>' +
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Jahresübersicht ' + year + '</div></div>' +
+    '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + ' · ' + state.parties.length + ' Partei(en) · ' + yearEntries.length + ' Einträge</div>';
 
   html += '<h2>Saldo je Partei</h2>';
@@ -3507,6 +3539,7 @@ async function init(){
   else { hideGate(); renderAll(); requestNotificationPermission(); }
   startPolling();
   setupInactivityTracking();
+  setupSceneStripTracking();
 }
 
 init();
