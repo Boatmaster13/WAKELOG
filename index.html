@@ -42,11 +42,12 @@
   --shadow:0 1px 2px rgba(20,18,14,0.05), 0 10px 28px -14px rgba(20,18,14,0.24);
 }
 *{ box-sizing:border-box; }
-html{ overflow-x:hidden; width:100%; }
+html{ overflow-x:hidden; width:100%; height:100%; background:var(--hull); }
 body{
   margin:0;
   overflow-x:hidden;
   width:100%;
+  min-height:100%;
   background:var(--foam);
   color:var(--ink);
   font-family:'Inter', sans-serif;
@@ -66,7 +67,7 @@ body{
   z-index:1;
   max-width:900px;
   margin:0 auto;
-  padding:2.4rem 1.6rem 2rem;
+  padding:calc(2.4rem + env(safe-area-inset-top, 0px)) 1.6rem 2rem;
 }
 .hero-mesh{ position:absolute; inset:0; z-index:0; pointer-events:none; }
 .hero-mesh svg{ width:100%; height:100%; display:block; }
@@ -439,7 +440,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .split-total.bad{ color:var(--flare); font-weight:600; }
 
 /* ---------- Zugriffscode / Admin ---------- */
-.gate-overlay{ position:fixed; inset:0; z-index:100; background:rgba(10,24,38,0.72); display:flex; align-items:center; justify-content:center; padding:1.2rem; }
+.gate-overlay{ position:fixed; top:0; right:0; bottom:0; left:0; z-index:100; background:rgba(10,24,38,0.72); display:flex; align-items:center; justify-content:center; padding:1.2rem; }
 .gate-card{ background:var(--panel); border-radius:var(--radius-lg); padding:1.9rem 1.8rem; max-width:370px; width:100%; box-shadow:var(--shadow); }
 .gate-card h2{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; text-transform:uppercase; font-size:1.4rem; color:var(--hull); margin:0 0 0.6rem; }
 .gate-card p{ font-size:0.83rem; color:var(--ink-soft); margin:0 0 1.1rem; line-height:1.5; }
@@ -462,7 +463,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .switch input:checked + .slider::before{ transform:translateX(18px); }
 
 @media (max-width: 560px){
-  .hero-container{ padding:1.9rem 1.1rem 1.6rem; }
+  .hero-container{ padding:calc(1.9rem + env(safe-area-inset-top, 0px)) 1.1rem 1.6rem; }
   .hero h1{ font-size:2.1rem; }
   .scene-strip{ height:60px; }
   .wrap{ padding-bottom:6rem; }
@@ -476,7 +477,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   .icon-btn{ font-size:0.66rem; padding:0.38rem 0.35rem; gap:0.2rem; }
 }
 @media (orientation: landscape) and (max-height: 480px){
-  .hero-container{ padding:1rem 1.4rem 0.9rem; }
+  .hero-container{ padding:calc(1rem + env(safe-area-inset-top, 0px)) 1.4rem 0.9rem; }
   .hero h1{ font-size:1.6rem; }
   .hero p{ display:none; }
   .scene-strip{ height:44px; }
@@ -759,7 +760,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {} };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {} };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -825,7 +826,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {} };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {} };
 }
 
 async function loadShared(){
@@ -841,6 +842,7 @@ async function loadShared(){
       state.settlementPayments = loaded.settlementPayments || {};
       state.auditLog = loaded.auditLog || [];
       state.priorityOverrides = loaded.priorityOverrides || {};
+      state.yearResetBackups = loaded.yearResetBackups || {};
     } else {
       state = defaultData();
     }
@@ -855,7 +857,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {} });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {} });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -873,6 +875,7 @@ function subscribeRealtime(){
       const newOverrides = loaded.priorityOverrides || {};
       notifyNewGiveUps(state.priorityOverrides || {}, newOverrides);
       state.priorityOverrides = newOverrides;
+      state.yearResetBackups = loaded.yearResetBackups || {};
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
     const active = document.activeElement;
@@ -2774,6 +2777,14 @@ function renderAdminGeneralSection(){
         '<button class="btn secondary" id="copyCodeBtn">📋 Code kopieren</button>' +
       '</div>' +
       '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Jahr zurücksetzen</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Löscht sämtliche Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben eines gewählten Jahres unwiderruflich aus der laufenden Ansicht. Vor dem Löschen wird automatisch eine Sicherung angelegt, die du danach jederzeit wiederherstellen kannst — bis zum nächsten Zurücksetzen desselben Jahres.</div>' +
+      '<div class="field"><label for="resetYearSelect">Jahr</label><select id="resetYearSelect"></select></div>' +
+      '<button class="btn secondary" id="resetYearBtn" style="border-color:#C0392B; color:#C0392B;">🗑️ Jahr zurücksetzen</button>' +
+      '<div id="resetYearRestoreArea" style="margin-top:0.9rem;"></div>' +
+      '<div class="gate-error" id="resetYearFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
 
   document.getElementById('exportCodeBtn').addEventListener('click', async () => {
@@ -2806,6 +2817,77 @@ function renderAdminGeneralSection(){
     } catch(e){
       fb.style.color = '#C0392B'; fb.textContent = 'Kopieren fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
     }
+  });
+
+  const resetYearSelect = document.getElementById('resetYearSelect');
+  const resetYears = priorityYears();
+  resetYearSelect.innerHTML = resetYears.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+  resetYearSelect.value = String(new Date().getFullYear());
+
+  function renderResetYearRestoreArea(){
+    const area = document.getElementById('resetYearRestoreArea');
+    const year = resetYearSelect.value;
+    const backup = state.yearResetBackups ? state.yearResetBackups[year] : null;
+    if(!backup){ area.innerHTML = ''; return; }
+    const d = new Date(backup.deletedAt);
+    area.innerHTML =
+      '<div class="hint" style="margin-bottom:0.6rem;">Es gibt eine Sicherung von ' + year + ' vom ' + d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr.</div>' +
+      '<button class="btn secondary" id="restoreYearBtn">↩️ Sicherung von ' + year + ' wiederherstellen</button>';
+    document.getElementById('restoreYearBtn').addEventListener('click', async () => {
+      const fb = document.getElementById('resetYearFeedback');
+      const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' wiederherzustellen.');
+      if(codeInput === null) return;
+      if(codeInput !== state.settings.adminCode){
+        fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Wiederherstellung abgebrochen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
+        return;
+      }
+      state.entries = state.entries.filter(e => yearOf(e.date) !== parseInt(year)).concat(backup.entries);
+      state.annualCosts[year] = backup.annualCosts;
+      state.settlementPayments[year] = backup.settlementPayments;
+      Object.keys(backup.priorityOverrides).forEach(d2 => { state.priorityOverrides[d2] = backup.priorityOverrides[d2]; });
+      delete state.yearResetBackups[year];
+      logAudit('Jahr ' + year + ' aus Sicherung wiederhergestellt');
+      await saveShared();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wiederhergestellt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
+      renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
+    });
+  }
+  renderResetYearRestoreArea();
+  resetYearSelect.addEventListener('change', renderResetYearRestoreArea);
+
+  document.getElementById('resetYearBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('resetYearFeedback');
+    const year = resetYearSelect.value;
+    if(!confirm('Wirklich ALLE Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben für ' + year + ' löschen? Eine Sicherung wird angelegt, ist aber nur bis zum nächsten Zurücksetzen desselben Jahres wiederherstellbar.')) return;
+    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' zurückzusetzen.');
+    if(codeInput === null) return;
+    if(codeInput !== state.settings.adminCode){
+      fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
+      return;
+    }
+    const yearInt = parseInt(year);
+    const entriesOfYear = state.entries.filter(e => yearOf(e.date) === yearInt);
+    const overridesOfYear = {};
+    Object.keys(state.priorityOverrides || {}).forEach(d => { if(d.startsWith(year)) overridesOfYear[d] = state.priorityOverrides[d]; });
+
+    if(!state.yearResetBackups) state.yearResetBackups = {};
+    state.yearResetBackups[year] = {
+      deletedAt: Date.now(),
+      entries: entriesOfYear,
+      annualCosts: (state.annualCosts && state.annualCosts[year]) || [],
+      settlementPayments: (state.settlementPayments && state.settlementPayments[year]) || [],
+      priorityOverrides: overridesOfYear
+    };
+
+    state.entries = state.entries.filter(e => yearOf(e.date) !== yearInt);
+    if(state.annualCosts) delete state.annualCosts[year];
+    if(state.settlementPayments) delete state.settlementPayments[year];
+    Object.keys(overridesOfYear).forEach(d => { delete state.priorityOverrides[d]; });
+
+    logAudit('Jahr ' + year + ' vollständig zurückgesetzt (Sicherung angelegt)');
+    await saveShared();
+    fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wurde zurückgesetzt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
+    renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
   });
 
   document.getElementById('changeAdminCodeBtn').addEventListener('click', async () => {
