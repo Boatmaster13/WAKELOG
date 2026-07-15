@@ -519,6 +519,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
 <div class="scene-strip" aria-hidden="true">
   <svg viewBox="0 0 1400 180" preserveAspectRatio="none">
+    <!-- Garantiert deckende Basis ganz unten (Bildschirmkante / Safari-Werkzeugleiste) -->
+    <rect x="0" y="150" width="1400" height="30" fill="var(--hull)"/>
     <!-- Hintere Wellenschicht -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105 L1400,180 L0,180 Z"
           fill="var(--ink)" fill-opacity="0.22"/>
