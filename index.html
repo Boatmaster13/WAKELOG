@@ -42,6 +42,7 @@
   --shadow:0 1px 2px rgba(20,18,14,0.05), 0 10px 28px -14px rgba(20,18,14,0.24);
 }
 *{ box-sizing:border-box; }
+img{ max-width:100%; height:auto; }
 html{ overflow-x:hidden; width:100%; height:100%; background:var(--hull); }
 body{
   margin:0;
@@ -196,6 +197,8 @@ body{
   padding:1.5rem 1.5rem 1.6rem;
   margin-bottom:1.2rem;
   box-shadow:var(--shadow);
+  overflow-x:hidden;
+  max-width:100%;
 }
 .card h2{
   font-family:'Big Shoulders Display', sans-serif;
@@ -384,12 +387,13 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .foot-total{ display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.85rem; font-weight:700; padding:0.8rem 0.2rem 0.2rem; border-top:1px solid var(--line-strong); margin-top:0.4rem; }
 
 /* ---------- Rundstempel Ausgleich ---------- */
-.cal-grid{ display:grid; grid-template-columns:1.6em repeat(7, 1fr); gap:0.25rem; }
-.cal-kw-col{ display:flex; align-items:center; justify-content:center; font-size:0.62rem; color:var(--ink-faint); }
+.cal-grid{ display:grid; grid-template-columns:24px repeat(7, minmax(0, 1fr)); gap:0.2rem; width:100%; max-width:100%; overflow:hidden; box-sizing:border-box; }
+.cal-grid > *{ min-width:0; }
+.cal-kw-col{ display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:var(--ink-faint); overflow:hidden; }
 .cal-kw-label{ font-family:'JetBrains Mono', monospace; font-weight:600; }
 .cal-weekday{
   text-align:center; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
-  color:#fff; background:var(--hull); padding:0.4rem 0; border-radius:4px;
+  color:#fff; background:var(--hull); padding:0.4rem 0; border-radius:4px; overflow:hidden;
 }
 .cal-day{
   aspect-ratio:0.85/1; border-radius:6px; display:flex;
@@ -521,22 +525,18 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   <div class="gate-card" id="gateCard"></div>
 </div>
 
+
+
 <div class="scene-strip" aria-hidden="true">
   <svg viewBox="0 0 1400 180" preserveAspectRatio="none">
-    <defs>
-      <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--hull)" stop-opacity="0"/>
-        <stop offset="100%" stop-color="var(--hull)" stop-opacity="1"/>
-      </linearGradient>
-    </defs>
-    <!-- Weicher Verlauf zu deckendem Dunkel ganz unten (Bildschirmkante / Safari-Werkzeugleiste) -->
-    <rect x="0" y="120" width="1400" height="60" fill="url(#bottomFade)"/>
+    <!-- Durchgehende, lückenlose Grundfläche -->
+    <rect x="0" y="0" width="1400" height="180" fill="var(--hull)"/>
     <!-- Hintere Wellenschicht -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105 L1400,180 L0,180 Z"
-          fill="var(--ink)" fill-opacity="0.22"/>
+          fill="var(--ink)" fill-opacity="0.5"/>
     <!-- Vordere Wellenschicht (durchgehend) -->
     <path d="M0,125 Q100,100 200,125 Q300,150 400,125 Q500,100 600,125 Q700,150 800,125 Q900,100 1000,125 Q1100,150 1200,125 Q1300,100 1400,125 L1400,180 L0,180 Z"
-          fill="var(--ink)" fill-opacity="0.42"/>
+          fill="var(--ink)" fill-opacity="1"/>
 
     <!-- Bronze-Akzente: Wellenkämme -->
     <path d="M0,105 Q100,80 200,105 Q300,130 400,105 Q500,80 600,105 Q700,130 800,105 Q900,80 1000,105 Q1100,130 1200,105 Q1300,80 1400,105"
