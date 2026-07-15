@@ -335,7 +335,7 @@ input:disabled, select:disabled{
 .party-code-actions{ display:flex; gap:0.35rem; flex-wrap:nowrap; }
 .icon-btn{
   font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
-  padding:0.42rem 0.5rem; border-radius:20px; border:1px solid var(--line-strong);
+  padding:0.42rem 0.5rem; border-radius:20px; border:1px solid var(--bronze-line);
   background:#fff; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
   display:inline-flex; align-items:center; justify-content:center; gap:0.3rem; transition:background 0.15s ease;
   flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
@@ -349,17 +349,17 @@ input:disabled, select:disabled{
   font-size:0.85rem;
   padding:0.68rem 1.3rem;
   border-radius:var(--radius-sm);
-  border:none;
-  background:var(--volt);
+  border:1.5px solid var(--bronze-line);
+  background:#CB9A57;
   color:var(--hull);
   cursor:pointer;
   transition:background 0.15s ease, transform 0.1s ease;
 }
-.btn:hover{ background:var(--volt-dark); }
+.btn:hover{ background:var(--volt); }
 .btn:disabled{ opacity:0.4; cursor:not-allowed; }
-.btn:disabled:hover{ background:var(--volt); }
+.btn:disabled:hover{ background:#CB9A57; }
 .btn:active{ transform:scale(0.98); }
-.btn.secondary{ background:transparent; color:var(--hull); border:1.5px solid var(--line-strong); }
+.btn.secondary{ background:transparent; color:var(--hull); border:1.5px solid var(--bronze-line); }
 .btn.secondary:hover{ background:var(--foam); }
 
 table{ width:100%; border-collapse:collapse; font-size:0.83rem; }
@@ -407,7 +407,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 /* ---------- Pegel-Balken (Saldo) ---------- */
 .stat-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:0.7rem; margin-bottom:1.4rem; }
 .stat{ background:var(--foam); border-radius:var(--radius-sm); padding:0.8rem 0.95rem; text-align:center; border:1.5px solid var(--bronze-line); }
-.stat-highlight{ background:#3a3733; }
+.stat-highlight{ background:#8a7f6e; }
 .stat-highlight .num{ color:#fff; }
 .stat-highlight .lbl{ color:rgba(255,255,255,0.65); }
 .stat .num{ font-family:'Big Shoulders Display', sans-serif; font-weight:700; font-size:1.4rem; color:var(--hull); text-align:center; }
@@ -644,6 +644,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="nav-indicator" id="navIndicator"></div>
         <button class="tab" data-tab="calendar">Kalender</button>
         <button class="tab active" data-tab="log">Logbuch</button>
+        <button class="tab" data-tab="chat">Chat</button>
         <button class="tab" data-tab="adjustment">Ausgleich</button>
         <button class="tab" data-tab="settlement">Abrechnung</button>
         <button class="tab" data-tab="admin">Verwaltung</button>
@@ -656,6 +657,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <h2>Vorrechts-Kalender</h2>
         <div id="calendarLegend" style="margin-bottom:1rem;"></div>
+        <div id="windWarningNotice" style="margin-bottom:1rem;"></div>
         <div id="calendarPendingBtnArea" style="margin-bottom:1rem;"></div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.9rem;">
           <button class="btn secondary" id="calPrevBtn">‹</button>
@@ -678,6 +680,15 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           </div>
           <button class="btn" id="calRangeSubmitBtn">Zeitraum abgeben</button>
           <div class="gate-error" id="calRangeFeedback" style="color:#1C9A64;"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Saison</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Wann wurde das Boot dieses Jahr ins Wasser gelassen bzw. herausgenommen?</div>
+        <div id="seasonEventsList" style="margin-bottom:0.9rem;"></div>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <button type="button" class="btn secondary" id="seasonLaunchBtn">🚤 Boot eingewassert (heute)</button>
+          <button type="button" class="btn secondary" id="seasonHaulBtn">⚓ Boot ausgewassert (heute)</button>
         </div>
       </div>
     </div>
@@ -756,7 +767,33 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card">
         <h2>Einträge</h2>
         <div class="year-select"><label>Jahr</label><select id="logYearFilter"></select></div>
+        <div id="serviceReminderNotice"></div>
         <div id="entriesTableWrap"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-chat">
+      <div class="card">
+        <h2>🍻 Feierabendbier ausrufen</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Ruf spontan zum Feierabendbier — alle anderen Parteien bekommen sofort eine Mitteilung und können anstossen oder sich anschliessen.</div>
+        <div id="beerPhotoPreviewArea" style="margin-bottom:0.7rem;"></div>
+        <input type="file" id="beerPhotoInput" accept="image/*" style="display:none;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.7rem;">
+          <button type="button" class="btn secondary" id="beerPhotoBtn">📷 Foto anhängen</button>
+        </div>
+        <button class="btn" id="beerCallBtn" style="background:#C9A227;">🍻 Feierabendbier ausrufen!</button>
+      </div>
+      <div class="card">
+        <h2>Chat</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Nachrichten und Fotos zwischen allen Parteien — für alles, was nicht ins Logbuch gehört.</div>
+        <div id="chatMessageList" style="max-height:420px; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>
+        <div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>
+        <input type="file" id="chatPhotoInput" accept="image/*" style="display:none;">
+        <div style="display:flex; gap:0.5rem; align-items:flex-end;">
+          <div class="field" style="flex:1; margin:0;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:'Inter', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>
+          <button type="button" class="btn secondary" id="chatPhotoBtn" style="flex-shrink:0;">📷</button>
+          <button type="button" class="btn" id="chatSendBtn" style="flex-shrink:0;">Senden</button>
+        </div>
       </div>
     </div>
 
@@ -795,9 +832,15 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
           <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
           <button class="btn" id="exportPdfBtn" style="white-space:nowrap; flex-shrink:0;">📄 PDF-Export</button>
+          <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; flex-shrink:0;">📊 CSV-Export</button>
         </div>
         <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
         <div id="settlementContent"></div>
+      </div>
+      <div class="card">
+        <h2>Jahresvergleich</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
+        <div id="yearComparisonChart"></div>
       </div>
     </div>
 
@@ -839,7 +882,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [] };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], seasonEvents: [], serviceReminder: null };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -849,7 +892,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-04';
+const APP_VERSION = '2026-07-15-10';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -906,7 +949,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [] };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], seasonEvents: [], serviceReminder: null };
 }
 
 async function loadShared(){
@@ -926,6 +969,9 @@ async function loadShared(){
       state.priorityRequests = loaded.priorityRequests || {};
       state.partyQrCodes = loaded.partyQrCodes || {};
       state.notifications = loaded.notifications || [];
+      state.chatMessages = loaded.chatMessages || [];
+      state.seasonEvents = loaded.seasonEvents || [];
+      state.serviceReminder = loaded.serviceReminder || null;
     } else {
       state = defaultData();
     }
@@ -940,7 +986,7 @@ async function loadShared(){
 
 async function saveShared(){
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200) });
+    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null });
   } catch(e){ console.error('Speichern fehlgeschlagen', e); }
   updateHeaderMeta();
 }
@@ -962,6 +1008,9 @@ function subscribeRealtime(){
       const newRequests = loaded.priorityRequests || {};
       state.partyQrCodes = loaded.partyQrCodes || {};
       state.notifications = loaded.notifications || [];
+      state.chatMessages = loaded.chatMessages || [];
+      state.seasonEvents = loaded.seasonEvents || [];
+      state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
       state.priorityRequests = newRequests;
     evaluateAccess();
@@ -982,7 +1031,7 @@ function requestNotificationPermission(){
 }
 
 function notifyNewGiveUps(oldOverrides, newOverrides){
-  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if(typeof Notification === 'undefined' || Notification.permission !== 'granted' || !getPushEnabled()) return;
   if(!accessGranted) return;
   Object.keys(newOverrides).forEach(dateStr => {
     const ov = newOverrides[dateStr];
@@ -1002,7 +1051,7 @@ function notifyNewGiveUps(oldOverrides, newOverrides){
 }
 
 function notifyNewRequests(oldRequests, newRequests){
-  if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if(typeof Notification === 'undefined' || Notification.permission !== 'granted' || !getPushEnabled()) return;
   if(!accessGranted || isAdminUser || !session.partyId) return;
   Object.keys(newRequests).forEach(dateStr => {
     const req = newRequests[dateStr];
@@ -1053,8 +1102,8 @@ function updateHeaderMeta(){
   if(strip){
     const unread = getUnreadNotifications().length;
     strip.innerHTML = '<div class="admin-strip">' +
-      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; text-align:center;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + ';"></span>User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
-      '<button type="button" class="inbox-btn" id="inboxBtn">📥' + (unread > 0 ? '<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '') + '</button>' +
+      (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
+      '<button type="button" class="inbox-btn" id="inboxBtn">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
     '</div>';
     const btn = document.getElementById('logoutBtn');
@@ -1306,6 +1355,7 @@ let calendarSelectedDate = null;
 let calendarIsDragging = false;
 let calendarDragStart = null;
 let calendarDragCurrent = null;
+let calendarJustDragged = false;
 
 function updateDragHighlight(){
   if(!calendarDragStart || !calendarDragCurrent) return;
@@ -1317,6 +1367,20 @@ function updateDragHighlight(){
   });
 }
 
+function selectCalendarDay(dateStr){
+  if(calendarSelectedDate === dateStr){
+    calendarSelectedDate = null;
+    calendarPendingAction = null;
+    const panel = document.getElementById('calendarDayPanel');
+    if(panel) panel.innerHTML = '';
+    renderCalendarTab();
+  } else {
+    calendarSelectedDate = dateStr;
+    calendarPendingAction = null;
+    renderCalendarDayPanel();
+  }
+}
+
 function finalizeCalendarDrag(){
   if(!calendarIsDragging) return;
   calendarIsDragging = false;
@@ -1324,30 +1388,23 @@ function finalizeCalendarDrag(){
   const lo = calendarDragStart <= calendarDragCurrent ? calendarDragStart : calendarDragCurrent;
   const hi = calendarDragStart <= calendarDragCurrent ? calendarDragCurrent : calendarDragStart;
   if(lo === hi){
-    if(calendarSelectedDate === lo){
-      calendarSelectedDate = null;
-      calendarPendingAction = null;
-      const panel = document.getElementById('calendarDayPanel');
-      if(panel) panel.innerHTML = '';
-      renderCalendarTab();
-    } else {
-      calendarSelectedDate = lo;
-      calendarPendingAction = null;
-      renderCalendarDayPanel();
-    }
-  } else {
-    const startField = document.getElementById('calRangeStart');
-    const endField = document.getElementById('calRangeEnd');
-    if(startField && endField){
-      startField.value = lo;
-      endField.value = hi;
-      startField.dispatchEvent(new Event('change'));
-      const fb = document.getElementById('calRangeFeedback');
-      if(fb){
-        fb.style.color = '#1C9A64';
-        fb.textContent = 'Zeitraum ' + fmtDateCH(lo) + ' bis ' + fmtDateCH(hi) + ' übernommen — unten "Zeitraum abgeben" oder "Zeitraum anfragen" klicken.';
-        fb.classList.add('show');
-      }
+    // Einzelner Tag: wird vom normalen 'click'-Event auf der Zelle behandelt, hier nichts tun.
+    calendarDragStart = null;
+    calendarDragCurrent = null;
+    return;
+  }
+  calendarJustDragged = true;
+  const startField = document.getElementById('calRangeStart');
+  const endField = document.getElementById('calRangeEnd');
+  if(startField && endField){
+    startField.value = lo;
+    endField.value = hi;
+    startField.dispatchEvent(new Event('change'));
+    const fb = document.getElementById('calRangeFeedback');
+    if(fb){
+      fb.style.color = '#1C9A64';
+      fb.textContent = 'Zeitraum ' + fmtDateCH(lo) + ' bis ' + fmtDateCH(hi) + ' übernommen — unten "Zeitraum abgeben" oder "Zeitraum anfragen" klicken.';
+      fb.classList.add('show');
     }
   }
   calendarDragStart = null;
@@ -1437,6 +1494,10 @@ function renderCalendarTab(){
       calendarDragCurrent = cell.dataset.date;
       updateDragHighlight();
     }, { passive: true });
+    cell.addEventListener('click', () => {
+      if(calendarJustDragged){ calendarJustDragged = false; return; }
+      selectCalendarDay(cell.dataset.date);
+    });
   });
 
   if(calendarSelectedDate) renderCalendarDayPanel();
@@ -1698,23 +1759,39 @@ function updateAppBadge(){
     else navigator.clearAppBadge();
   } catch(e){}
 }
+function getPushEnabled(){
+  try{ return localStorage.getItem('wakelog-push-enabled') !== 'off'; } catch(e){ return true; }
+}
+function setPushEnabled(on){
+  try{ localStorage.setItem('wakelog-push-enabled', on ? 'on' : 'off'); } catch(e){}
+}
+
 function showInboxModal(){
   const items = getRelevantNotifications();
   const overlay = document.createElement('div');
   overlay.className = 'gate-overlay';
   overlay.style.display = 'flex';
+  const pushOn = getPushEnabled();
   overlay.innerHTML =
     '<div class="gate-card">' +
       '<h2>Posteingang</h2>' +
+      '<div class="toggle-row" style="margin-bottom:1rem; padding-bottom:0.9rem; border-bottom:1px solid var(--line);">' +
+        '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
+        '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
+      '</div>' +
       (items.length ? '<div style="max-height:55vh; overflow-y:auto; margin-bottom:1rem;">' +
         items.map(n => '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
           '<div>' + escapeHtml(n.message) + '</div>' +
-          '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ' ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+          '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
         '</div>').join('') +
       '</div>' : '<div class="empty">Noch keine Mitteilungen.</div>') +
       '<button class="btn" id="inboxCloseBtn">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
+  document.getElementById('pushToggle').addEventListener('change', (ev) => {
+    setPushEnabled(ev.target.checked);
+    if(ev.target.checked) requestNotificationPermission();
+  });
   document.getElementById('inboxCloseBtn').addEventListener('click', () => {
     setInboxLastSeen(Date.now());
     overlay.remove();
@@ -1907,6 +1984,66 @@ function updatePaidSplitTotal(){
 }
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+let weatherCache = {};
+function weatherEmoji(code){
+  if(code === 0) return '☀️';
+  if(code <= 2) return '🌤️';
+  if(code === 3) return '☁️';
+  if(code >= 45 && code <= 48) return '🌫️';
+  if(code >= 51 && code <= 67) return '🌦️';
+  if(code >= 71 && code <= 77) return '🌨️';
+  if(code >= 80 && code <= 82) return '🌧️';
+  if(code >= 95) return '⛈️';
+  return '🌡️';
+}
+async function fetchWeatherForYear(year){
+  if(!state.settings || typeof state.settings.weatherLat !== 'number' || typeof state.settings.weatherLon !== 'number') return;
+  const yearEntries = state.entries.filter(e => yearOf(e.date) === year);
+  if(!yearEntries.length) return;
+  const missing = yearEntries.filter(e => !weatherCache[e.date]);
+  if(!missing.length) return;
+  const dates = missing.map(e => e.date).sort();
+  const start = dates[0];
+  const end = dates[dates.length - 1];
+  const today = new Date().toISOString().slice(0,10);
+  try{
+    const isHistoric = end < today;
+    const base = isHistoric ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
+    const url = base + '?latitude=' + state.settings.weatherLat + '&longitude=' + state.settings.weatherLon +
+      '&start_date=' + start + '&end_date=' + (end > today ? today : end) +
+      '&daily=temperature_2m_max,weathercode&timezone=Europe%2FZurich';
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data.daily && data.daily.time){
+      data.daily.time.forEach((d, i) => {
+        weatherCache[d] = { temp: data.daily.temperature_2m_max[i], code: data.daily.weathercode[i] };
+      });
+    }
+    renderEntriesTable();
+  } catch(e){ /* Wetter nicht verfügbar, kein Problem */ }
+}
+
+async function checkWindWarning(){
+  const el = document.getElementById('windWarningNotice');
+  if(!el) return;
+  if(!state.settings || typeof state.settings.weatherLat !== 'number' || typeof state.settings.weatherLon !== 'number'){ el.innerHTML = ''; return; }
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + state.settings.weatherLat + '&longitude=' + state.settings.weatherLon + '&hourly=windgusts_10m&forecast_days=2&timezone=Europe%2FZurich';
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.hourly || !data.hourly.windgusts_10m) return;
+    const maxGust = Math.max(...data.hourly.windgusts_10m);
+    const officialLink = '<a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener">Offizielle Sturmwarnung prüfen ↗</a>';
+    if(maxGust >= 63){
+      el.innerHTML = '<div class="notice warn">🌬️ Starke Böen bis ' + Math.round(maxGust) + ' km/h in den nächsten 48 Std. vorhergesagt (eigene Einschätzung anhand der Wetterdaten, keine offizielle Sturmwarnung). ' + officialLink + '</div>';
+    } else if(maxGust >= 46){
+      el.innerHTML = '<div class="notice warn">💨 Böen bis ' + Math.round(maxGust) + ' km/h in den nächsten 48 Std. möglich (eigene Einschätzung). ' + officialLink + '</div>';
+    } else {
+      el.innerHTML = '';
+    }
+  } catch(e){ el.innerHTML = ''; }
+}
+
 function fmtDateCH(dateStr){
   if(!dateStr) return '';
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -2073,6 +2210,55 @@ function clearEntryErrors(){
   });
 }
 
+function playCheersSound(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    // Kurzer "Glas-Anstoss"-Klang: zwei helle, kurz überlappende Töne + ein tieferer "Plopp"
+    function tone(freq, start, dur, vol, type){
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, now + start);
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(vol, now + start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now + start); osc.stop(now + start + dur + 0.05);
+    }
+    tone(1800, 0, 0.25, 0.18, 'triangle');
+    tone(2400, 0.03, 0.22, 0.14, 'triangle');
+    tone(180, 0.28, 0.18, 0.22, 'sine');
+    tone(120, 0.3, 0.22, 0.16, 'sine');
+  } catch(e){}
+}
+
+function renderChatTab(){
+  if(!document.getElementById('chatMessageList')) return;
+  const list = document.getElementById('chatMessageList');
+  const msgs = (state.chatMessages || []).slice().sort((a,b) => a.ts - b.ts);
+  if(!msgs.length){
+    list.innerHTML = '<div class="empty">Noch keine Nachrichten.</div>';
+  } else {
+    list.innerHTML = msgs.map(m => {
+      const mine = m.fromPartyId === session.partyId;
+      const isBeer = m.type === 'beer';
+      return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
+        '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.6rem 0.8rem;">' +
+          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">🍻 ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zum Feierabendbier!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + '</div>') +
+          (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
+          (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
+        '</div>' +
+        '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + ';">' + new Date(m.ts).toLocaleDateString('de-CH') + ', ' + new Date(m.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+      '</div>';
+    }).join('');
+    list.scrollTop = list.scrollHeight;
+  }
+}
+
+let chatPendingPhoto = null;
+let beerPendingPhoto = null;
+
 async function compressImage(file, maxDim, quality){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2233,18 +2419,36 @@ function renderYearFilters(){
   setSel.value = years.includes(parseInt(prevSet)) ? prevSet : years[0];
 }
 
+function renderServiceReminderNotice(){
+  const el = document.getElementById('serviceReminderNotice');
+  if(!el) return;
+  if(!state.serviceReminder || !state.serviceReminder.intervalHours){ el.innerHTML = ''; return; }
+  const readings = state.entries.filter(e => typeof e.reading === 'number').map(e => e.reading);
+  if(!readings.length){ el.innerHTML = ''; return; }
+  const maxReading = Math.max(...readings);
+  const dueAt = state.serviceReminder.lastServiceReading + state.serviceReminder.intervalHours;
+  if(maxReading >= dueAt){
+    el.innerHTML = '<div class="notice warn" style="margin-bottom:1rem;">🔧 Service fällig: aktueller Zählerstand (' + fmtNum(maxReading,1) + ' Std.) liegt über dem Intervall seit dem letzten Service (fällig bei ' + fmtNum(dueAt,1) + ' Std.).</div>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+
 function renderEntriesTable(){
+  renderServiceReminderNotice();
   const yearSel = document.getElementById('logYearFilter');
   if(!yearSel.value) return;
   const year = parseInt(yearSel.value);
   const wrap = document.getElementById('entriesTableWrap');
   const rows = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => b.date.localeCompare(a.date));
   const hoursMap = computeHoursMap();
+  const weatherOn = state.settings && typeof state.settings.weatherLat === 'number';
 
   if(!rows.length){ wrap.innerHTML = '<div class="empty">Noch keine Einträge für ' + year + '.</div>'; return; }
+  if(weatherOn) fetchWeatherForYear(year);
 
   let html = '<table><thead><tr>' +
-    '<th>Datum</th><th class="name-cell">Partei</th><th class="type-cell">Typ</th>' +
+    '<th>Datum</th>' + (weatherOn ? '<th>Wetter</th>' : '') + '<th class="name-cell">Partei</th><th class="type-cell">Typ</th>' +
     '<th class="num">Zählerstand</th><th class="num">Std.</th><th class="num">Verbrauch [l/h]</th><th class="num">Mutm. Verbrauch [l]</th><th class="num">Getankt [l]</th><th class="num">Preis [CHF/l]</th><th class="num">Ausgaben [CHF]</th><th>Foto</th><th></th>' +
     '</tr></thead><tbody>';
 
@@ -2269,6 +2473,10 @@ function renderEntriesTable(){
     }
     html += '<tr>';
     html += '<td>' + fmtDateCH(e.date) + '</td>';
+    if(weatherOn){
+      const w = weatherCache[e.date];
+      html += '<td>' + (w ? weatherEmoji(w.code) + ' ' + Math.round(w.temp) + '°' : '<span class="hint">—</span>') + '</td>';
+    }
     html += '<td class="name-cell">' + partyCell + '</td>';
     html += '<td class="type-cell">' + tags + '</td>';
     html += '<td class="num">' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading, 1) : '—') + '</td>';
@@ -2397,6 +2605,38 @@ function settlementTransactions(rows){
   return tx;
 }
 
+function exportYearOverviewCsv(year){
+  const yearEntries = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => a.date.localeCompare(b.date));
+  const hoursMap = computeHoursMap();
+  const rows = [['Datum','Partei(en)','Typ','Zaehlerstand','Std','Verbrauch l_h','Getankt l','Preis CHF_l','Ausgaben CHF']];
+  yearEntries.forEach(e => {
+    const flags = getEntryFlags(e);
+    const usage = getEntryUsageSplit(e);
+    const names = usage.ids.map(id => partyName(id)).join(' + ');
+    rows.push([
+      fmtDateCH(e.date),
+      names,
+      (flags.hasUsage ? 'Nutzung' : '') + (flags.hasUsage && flags.hasRefuel ? ' + ' : '') + (flags.hasRefuel ? 'Tanken' : ''),
+      flags.hasUsage && typeof e.reading === 'number' ? e.reading : '',
+      flags.hasUsage ? fmtNum(hoursMap[e.id] || 0, 1) : '',
+      typeof e.consumption === 'number' ? e.consumption : '',
+      flags.hasRefuel ? e.liters : '',
+      flags.hasRefuel && e.liters > 0 ? (e.expense / e.liters).toFixed(2) : '',
+      flags.hasRefuel ? e.expense : ''
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'wakelog-' + year + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function exportYearOverviewPdf(year){
   const { rows, totalFuelExpense, totalAnnual, totalGifts } = computeSettlement(year);
   const printArea = document.getElementById('printArea');
@@ -2430,7 +2670,7 @@ function exportYearOverviewPdf(year){
     annualItems.forEach(c => {
       const payerIds = Object.keys(c.paidBy || {});
       const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : escapeHtml(partyName(payerIds[0]));
-      html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date||'') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + escapeHtml(payerLabel) + '</td></tr>';
+      html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date ? fmtDateCH(c.date) : '') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + escapeHtml(payerLabel) + '</td></tr>';
     });
     html += '</table>';
   }
@@ -2444,7 +2684,7 @@ function exportYearOverviewPdf(year){
       const flags = getEntryFlags(e);
       const usage = getEntryUsageSplit(e);
       const type = (flags.hasUsage?'Nutzung':'') + (flags.hasUsage&&flags.hasRefuel?' + ':'') + (flags.hasRefuel?'Tanken':'');
-      html += '<tr><td>' + e.date + '</td><td>' + splitLabel(usage.ids, usage.split) + '</td><td>' + type + '</td>' +
+      html += '<tr><td>' + fmtDateCH(e.date) + '</td><td>' + splitLabel(usage.ids, usage.split) + '</td><td>' + type + '</td>' +
         '<td>' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading,1) : '—') + '</td>' +
         '<td>' + (flags.hasUsage ? fmtNum(hoursMap[e.id]||0,1) : '—') + '</td>' +
         '<td>' + (flags.hasRefuel && e.liters ? fmtNum(e.liters,1) : '—') + '</td>' +
@@ -2457,7 +2697,7 @@ function exportYearOverviewPdf(year){
   if(settlements.length){
     html += '<h2>Ausgleichszahlungen</h2><table><tr><th>Datum</th><th>Von</th><th>An</th><th>Betrag</th></tr>';
     settlements.forEach(s => {
-      html += '<tr><td>' + (s.date||'') + '</td><td>' + escapeHtml(partyName(s.from)) + '</td><td>' + escapeHtml(partyName(s.to)) + '</td><td>' + fmtCHF(s.amount) + '</td></tr>';
+      html += '<tr><td>' + (s.date ? fmtDateCH(s.date) : '') + '</td><td>' + escapeHtml(partyName(s.from)) + '</td><td>' + escapeHtml(partyName(s.to)) + '</td><td>' + fmtCHF(s.amount) + '</td></tr>';
     });
     html += '</table>';
   }
@@ -2628,6 +2868,38 @@ function setupQrCodeUI(){
   });
 }
 
+function renderYearComparison(){
+  const el = document.getElementById('yearComparisonChart');
+  if(!el) return;
+  const years = priorityYears();
+  if(years.length < 2){ el.innerHTML = '<div class="hint">Sobald Daten aus mehr als einem Jahr vorliegen, erscheint hier ein Vergleich.</div>'; return; }
+  const hoursMap = computeHoursMap();
+  const perYear = years.map(y => {
+    const yr = String(y);
+    const { totalFuelExpense, totalAnnual } = computeSettlement(y);
+    const hours = state.entries.filter(e => yearOf(e.date) === y).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+    return { year: y, total: totalFuelExpense + totalAnnual, hours };
+  });
+  const maxTotal = Math.max(...perYear.map(p => p.total), 1);
+  const maxHours = Math.max(...perYear.map(p => p.hours), 1);
+  el.innerHTML =
+    '<div style="display:flex; gap:0.4rem; align-items:flex-end; margin-bottom:0.6rem;">' +
+      '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:var(--volt);"></span>Gesamtaufwand CHF</div>' +
+      '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:#6E85A8;"></span>Motorstunden</div>' +
+    '</div>' +
+    '<div style="display:flex; gap:1.2rem; align-items:flex-end; height:140px; padding:0 0.3rem;">' +
+    perYear.map(p =>
+      '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
+        '<div style="display:flex; gap:0.25rem; align-items:flex-end; height:100%;">' +
+          '<div style="width:16px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; background:var(--volt); border-radius:3px 3px 0 0;" title="' + fmtCHF(p.total) + '"></div>' +
+          '<div style="width:16px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; background:#6E85A8; border-radius:3px 3px 0 0;" title="' + fmtNum(p.hours,1) + ' Std."></div>' +
+        '</div>' +
+        '<div class="hint" style="margin:0;">' + p.year + '</div>' +
+      '</div>'
+    ).join('') +
+    '</div>';
+}
+
 function renderSettlementPaymentList(year){
   const wrap = document.getElementById('settlementPaymentList');
   if(!wrap) return;
@@ -2664,14 +2936,19 @@ function setupSettlementPaymentUI(year){
     const area = document.getElementById('spQrArea');
     if(!area) return;
     const qr = state.partyQrCodes ? state.partyQrCodes[toSel.value] : null;
-    area.innerHTML =
-      (qr ?
-        '<div class="hint" style="margin-bottom:0.5rem;">TWINT-QR-Code von ' + escapeHtml(partyName(toSel.value)) + ' — mit der TWINT-App scannen:</div>' +
-        '<img src="' + qr + '" alt="TWINT-QR-Code" style="max-width:200px; border-radius:var(--radius-sm); border:1px solid var(--line-strong); margin-bottom:0.6rem; display:block;">' : '') +
-      '<button type="button" class="btn secondary" id="openTwintBtn">📲 TWINT-App öffnen</button>' +
-      '<div class="hint" style="margin-top:0.4rem;">Öffnet direkt die TWINT-App auf deinem Handy (falls installiert) — Empfänger und Betrag musst du dort selbst eingeben.</div>';
-    const openBtn = document.getElementById('openTwintBtn');
-    if(openBtn) openBtn.addEventListener('click', () => { window.open('https://app.scheme.twint.ch/', '_blank'); });
+    area.innerHTML = qr ?
+      ('<div class="hint" style="margin-bottom:0.5rem;">TWINT-QR-Code von ' + escapeHtml(partyName(toSel.value)) + ' — mit einem zweiten Gerät scannen, oder speichern und in TWINT "aus Galerie scannen" wählen:</div>' +
+      '<img src="' + qr + '" alt="TWINT-QR-Code" style="max-width:200px; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); display:block; margin-bottom:0.6rem;">' +
+      '<button type="button" class="btn secondary" id="saveQrBtn">💾 QR-Code speichern</button>') : '';
+    const saveBtn = document.getElementById('saveQrBtn');
+    if(saveBtn) saveBtn.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = qr;
+      a.download = 'twint-qr-' + partyName(toSel.value).replace(/[^a-z0-9]/gi,'_') + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
   }
   toSel.addEventListener('change', renderSpQrArea);
   renderSpQrArea();
@@ -2800,8 +3077,8 @@ function renderPriorityRule(){
 
 function isoWeekNumber(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 function rotationPartyId(order, year, dateStr){
@@ -2854,7 +3131,7 @@ function renderPriorityRuleBody(){
           '</select></div>' +
         '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><input type="text" id="prioOddDisplay" value="' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '" disabled></div>' +
       '</div>' +
-      '<button class="btn secondary" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '<button class="btn" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
       '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
 
     document.getElementById('prioEven').addEventListener('change', (ev) => {
@@ -3200,7 +3477,7 @@ function renderAdminAuditSection(){
       '<div class="hint" style="margin:0.6rem 0 0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
       (logEntries.length ? logEntries.map(l => {
         const d = new Date(l.ts);
-        const dateStr = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
+        const dateStr = d.toLocaleDateString('de-CH') + ', ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
         return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
           '<div class="hint" style="margin:0;">' + dateStr + ' — <b>' + escapeHtml(l.actor) + '</b></div>' +
           '<div>' + escapeHtml(l.action) + '</div>' +
@@ -3223,7 +3500,7 @@ function exportAuditLogPdf(){
   html += '<table><tr><th>Datum</th><th>Wer</th><th>Was</th></tr>';
   logEntries.forEach(l => {
     const d = new Date(l.ts);
-    const dateStr = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' });
+    const dateStr = d.toLocaleDateString('de-CH') + ', ' + d.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
     html += '<tr><td>' + dateStr + '</td><td>' + escapeHtml(l.actor) + '</td><td>' + escapeHtml(l.action) + '</td></tr>';
   });
   html += '</table>';
@@ -3332,6 +3609,43 @@ function renderAdminGeneralSection(){
         '<label for="requirePhotoToggle">Foto bei Nutzungseinträgen zwingend</label>' +
       '</div>' +
       '<div class="hint">Standardmässig muss bei jedem Nutzungseintrag ein Foto des Bordcomputers hochgeladen werden. Schaltest du das aus, können Einträge auch ohne Foto gespeichert werden.</div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Service-Erinnerung</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Lege ein Intervall (Motorstunden) fest — die App warnt alle Parteien, sobald der Zählerstand seit dem letzten Service dieses Intervall überschreitet.</div>' +
+      '<div class="row">' +
+        '<div class="field"><label for="serviceIntervalField">Intervall (Std.)</label><input type="number" id="serviceIntervalField" min="0" step="1" value="' + (state.serviceReminder ? state.serviceReminder.intervalHours : '') + '" placeholder="z. B. 100"></div>' +
+        '<div class="field"><label for="serviceLastField">Letzter Service bei Std.</label><input type="number" id="serviceLastField" min="0" step="0.1" value="' + (state.serviceReminder ? state.serviceReminder.lastServiceReading : '') + '" placeholder="z. B. 1200"></div>' +
+      '</div>' +
+      '<button class="btn" id="saveServiceReminderBtn">Speichern</button>' +
+      '<div class="gate-error" id="serviceReminderFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Standort für Wetteranzeige</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Einmal festlegen, dann zeigt das Logbuch rückblickend das Wetter am jeweiligen Eintragsdatum an — und eine eigene Windwarnung, falls starke Böen vorhergesagt sind.</div>' +
+      '<div class="field"><label for="weatherPresetSelect">Ort am Zugersee (Vorauswahl)</label><select id="weatherPresetSelect">' +
+        '<option value="">— eigene Koordinaten unten —</option>' +
+        '<option value="47.12,8.48" selected>Zugersee (Mitte)</option>' +
+        '<option value="47.1662,8.5155">Zug</option>' +
+        '<option value="47.1520,8.4970">Oberwil b. Zug</option>' +
+        '<option value="47.1804,8.4629">Cham</option>' +
+        '<option value="47.1600,8.4550">Hünenberg See</option>' +
+        '<option value="47.1300,8.4850">Buonas</option>' +
+        '<option value="47.1252,8.4713">Risch</option>' +
+        '<option value="47.0847,8.4536">Immensee</option>' +
+        '<option value="47.0928,8.5159">Walchwil</option>' +
+        '<option value="47.0693,8.5308">Arth</option>' +
+      '</select></div>' +
+      '<div class="row">' +
+        '<div class="field"><label for="weatherLatField">Breitengrad</label><input type="number" id="weatherLatField" step="0.0001" value="' + (state.settings.weatherLat || '') + '" placeholder="z. B. 47.1662"></div>' +
+        '<div class="field"><label for="weatherLonField">Längengrad</label><input type="number" id="weatherLonField" step="0.0001" value="' + (state.settings.weatherLon || '') + '" placeholder="z. B. 8.5155"></div>' +
+      '</div>' +
+      '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+        '<button type="button" class="btn secondary" id="useMyLocationBtn">📍 Aktuellen Standort verwenden</button>' +
+        '<button class="btn" id="saveWeatherLocationBtn">Speichern</button>' +
+      '</div>' +
+      '<div class="gate-error" id="weatherLocationFeedback" style="color:#1C9A64;"></div>' +
+      '<div style="margin-top:0.8rem;"><a href="https://www.meteoswiss.admin.ch/weather/hazards/hazard-map.html" target="_blank" rel="noopener" style="font-size:0.82rem; color:var(--ink-soft);">↗ Offizielle Sturmwarnung / Gefahrenkarte (MeteoSchweiz)</a></div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<label>Export</label>' +
@@ -3478,6 +3792,53 @@ function renderAdminGeneralSection(){
     logAudit('Authenticator-App ' + (hadExisting ? 'neu ' : '') + 'eingerichtet');
     await saveShared();
     showTotpSetupModal(newTotpSecret, () => renderAdminGeneralSection());
+  });
+
+  document.getElementById('saveServiceReminderBtn').addEventListener('click', async () => {
+    const intervalVal = parseFloat(document.getElementById('serviceIntervalField').value);
+    const lastVal = parseFloat(document.getElementById('serviceLastField').value);
+    const fb = document.getElementById('serviceReminderFeedback');
+    if(!intervalVal || intervalVal <= 0 || isNaN(lastVal)){
+      fb.style.color = '#C0392B'; fb.textContent = 'Bitte gültiges Intervall und letzten Service-Stand angeben.'; fb.classList.add('show'); return;
+    }
+    state.serviceReminder = { intervalHours: intervalVal, lastServiceReading: lastVal };
+    logAudit('Service-Erinnerung gesetzt: alle ' + intervalVal + ' Std., letzter Service bei ' + lastVal + ' Std.');
+    await saveShared();
+    fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+  });
+
+  document.getElementById('weatherPresetSelect').addEventListener('change', (ev) => {
+    if(!ev.target.value) return;
+    const [lat, lon] = ev.target.value.split(',');
+    document.getElementById('weatherLatField').value = lat;
+    document.getElementById('weatherLonField').value = lon;
+  });
+
+  document.getElementById('useMyLocationBtn').addEventListener('click', () => {
+    const fb = document.getElementById('weatherLocationFeedback');
+    if(!navigator.geolocation){ fb.style.color = '#C0392B'; fb.textContent = 'Standort wird von diesem Gerät nicht unterstützt.'; fb.classList.add('show'); return; }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      document.getElementById('weatherLatField').value = pos.coords.latitude.toFixed(4);
+      document.getElementById('weatherLonField').value = pos.coords.longitude.toFixed(4);
+    }, () => {
+      fb.style.color = '#C0392B'; fb.textContent = 'Standort konnte nicht ermittelt werden.'; fb.classList.add('show');
+    });
+  });
+
+  document.getElementById('saveWeatherLocationBtn').addEventListener('click', async () => {
+    const lat = parseFloat(document.getElementById('weatherLatField').value);
+    const lon = parseFloat(document.getElementById('weatherLonField').value);
+    const fb = document.getElementById('weatherLocationFeedback');
+    if(isNaN(lat) || isNaN(lon)){
+      fb.style.color = '#C0392B'; fb.textContent = 'Bitte gültige Koordinaten angeben.'; fb.classList.add('show'); return;
+    }
+    state.settings.weatherLat = lat;
+    state.settings.weatherLon = lon;
+    logAudit('Standort für Wetteranzeige gesetzt');
+    await saveShared();
+    fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    weatherCache = {};
+    renderEntriesTable();
   });
 
   document.getElementById('saveInitialReadingBtn').addEventListener('click', async () => {
@@ -3874,9 +4235,12 @@ function renderAll(){
   renderYearFilters();
   renderEntriesTable();
   renderSettlement();
+  renderYearComparison();
   renderAdjustmentTab();
   renderAdminPanel();
   renderCalendarTab();
+  renderChatTab();
+  renderSeasonEventsList();
   updateHeaderMeta();
   renderInstruments();
   updateTabVisibility();
@@ -4051,6 +4415,10 @@ async function init(){
     const year = parseInt(document.getElementById('settlementYear').value);
     exportYearOverviewPdf(year);
   });
+  document.getElementById('exportCsvBtn').addEventListener('click', () => {
+    const year = parseInt(document.getElementById('settlementYear').value);
+    exportYearOverviewCsv(year);
+  });
   document.getElementById('giftToggle').addEventListener('change', (ev) => {
     document.getElementById('giftBody').style.display = ev.target.checked ? 'block' : 'none';
     if(!ev.target.checked){
@@ -4119,6 +4487,105 @@ async function init(){
   setupInactivityTracking();
   setupUpdateChecking();
   setupSceneStripTracking();
+  setupChatUI();
+  setupSeasonUI();
+}
+
+function renderSeasonEventsList(){
+  const el = document.getElementById('seasonEventsList');
+  if(!el) return;
+  const events = (state.seasonEvents || []).slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0,6);
+  el.innerHTML = events.length ? events.map(ev =>
+    '<div class="hint">' + (ev.type === 'launch' ? '🚤 Eingewassert' : '⚓ Ausgewassert') + ': ' + fmtDateCH(ev.date) + '</div>'
+  ).join('') : '<div class="hint">Noch keine Einträge.</div>';
+}
+
+function setupSeasonUI(){
+  const launchBtn = document.getElementById('seasonLaunchBtn');
+  const haulBtn = document.getElementById('seasonHaulBtn');
+  if(!launchBtn) return;
+  checkWindWarning();
+  setInterval(checkWindWarning, 30 * 60 * 1000);
+  renderSeasonEventsList();
+  launchBtn.addEventListener('click', async () => {
+    const today = new Date().toISOString().slice(0,10);
+    if(!state.seasonEvents) state.seasonEvents = [];
+    state.seasonEvents.push({ id: uid(), date: today, type: 'launch' });
+    logAudit('Boot am ' + fmtDateCH(today) + ' eingewassert');
+    await saveShared();
+    renderSeasonEventsList();
+  });
+  haulBtn.addEventListener('click', async () => {
+    const today = new Date().toISOString().slice(0,10);
+    if(!state.seasonEvents) state.seasonEvents = [];
+    state.seasonEvents.push({ id: uid(), date: today, type: 'haul' });
+    logAudit('Boot am ' + fmtDateCH(today) + ' ausgewassert');
+    await saveShared();
+    renderSeasonEventsList();
+  });
+}
+
+function setupChatUI(){
+  const chatPhotoInput = document.getElementById('chatPhotoInput');
+  const chatPhotoBtn = document.getElementById('chatPhotoBtn');
+  const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
+  if(!chatPhotoInput) return;
+
+  chatPhotoBtn.addEventListener('click', () => chatPhotoInput.click());
+  chatPhotoInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    try{
+      chatPendingPhoto = await compressImage(file, 700, 0.6);
+      chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
+      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; ev.target.value = ''; });
+    } catch(e){}
+  });
+
+  document.getElementById('chatSendBtn').addEventListener('click', async () => {
+    if(!session.partyId && !isAdminUser) return;
+    const textInput = document.getElementById('chatTextInput');
+    const text = textInput.value.trim();
+    if(!text && !chatPendingPhoto) return;
+    if(!state.chatMessages) state.chatMessages = [];
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text, photo: chatPendingPhoto, type: 'normal' });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    pushNotification((session.partyId ? partyName(session.partyId) : 'Administrator') + ' hat eine Nachricht geschrieben' + (text ? ': "' + (text.length > 60 ? text.slice(0,60) + '…' : text) + '"' : ' (Foto)'), null);
+    textInput.value = '';
+    chatPendingPhoto = null;
+    chatPreviewArea.innerHTML = '';
+    chatPhotoInput.value = '';
+    await saveShared();
+    renderChatTab();
+  });
+
+  const beerPhotoInput = document.getElementById('beerPhotoInput');
+  const beerPhotoBtn = document.getElementById('beerPhotoBtn');
+  const beerPreviewArea = document.getElementById('beerPhotoPreviewArea');
+  beerPhotoBtn.addEventListener('click', () => beerPhotoInput.click());
+  beerPhotoInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    try{
+      beerPendingPhoto = await compressImage(file, 700, 0.6);
+      beerPreviewArea.innerHTML = '<img src="' + beerPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="beerPhotoRemoveBtn">entfernen</button>';
+      document.getElementById('beerPhotoRemoveBtn').addEventListener('click', () => { beerPendingPhoto = null; beerPreviewArea.innerHTML = ''; ev.target.value = ''; });
+    } catch(e){}
+  });
+
+  document.getElementById('beerCallBtn').addEventListener('click', async () => {
+    if(!state.chatMessages) state.chatMessages = [];
+    const name = session.partyId ? partyName(session.partyId) : 'Administrator';
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo: beerPendingPhoto, type: 'beer' });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    pushNotification('🍻 ' + name + ' ruft zum Feierabendbier! Prost mitmachen?', null);
+    beerPendingPhoto = null;
+    beerPreviewArea.innerHTML = '';
+    beerPhotoInput.value = '';
+    playCheersSound();
+    await saveShared();
+    renderChatTab();
+  });
 }
 
 init();
