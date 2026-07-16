@@ -918,7 +918,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-22';
+const APP_VERSION = '2026-07-15-23';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -2164,7 +2164,7 @@ async function fetchLiveWeatherWidget(){
             '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
             '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
           '</a>',
-          'MeteoSchweiz' + (placeName ? ' · ' + escapeHtml(placeName) : ' · dein Standort')
+          (placeName ? escapeHtml(placeName) : 'Aktueller Standort')
         );
       }
     } catch(e){ renderLiveWeatherWidget(''); }
