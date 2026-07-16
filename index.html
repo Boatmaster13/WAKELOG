@@ -781,9 +781,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div class="field" style="grid-column:1 / -1;">
             <label id="photoLabel">Foto Bordcomputer (Tagesverbrauch) *</label>
             <div style="display:flex; gap:0.4rem; flex-wrap:nowrap;">
-              <label class="btn secondary file-label" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem; text-align:center; cursor:pointer;">📷 Aufnehmen<input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-inlabel"></label>
-              <label class="btn secondary file-label" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem; text-align:center; cursor:pointer;">🖼️ Galerie<input type="file" id="f-photo-gallery" accept="image/*" class="file-inlabel"></label>
+              <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
+              <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
             </div>
+            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-hidden">
+            <input type="file" id="f-photo-gallery" accept="image/*" class="file-hidden">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Foto auswählen — dieses Feld ist Pflicht.</div>
@@ -796,8 +798,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <label class="checkbox-item" style="display:inline-flex;"><input type="checkbox" id="giftToggle"> Ein Teil (oder alles) wurde von einer externen Person geschenkt</label>
             <div id="giftBody" style="display:none; margin-top:0.7rem;">
               <div class="row">
-                <div class="field"><label for="giftName">Name der Person</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben.</div></div>
-                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF)</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
+                <div class="field"><label for="giftName">Name der Person *</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben — dieses Feld ist Pflicht.</div></div>
+                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF) *</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
               </div>
               <div class="hint">Dieser Betrag wird von den Ausgaben abgezogen, bevor sie auf die Parteien aufgeteilt werden — die Bootsgemeinschaft profitiert direkt davon.</div>
             </div>
@@ -1145,7 +1147,10 @@ function updateHeaderMeta(){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
     strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between;">' +
       '<div style="display:flex; align-items:center; gap:0.4rem;">' +
-        '<div id="liveWeatherWidget"></div>' +
+        '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
+          '<div id="liveWeatherWidget"></div>' +
+          '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; text-align:center;"></div>' +
+        '</div>' +
         '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
         '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdose ausrufen">🍺</button>' +
         '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
@@ -1154,8 +1159,7 @@ function updateHeaderMeta(){
         (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
         '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
-    '</div>' +
-    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem; text-align:left;"></div>';
+    '</div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -1215,8 +1219,7 @@ async function finalizeBeerCall(photoDataUrl){
   const msgId = uid();
   state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
   if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-  const callerName = isAdminUser ? 'Administrator' : (session.partyId ? partyName(session.partyId) : 'Jemand');
-  pushNotification('⚓ ' + callerName + ' hat zur Ankerdose gerufen! 🍺', null);
+  // Ankerdose-Rufe erscheinen nur noch im Chat — keine zusätzliche Kopie im Posteingang.
   await saveShared();
   updateHeaderMeta();
   showBeerConfirmation();
@@ -1499,11 +1502,17 @@ function finalizeCalendarDrag(){
   const hi = calendarDragStart <= calendarDragCurrent ? calendarDragCurrent : calendarDragStart;
   if(lo === hi){
     // Einzelner Tag: wird vom normalen 'click'-Event auf der Zelle behandelt, hier nichts tun.
+    // Wichtig: ein evtl. noch gesetztes Drag-Flag von einer früheren Zeitraumauswahl zurücksetzen,
+    // sonst wird der erste Klick auf einen Einzeltag geschluckt.
+    calendarJustDragged = false;
     calendarDragStart = null;
     calendarDragCurrent = null;
     return;
   }
   calendarJustDragged = true;
+  // Auf Touch-Geräten feuert nach einem Drag kein 'click' — Flag darum nach kurzer Zeit
+  // automatisch zurücksetzen, damit der nächste Einzeltag-Tipp sofort funktioniert.
+  setTimeout(() => { calendarJustDragged = false; }, 400);
   calendarSelectedDate = null;
   calendarPendingAction = null;
   const dayPanel = document.getElementById('calendarDayPanel');
@@ -1914,7 +1923,7 @@ function showInboxModal(){
           '<div>' + escapeHtml(n.message) + '</div>' +
           '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
         '</div>').join('') +
-      '</div>' : '<div class="empty">Noch keine Mitteilungen.<br><span style="font-size:0.82rem;">Hier erscheinen automatische Hinweise — z.&nbsp;B. zu Vorrechtstagen (Anfragen, Zu- und Absagen, Abgaben) und Ankerdose-Rufen. Persönliche Nachrichten laufen über den Chat.</span></div>') +
+      '</div>' : '<div class="empty">Noch keine Mitteilungen.<br><span style="font-size:0.82rem;">Hier erscheinen automatische Hinweise — z.&nbsp;B. zu Vorrechtstagen (Anfragen, Zu- und Absagen, Abgaben). Persönliche Nachrichten und Ankerdose-Rufe laufen über den Chat.</span></div>') +
       '<button class="btn" id="inboxCloseBtn" style="margin-top:1.1rem;">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -2242,12 +2251,16 @@ async function renderWeatherForCoords(lat, lon){
           if(!postcode) postcode = (geoData.postcode || '').replace(/\s/g,'');
         } catch(e){}
       }
-      let meteoLink = 'https://www.meteoswiss.admin.ch/';
+      let meteoLink = 'https://www.meteoschweiz.admin.ch/';
       if(placeName && postcode){
+        // Deutsche Lokalprognose-URL: https://www.meteoschweiz.admin.ch/lokalprognose/<ort>/<plz>.html
+        // Umlaute werden dort als ae/oe/ue geschrieben (z. B. "maennedorf").
         const slug = placeName.toLowerCase()
-          .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/é/g,'e').replace(/è/g,'e').replace(/ç/g,'c')
+          .replace(/[0-9]+/g,'')
+          .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue')
+          .replace(/é/g,'e').replace(/è/g,'e').replace(/ê/g,'e').replace(/à/g,'a').replace(/â/g,'a').replace(/ç/g,'c')
           .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-        meteoLink = 'https://www.meteoswiss.admin.ch/local-forecasts/' + slug + '/' + postcode + '.html';
+        if(slug) meteoLink = 'https://www.meteoschweiz.admin.ch/lokalprognose/' + slug + '/' + postcode + '.html';
       }
       if(data.current){
         const cat = weatherCategory(data.current.weathercode);
@@ -2258,7 +2271,7 @@ async function renderWeatherForCoords(lat, lon){
             '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
             '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
           '</a>',
-          '<a href="' + meteoLink + '" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">' + locLabel + '</a>'
+          '<a href="' + meteoLink + '" target="_blank" rel="noopener" style="color:inherit; text-decoration:none; display:block; text-align:center;">' + locLabel + '</a>'
         );
       }
     } catch(e){ renderLiveWeatherWidget(''); }
@@ -2575,7 +2588,7 @@ function checkNewBeerCalls(oldMessages, newMessages){
   newMessages.forEach(m => {
     if(m.type === 'beer' && !oldIds.has(m.id) && m.fromPartyId !== session.partyId){
       playCheersSound();
-      pushNotification('⚓ ' + partyName(m.fromPartyId) + ' ruft zur Ankerdose! Prost mitmachen?', null);
+      // Kein pushNotification mehr: der Ruf steht bereits im Chat — sonst doppelt im Posteingang.
       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && getPushEnabled()){
         try{
           new Notification('⚓ Ankerdose!', {
@@ -3538,7 +3551,7 @@ function renderSettlementPaymentList(year){
   if(!wrap) return;
   const items = (state.settlementPayments && state.settlementPayments[year]) || [];
   if(!items.length){ wrap.innerHTML = '<div class="empty">Noch keine Ausgleichszahlungen für ' + year + ' erfasst.</div>'; return; }
-  wrap.innerHTML = items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(s => {
+  wrap.innerHTML = items.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.createdAt||0) - (a.createdAt||0)).map(s => {
     const involved = isAdminUser || (session.partyId && (s.from === session.partyId || s.to === session.partyId));
     const locked = isLocked(s);
     const canEdit = involved && (isAdminUser || !locked);
@@ -5043,6 +5056,11 @@ async function init(){
   document.addEventListener('mouseup', finalizeCalendarDrag);
   document.addEventListener('click', (ev) => {
     if(!calendarSelectedDate) return;
+    // Wenn das geklickte Element nicht mehr im DOM hängt, wurde das Panel durch den
+    // Button-Klick gerade neu gerendert (z. B. "Diesen Tag abgeben" → Bestätigungsdialog).
+    // Das ist KEIN Klick ausserhalb — sonst wird der Bestätigungsdialog sofort geschlossen
+    // und die Abgabe kommt nie zustande (Tag wird nicht grau).
+    if(!ev.target.isConnected) return;
     const insideCalendar = ev.target.closest('#calendarGrid') || ev.target.closest('#calendarDayPanel');
     if(!insideCalendar){
       calendarSelectedDate = null;
@@ -5203,8 +5221,9 @@ async function init(){
   document.getElementById('giftName').addEventListener('input', () => {
     if(document.getElementById('giftName').value.trim()) document.getElementById('err-gift-name').classList.remove('show');
   });
-  // Aufnehmen/Galerie öffnen die Datei-Auswahl jetzt nativ über <label for=...>.
-  // Kein JS-.click() mehr — das wurde auf einigen Mobil-Browsern blockiert.
+  // Aufnehmen/Galerie: echte Buttons, die das versteckte Datei-Feld per .click() im
+  // User-Tap öffnen — gleiches Muster wie beim Ankerdose-Foto, das zuverlässig die
+  // Kamera-App startet. (Das Label-Overlay davor funktionierte auf iOS nicht immer.)
   const handlePhotoFile = async (ev) => {
     const file = ev.target.files[0];
     if(!file) return;
@@ -5222,6 +5241,16 @@ async function init(){
   };
   document.getElementById('f-photo-camera').addEventListener('change', handlePhotoFile);
   document.getElementById('f-photo-gallery').addEventListener('change', handlePhotoFile);
+  document.getElementById('photoCameraBtn').addEventListener('click', () => {
+    const inp = document.getElementById('f-photo-camera');
+    inp.value = '';
+    inp.click();
+  });
+  document.getElementById('photoGalleryBtn').addEventListener('click', () => {
+    const inp = document.getElementById('f-photo-gallery');
+    inp.value = '';
+    inp.click();
+  });
   [['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
     const el = document.getElementById(fieldId);
     el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
