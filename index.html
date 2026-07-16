@@ -153,11 +153,11 @@ body{
 .instruments{ display:flex; gap:0.6rem; margin-top:1.5rem; position:relative; z-index:1; flex-wrap:wrap; }
 
 .weather-widget{
-  position:relative; overflow:hidden;
+  position:relative; overflow:hidden; height:32px; box-sizing:border-box;
   display:inline-flex; align-items:center; gap:0.3rem;
   background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25);
-  border-radius:20px; padding:0.35rem 0.8rem; text-decoration:none; color:#fff;
-  font-family:'Inter', sans-serif; cursor:default;
+  border-radius:16px; padding:0 0.6rem; text-decoration:none; color:#fff;
+  font-family:'Inter', sans-serif; cursor:pointer;
 }
 .weather-icon{ font-size:1.15rem; line-height:1; position:relative; z-index:2; }
 .weather-temp{ font-weight:700; font-size:0.95rem; position:relative; z-index:2; }
@@ -596,17 +596,17 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 }
 #printArea{ display:none; }
 @media print{
-  body *{ visibility:hidden; }
-  #printArea, #printArea *{ visibility:visible; }
-  #printArea{ display:block; position:absolute; top:0; left:0; width:100%; padding:1.5rem; background:#fff; }
+  body > *:not(#printArea){ display:none !important; }
+  #printArea{ display:block; position:static; width:100%; padding:1.5rem; background:#fff; }
   #printArea .print-header{ display:flex; align-items:center; gap:0.8rem; border-bottom:3px solid var(--volt); padding-bottom:0.7rem; margin-bottom:0.4rem; }
   #printArea .print-logo{ width:44px; height:44px; }
   #printArea h1{ font-family:'Big Shoulders Display', sans-serif; font-size:1.6rem; margin:0; color:var(--hull); text-transform:uppercase; }
   #printArea .print-subtitle{ font-family:'Inter', sans-serif; font-size:0.85rem; color:var(--ink-soft); margin-top:0.1rem; }
   #printArea h2{ font-family:'Big Shoulders Display', sans-serif; font-size:1.2rem; margin:1.3rem 0 0.5rem; color:var(--hull); border-bottom:1.5px solid var(--volt); padding-bottom:0.2rem; }
   #printArea table{ width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:1rem; }
-  #printArea th{ background:#F2E6D3; color:var(--hull); border:1px solid #D8C4A0; padding:0.35rem 0.5rem; text-align:left; }
+  #printArea th{ background:#F2E6D3; color:var(--hull); border:1px solid #D8C4A0; padding:0.35rem 0.5rem; text-align:left; font-weight:700; }
   #printArea td{ border:1px solid #ddd; padding:0.35rem 0.5rem; text-align:left; }
+  #printArea tr.print-result-row td{ font-weight:700; background:#F2E6D3; }
   #printArea .print-balance{ margin-bottom:0.6rem; padding:0.5rem 0.7rem; border-left:3px solid var(--volt); background:#FAF6EF; }
   #printArea .print-meta{ color:#777; font-size:0.78rem; margin:0.6rem 0 1rem; }
 }
@@ -788,7 +788,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <div id="giftBody" style="display:none; margin-top:0.7rem;">
               <div class="row">
                 <div class="field"><label for="giftName">Name der Person</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben.</div></div>
-                <div class="field"><label for="giftAmount">Geschenkter Betrag (CHF)</label><input type="number" id="giftAmount" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
+                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF)</label><input type="number" id="giftAmount" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
               </div>
               <div class="hint">Dieser Betrag wird von den Ausgaben abgezogen, bevor sie auf die Parteien aufgeteilt werden — die Bootsgemeinschaft profitiert direkt davon.</div>
             </div>
@@ -918,7 +918,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-19';
+const APP_VERSION = '2026-07-15-21';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1018,6 +1018,7 @@ async function saveShared(){
 }
 
 function subscribeRealtime(){
+  let realtimeFirstFire = true;
   onValue(dataRef, (snapshot) => {
     const loaded = snapshot.val() || {};
     state.parties = (loaded.parties && loaded.parties.length) ? loaded.parties : (state.parties.length ? state.parties : defaultData().parties);
@@ -1034,7 +1035,9 @@ function subscribeRealtime(){
       const newRequests = loaded.priorityRequests || {};
       state.partyQrCodes = loaded.partyQrCodes || {};
       state.notifications = loaded.notifications || [];
-      state.chatMessages = loaded.chatMessages || [];
+      const newChatMessages = loaded.chatMessages || [];
+      checkNewBeerCalls(state.chatMessages || [], newChatMessages);
+      state.chatMessages = newChatMessages;
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
@@ -1134,11 +1137,12 @@ function updateHeaderMeta(){
         '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdose ausrufen">🍺</button>' +
         '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '</div>' +
-      '<div style="display:flex; align-items:center; gap:0.5rem;">' +
-        (isAdminUser ? '<span class="admin-badge">Administrator</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
-        '<button type="button" class="logout-btn" id="logoutBtn">Abmelden</button>' +
+      '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">' +
+        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content; white-space:nowrap;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
+        '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem;"></div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -1149,10 +1153,33 @@ function handleAdminStripClick(ev){
   if(ev.target.closest('#logoutBtn')){ logout(); return; }
   if(ev.target.closest('#inboxBtn')){ showInboxModal(); return; }
   if(ev.target.closest('#beerCallBtn')){
-    const input = document.getElementById('beerPhotoInput');
-    if(input) input.click();
+    showBeerCallConfirm();
     return;
   }
+}
+
+function showBeerCallConfirm(){
+  const name = session.partyId ? partyName(session.partyId) : 'Administrator';
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML =
+    '<div class="gate-card" style="text-align:center;">' +
+      '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
+      '<h2>Ankerdose ausrufen?</h2>' +
+      '<p>Als <b>' + escapeHtml(name) + '</b> alle anderen Parteien jetzt zur Ankerdose rufen? Du kannst danach noch ein Foto machen.</p>' +
+      '<div style="display:flex; gap:0.6rem;">' +
+        '<button class="btn" id="beerConfirmYesBtn" style="flex:1;">Ja, ausrufen!</button>' +
+        '<button class="btn secondary" id="beerConfirmNoBtn" style="flex:1;">Abbrechen</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('beerConfirmNoBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('beerConfirmYesBtn').addEventListener('click', () => {
+    overlay.remove();
+    const input = document.getElementById('beerPhotoInput');
+    if(input) input.click();
+  });
 }
 
 async function logout(){
@@ -1826,7 +1853,7 @@ function showInboxModal(){
           '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
         '</div>').join('') +
       '</div>' : '<div class="empty">Noch keine Mitteilungen.</div>') +
-      '<button class="btn" id="inboxCloseBtn">Schliessen</button>' +
+      '<button class="btn" id="inboxCloseBtn" style="margin-top:1.1rem;">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('openChatFromInboxBtn').addEventListener('click', () => {
@@ -1944,15 +1971,38 @@ function renderUsageSplitArea(){
   const ids = Array.from(wrap.querySelectorAll('.party-check:checked')).map(cb => cb.value);
   if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
   area.style.display = 'block';
-  const equal = Math.round((100/ids.length)*10)/10;
-  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Gemeinsame Nutzung — Aufteilung der heutigen Motorstunden (muss 100% ergeben):</div>' +
-    ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="usage-split-input" data-id="' + id + '" step="0.1" min="0" max="100" value="' + equal + '"><span>%</span></div>').join('') +
-    '<div class="split-total" id="usageSplitTotal"></div>';
-  area.querySelectorAll('.usage-split-input').forEach(inp => inp.addEventListener('input', () => {
-    autoFillLastSplit(area, '.usage-split-input', inp);
-    updateUsageSplitTotal();
-  }));
-  updateUsageSplitTotal();
+  area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Gemeinsame Nutzung — war jemand nur einen halben Tag an Bord? (Aufteilung wird automatisch berechnet)</div>' +
+    ids.map(id => '<div class="split-row">' +
+      '<span class="split-name">' + escapeHtml(partyName(id)) + '</span>' +
+      '<div class="type-toggle halfday-toggle" data-id="' + id + '" style="flex-shrink:0;">' +
+        '<button type="button" data-val="1" class="active">Ganzer Tag</button>' +
+        '<button type="button" data-val="0.5">Halber Tag</button>' +
+      '</div>' +
+      '<input type="hidden" class="usage-split-input" data-id="' + id + '" value="">' +
+    '</div>').join('');
+  area.querySelectorAll('.halfday-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toggle = btn.closest('.halfday-toggle');
+      toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      recomputeHalfDaySplit(area, ids);
+    });
+  });
+  recomputeHalfDaySplit(area, ids);
+}
+
+function recomputeHalfDaySplit(area, ids){
+  const weights = ids.map(id => {
+    const toggle = area.querySelector('.halfday-toggle[data-id="' + id + '"]');
+    const activeBtn = toggle.querySelector('button.active');
+    return parseFloat(activeBtn.dataset.val);
+  });
+  const totalWeight = weights.reduce((s,w) => s+w, 0);
+  ids.forEach((id, i) => {
+    const pct = totalWeight > 0 ? (weights[i]/totalWeight*100) : (100/ids.length);
+    const hiddenInput = area.querySelector('.usage-split-input[data-id="' + id + '"]');
+    if(hiddenInput) hiddenInput.value = Math.round(pct*10)/10;
+  });
 }
 
 function autoFillLastSplit(area, selector, changedInput){
@@ -1965,14 +2015,7 @@ function autoFillLastSplit(area, selector, changedInput){
   last.value = (Math.round(remainder * 10) / 10);
 }
 
-function updateUsageSplitTotal(){
-  const area = document.getElementById('usageSplitArea');
-  const inputs = Array.from(area.querySelectorAll('.usage-split-input'));
-  const total = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
-  const el = document.getElementById('usageSplitTotal');
-  el.textContent = 'Summe: ' + fmtNum(total,1) + ' %';
-  el.className = 'split-total ' + (Math.abs(total-100) < 0.15 ? 'ok' : 'bad');
-}
+
 
 function renderPayerCheckboxes(){
   const wrap = document.getElementById('payerCheckboxes');
@@ -2017,8 +2060,21 @@ function renderPaidSplitArea(){
   document.getElementById('paidUnequalToggle').addEventListener('change', (ev) => {
     document.getElementById('paidAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
   });
-  area.querySelectorAll('.paid-split-input').forEach(inp => inp.addEventListener('input', updatePaidSplitTotal));
+  area.querySelectorAll('.paid-split-input').forEach(inp => inp.addEventListener('input', () => {
+    autoFillLastAmountSplit(area, '.paid-split-input', inp, totalExpense);
+    updatePaidSplitTotal();
+  }));
   updatePaidSplitTotal();
+}
+
+function autoFillLastAmountSplit(area, selector, changedInput, total){
+  const inputs = Array.from(area.querySelectorAll(selector));
+  if(inputs.length < 2) return;
+  const last = inputs[inputs.length - 1];
+  if(changedInput === last) return;
+  const othersSum = inputs.slice(0, -1).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const remainder = Math.max(0, Math.round((total - othersSum) * 100) / 100);
+  last.value = remainder;
 }
 
 function updatePaidSplitTotal(){
@@ -2044,14 +2100,20 @@ function updatePaidSplitTotal(){
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let weatherCache = {};
 let liveWeatherWidgetHtml = '';
-function renderLiveWeatherWidget(html){
+let liveWeatherLocationHtml = '';
+function renderLiveWeatherWidget(html, locationHtml){
   liveWeatherWidgetHtml = html;
+  if(typeof locationHtml === 'string') liveWeatherLocationHtml = locationHtml;
   const el = document.getElementById('liveWeatherWidget');
   if(el) el.innerHTML = html;
+  const locEl = document.getElementById('liveWeatherLocationLine');
+  if(locEl) locEl.innerHTML = liveWeatherLocationHtml;
 }
 function renderLiveWeatherWidgetCache(){
   const el = document.getElementById('liveWeatherWidget');
   if(el) el.innerHTML = liveWeatherWidgetHtml;
+  const locEl = document.getElementById('liveWeatherLocationLine');
+  if(locEl) locEl.innerHTML = liveWeatherLocationHtml;
 }
 async function fetchLiveWeatherWidget(){
   if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
@@ -2060,15 +2122,21 @@ async function fetchLiveWeatherWidget(){
       const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
       const res = await fetch(url);
       const data = await res.json();
+      let placeName = '';
+      try{
+        const geoRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&localityLanguage=de');
+        const geoData = await geoRes.json();
+        placeName = geoData.locality || geoData.city || geoData.principalSubdivision || '';
+      } catch(e){}
       if(data.current){
         const cat = weatherCategory(data.current.weathercode);
         renderLiveWeatherWidget(
-          '<div class="weather-widget weather-' + cat + '" title="Aktuelles Wetter an deinem Standort">' +
+          '<a href="https://www.meteoschweiz.admin.ch/" target="_blank" rel="noopener" class="weather-widget weather-' + cat + '" title="Tageswetter auf MeteoSchweiz ansehen">' +
             '<span class="weather-icon">' + weatherEmoji(data.current.weathercode) + '</span>' +
             '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
             '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
-          '</div>' +
-          '<div class="sub" style="font-size:0.6rem; margin-top:0.15rem; text-align:right;">MeteoSchweiz · dein Standort</div>'
+          '</a>',
+          'MeteoSchweiz' + (placeName ? ' · ' + escapeHtml(placeName) : ' · dein Standort')
         );
       }
     } catch(e){ renderLiveWeatherWidget(''); }
@@ -2323,6 +2391,42 @@ function clearEntryErrors(){
 }
 
 const BURP_SOUND_COUNT = 10;
+function showBeerConfirmation(){
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML =
+    '<div class="gate-card" style="text-align:center;">' +
+      '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
+      '<h2>Ankerdose ausgerufen!</h2>' +
+      '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen.</p>' +
+      '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">Prost!</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('beerConfirmCloseBtn').addEventListener('click', () => overlay.remove());
+  setTimeout(() => { if(overlay.parentNode) overlay.remove(); }, 6000);
+}
+
+function checkNewBeerCalls(oldMessages, newMessages){
+  if(!accessGranted) return;
+  const oldIds = new Set(oldMessages.map(m => m.id));
+  newMessages.forEach(m => {
+    if(m.type === 'beer' && !oldIds.has(m.id) && m.fromPartyId !== session.partyId){
+      playCheersSound();
+      pushNotification('⚓ ' + partyName(m.fromPartyId) + ' ruft zur Ankerdose! Prost mitmachen?', null);
+      if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && getPushEnabled()){
+        try{
+          new Notification('⚓ Ankerdose!', {
+            body: partyName(m.fromPartyId) + ' ruft zur Ankerdose — Prost mitmachen?',
+            icon: 'icon-192.png'
+          });
+        } catch(e){}
+      }
+      updateHeaderMeta();
+    }
+  });
+}
+
 function playCheersSound(){
   try{
     const canOpen = new Audio('sound-can-open.mp3');
@@ -2534,11 +2638,16 @@ function startEdit(id){
   document.querySelectorAll('#partyCheckboxes .party-check').forEach(cb => { cb.checked = usage.ids.includes(cb.value); });
   renderUsageSplitArea();
   if(usage.ids.length > 1){
+    const equalShare = 100 / usage.ids.length;
     usage.ids.forEach(id => {
-      const inp = document.querySelector('#usageSplitArea .usage-split-input[data-id="' + id + '"]');
-      if(inp) inp.value = usage.split[id] || 0;
+      const pct = usage.split[id] || 0;
+      const toggle = document.querySelector('#usageSplitArea .halfday-toggle[data-id="' + id + '"]');
+      if(toggle && pct < equalShare - 1){
+        toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        toggle.querySelector('button[data-val="0.5"]').classList.add('active');
+      }
     });
-    updateUsageSplitTotal();
+    recomputeHalfDaySplit(document.getElementById('usageSplitArea'), usage.ids);
   }
   document.getElementById('f-date').value = e.date;
   document.getElementById('f-reading').value = flags.hasUsage ? (typeof e.reading === 'number' ? e.reading : '') : '';
@@ -2844,6 +2953,10 @@ function exportYearOverviewCsv(year){
       flags.hasRefuel ? e.expense : ''
     ]);
   });
+  const totalHours = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+  const totalLiters = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.liters||0) : 0), 0);
+  const totalExpense = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.expense||0) : 0), 0);
+  rows.push(['Total', '', '', '', fmtNum(totalHours,1), '', totalLiters ? fmtNum(totalLiters,1) : '', '', totalExpense ? fmtNum(totalExpense,2) : '']);
   downloadCsv('wakelog-' + year + '.csv', rows);
 }
 
@@ -2877,11 +2990,14 @@ function exportYearOverviewPdf(year){
   const annualItems = (state.annualCosts && state.annualCosts[year]) || [];
   if(annualItems.length){
     html += '<h2>Fixkosten im Detail</h2><table><tr><th>Art</th><th>Beschreibung</th><th>Datum</th><th>Betrag</th><th>Bezahlt von</th></tr>';
+    let acTotal = 0;
     annualItems.forEach(c => {
       const payerIds = Object.keys(c.paidBy || {});
-      const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : escapeHtml(partyName(payerIds[0]));
-      html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date ? fmtDateCH(c.date) : '') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + escapeHtml(payerLabel) + '</td></tr>';
+      const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : (payerIds.length ? escapeHtml(partyName(payerIds[0])) : '—');
+      acTotal += c.amount;
+      html += '<tr><td>' + escapeHtml(c.type) + '</td><td>' + escapeHtml(c.description || '') + '</td><td>' + (c.date ? fmtDateCH(c.date) : '') + '</td><td>' + fmtCHF(c.amount) + '</td><td>' + payerLabel + '</td></tr>';
     });
+    html += '<tr class="print-result-row"><td colspan="3">Total</td><td>' + fmtCHF(acTotal) + '</td><td></td></tr>';
     html += '</table>';
   }
 
@@ -2890,16 +3006,21 @@ function exportYearOverviewPdf(year){
     html += '<p>Keine Einträge in diesem Jahr.</p>';
   } else {
     html += '<table><tr><th>Datum</th><th>Partei</th><th>Typ</th><th>Zählerstand</th><th>Std.</th><th>Getankt (l)</th><th>Ausgaben</th></tr>';
+    let totalHoursPdf = 0, totalLitersPdf = 0, totalExpensePdf = 0;
     yearEntries.forEach(e => {
       const flags = getEntryFlags(e);
       const usage = getEntryUsageSplit(e);
       const type = (flags.hasUsage?'Nutzung':'') + (flags.hasUsage&&flags.hasRefuel?' + ':'') + (flags.hasRefuel?'Tanken':'');
+      const hrs = flags.hasUsage ? (hoursMap[e.id]||0) : 0;
+      totalHoursPdf += hrs;
+      if(flags.hasRefuel){ totalLitersPdf += (e.liters||0); totalExpensePdf += (e.expense||0); }
       html += '<tr><td>' + fmtDateCH(e.date) + '</td><td>' + splitLabel(usage.ids, usage.split) + '</td><td>' + type + '</td>' +
         '<td>' + (flags.hasUsage && typeof e.reading === 'number' ? fmtNum(e.reading,1) : '—') + '</td>' +
-        '<td>' + (flags.hasUsage ? fmtNum(hoursMap[e.id]||0,1) : '—') + '</td>' +
+        '<td>' + (flags.hasUsage ? fmtNum(hrs,1) : '—') + '</td>' +
         '<td>' + (flags.hasRefuel && e.liters ? fmtNum(e.liters,1) : '—') + '</td>' +
         '<td>' + (flags.hasRefuel ? fmtCHF(e.expense||0) : '—') + '</td></tr>';
     });
+    html += '<tr class="print-result-row"><td colspan="4">Total</td><td>' + fmtNum(totalHoursPdf,1) + '</td><td>' + fmtNum(totalLitersPdf,1) + '</td><td>' + fmtCHF(totalExpensePdf) + '</td></tr>';
     html += '</table>';
   }
 
@@ -3040,9 +3161,13 @@ function setupQrCodeUI(){
     }
   }
   renderMyQrPreview();
-  if(isAdminUser) partySelect.addEventListener('change', renderMyQrPreview);
+  if(isAdminUser && !partySelect.dataset.wired){ partySelect.dataset.wired = '1'; partySelect.addEventListener('change', renderMyQrPreview); }
 
-  document.getElementById('qrUploadBtn').addEventListener('click', () => {
+  const uploadBtn = document.getElementById('qrUploadBtn');
+  if(uploadBtn.dataset.wired) return;
+  uploadBtn.dataset.wired = '1';
+
+  uploadBtn.addEventListener('click', () => {
     document.getElementById('qrUploadInput').click();
   });
 
@@ -3097,38 +3222,55 @@ function renderYearComparison(){
   const maxTotal = Math.max(...perYear.map(p => p.total), 1);
   const maxHours = Math.max(...perYear.map(p => p.hours), 1);
 
-  function segments(p, valueKey, totalValue){
-    if(totalValue <= 0) return '';
+  function segments(p){
+    if(p.total <= 0) return '';
     return p.rows.map(r => {
-      const val = valueKey === 'total' ? r.fairShare : r.hours;
-      const share = val / totalValue;
+      const share = r.fairShare / p.total;
       if(share <= 0) return '';
-      return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + '"></div>';
+      return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + ': ' + fmtCHF(r.fairShare) + '"></div>';
     }).join('');
   }
+
+  // Balkendiagramm: Gesamtaufwand pro Jahr, nach Partei eingefärbt
+  const barsHtml = '<div style="display:flex; gap:1.4rem; align-items:flex-end; height:120px; padding:0 0.3rem;">' +
+    perYear.map(p =>
+      '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
+        '<div style="width:28px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p) + '</div>' +
+        '<div class="hint" style="margin:0; font-weight:700;">' + fmtCHF(p.total) + '</div>' +
+        '<div class="hint" style="margin:0;">' + p.year + '</div>' +
+      '</div>'
+    ).join('') +
+  '</div>';
+
+  // Liniendiagramm: Motorstunden über die Jahre
+  const svgW = 300, svgH = 90, padX = 30, padY = 15;
+  const stepX = (svgW - padX*2) / (perYear.length - 1);
+  const points = perYear.map((p,i) => {
+    const x = padX + i*stepX;
+    const y = svgH - padY - (p.hours/maxHours)*(svgH - padY*2);
+    return { x, y, hours: p.hours, year: p.year };
+  });
+  const pathD = points.map((pt,i) => (i===0 ? 'M' : 'L') + pt.x + ',' + pt.y).join(' ');
+  const lineHtml =
+    '<svg viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%; max-width:320px; height:auto; display:block; margin:0 auto;">' +
+      '<path d="' + pathD + '" fill="none" stroke="#6E85A8" stroke-width="2"/>' +
+      points.map(pt => '<circle cx="' + pt.x + '" cy="' + pt.y + '" r="3.5" fill="#6E85A8"/>' +
+        '<text x="' + pt.x + '" y="' + (pt.y - 8) + '" text-anchor="middle" font-size="9" fill="var(--ink-soft)" font-family="Inter, sans-serif">' + fmtNum(pt.hours,1) + '</text>' +
+        '<text x="' + pt.x + '" y="' + (svgH - 2) + '" text-anchor="middle" font-size="9" fill="var(--ink-faint)" font-family="Inter, sans-serif">' + pt.year + '</text>'
+      ).join('') +
+    '</svg>';
+
+  const anyData = perYear.some(p => p.total > 0 || p.hours > 0);
 
   el.innerHTML =
     '<div class="cal-legend" style="margin-bottom:0.9rem;">' +
       state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
     '</div>' +
-    '<div class="hint" style="margin-bottom:0.9rem;">Je zwei Balken pro Jahr: links Gesamtaufwand (CHF), rechts Motorstunden — beide nach Partei eingefärbt.</div>' +
-    '<div style="display:flex; gap:1.2rem; align-items:flex-end; height:140px; padding:0 0.3rem;">' +
-    perYear.map(p =>
-      '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
-        '<div style="display:flex; gap:0.5rem; align-items:flex-end; height:100%;">' +
-          '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem; height:100%; justify-content:flex-end;">' +
-            '<div style="width:18px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'total', p.total) + '</div>' +
-            '<div class="hint" style="margin:0; font-size:0.62rem;">CHF</div>' +
-          '</div>' +
-          '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem; height:100%; justify-content:flex-end;">' +
-            '<div style="width:18px; height:' + Math.max(4, (p.hours/maxHours)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p, 'hours', p.hours) + '</div>' +
-            '<div class="hint" style="margin:0; font-size:0.62rem;">Std.</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="hint" style="margin:0;">' + p.year + (p.total === 0 && p.hours === 0 ? ' (keine Daten)' : '') + '</div>' +
-      '</div>'
-    ).join('') +
-    '</div>';
+    (anyData ? '' : '<div class="hint" style="margin-bottom:0.9rem;">Für ' + perYear.map(p=>p.year).join('/') + '<br>liegen noch keine Daten vor.</div>') +
+    '<h3 style="margin-bottom:0.5rem;">Gesamtaufwand (CHF)</h3>' +
+    barsHtml +
+    '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden</h3>' +
+    lineHtml;
 }
 
 function exportYearComparisonCsv(){
@@ -3164,26 +3306,47 @@ function exportYearComparisonPdf(){
   setTimeout(() => { window.print(); }, 100);
 }
 
+let editingSpId = null;
+
 function renderSettlementPaymentList(year){
   const wrap = document.getElementById('settlementPaymentList');
   if(!wrap) return;
   const items = (state.settlementPayments && state.settlementPayments[year]) || [];
   if(!items.length){ wrap.innerHTML = '<div class="empty">Noch keine Ausgleichszahlungen für ' + year + ' erfasst.</div>'; return; }
   wrap.innerHTML = items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(s => {
-    const canDelete = isAdminUser || (session.partyId && (s.from === session.partyId || s.to === session.partyId));
+    const involved = isAdminUser || (session.partyId && (s.from === session.partyId || s.to === session.partyId));
+    const locked = isLocked(s);
+    const canEdit = involved && (isAdminUser || !locked);
     return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
       '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(partyName(s.from)) + ' → ' + escapeHtml(partyName(s.to)) + '</b><span>' + fmtCHF(s.amount) + '</span></div>' +
-      '<div class="hint" style="margin:0;">' + (s.date || '') + '</div>' +
-      (canDelete ? '<button class="del-btn" data-sp-id="' + s.id + '" data-sp-year="' + year + '">löschen</button>' : '') +
+      '<div class="hint" style="margin:0;">' + fmtDateCH(s.date) + '</div>' +
+      (canEdit ? '<div style="display:flex; gap:0.6rem;">' +
+        '<button class="del-btn" data-sp-edit="' + s.id + '" data-sp-year="' + year + '">bearbeiten</button>' +
+        '<button class="del-btn" data-sp-id="' + s.id + '" data-sp-year="' + year + '">löschen</button>' +
+      '</div>' : (involved ? '<div class="hint" style="margin:0;">Gesperrt (älter als 24 Std.) — nur Administrator kann ändern.</div>' : '')) +
     '</div>';
   }).join('');
   wrap.querySelectorAll('.del-btn[data-sp-id]').forEach(btn => btn.addEventListener('click', async () => {
     const y = btn.dataset.spYear;
     const item = (state.settlementPayments[y] || []).find(s => s.id === btn.dataset.spId);
+    if(item && !isAdminUser && isLocked(item)){ alert('Diese Zahlung ist gesperrt (älter als 24 Std.). Nur der Administrator kann sie ändern oder löschen.'); return; }
     state.settlementPayments[y] = (state.settlementPayments[y] || []).filter(s => s.id !== btn.dataset.spId);
     if(item) logAudit('Ausgleichszahlung gelöscht (' + partyName(item.from) + ' → ' + partyName(item.to) + ', ' + fmtCHF(item.amount) + ')');
     await saveShared();
     renderSettlementPaymentList(y); renderSettlement();
+  }));
+  wrap.querySelectorAll('.del-btn[data-sp-edit]').forEach(btn => btn.addEventListener('click', () => {
+    const y = btn.dataset.spYear;
+    const item = (state.settlementPayments[y] || []).find(s => s.id === btn.dataset.spEdit);
+    if(!item) return;
+    if(!isAdminUser && isLocked(item)){ alert('Diese Zahlung ist gesperrt (älter als 24 Std.). Nur der Administrator kann sie ändern.'); return; }
+    editingSpId = item.id;
+    document.getElementById('spFrom').value = item.from;
+    document.getElementById('spTo').value = item.to;
+    document.getElementById('spAmount').value = item.amount;
+    document.getElementById('spDate').value = item.date;
+    document.getElementById('addSettlementPaymentBtn').textContent = 'Änderungen speichern';
+    document.getElementById('addSettlementPaymentBtn').scrollIntoView({ behavior:'smooth', block:'center' });
   }));
 }
 
@@ -3194,7 +3357,10 @@ function setupSettlementPaymentUI(year){
   const opts = state.parties.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
   fromSel.innerHTML = opts;
   toSel.innerHTML = opts;
-  if(state.parties.length > 1) toSel.value = state.parties[1].id;
+  if(state.parties.length === 2){
+    const other = state.parties.find(p => p.id !== fromSel.value);
+    if(other) toSel.value = other.id;
+  }
 
   function renderSpQrArea(){
     const area = document.getElementById('spQrArea');
@@ -3214,7 +3380,6 @@ function setupSettlementPaymentUI(year){
       a.remove();
     });
   }
-  toSel.addEventListener('change', renderSpQrArea);
   renderSpQrArea();
 
   const dateField = document.getElementById('spDate');
@@ -3222,11 +3387,20 @@ function setupSettlementPaymentUI(year){
 
   renderSettlementPaymentList(year);
 
+  if(fromSel.dataset.wired) return;
+  fromSel.dataset.wired = '1';
+
+  fromSel.addEventListener('change', () => {
+    document.getElementById('err-sp-from').classList.remove('show');
+    if(state.parties.length === 2 && toSel.value === fromSel.value){
+      const other = state.parties.find(p => p.id !== fromSel.value);
+      if(other) toSel.value = other.id;
+    }
+  });
+  toSel.addEventListener('change', () => { document.getElementById('err-sp-to').classList.remove('show'); renderSpQrArea(); });
   const clearSpErrors = () => {
     ['err-sp-from','err-sp-to','err-sp-amount','err-sp-date'].forEach(id => document.getElementById(id).classList.remove('show'));
   };
-  fromSel.addEventListener('change', () => document.getElementById('err-sp-from').classList.remove('show'));
-  toSel.addEventListener('change', () => document.getElementById('err-sp-to').classList.remove('show'));
   document.getElementById('spAmount').addEventListener('input', () => {
     const v = parseFloat(document.getElementById('spAmount').value);
     if(!isNaN(v) && v > 0) document.getElementById('err-sp-amount').classList.remove('show');
@@ -3247,8 +3421,8 @@ function setupSettlementPaymentUI(year){
     let hasError = false;
     const showSpErr = (id) => { document.getElementById(id).classList.add('show'); hasError = true; };
 
-    const from = fromSel.value;
-    const to = toSel.value;
+    const from = document.getElementById('spFrom').value;
+    const to = document.getElementById('spTo').value;
     const amount = parseFloat(document.getElementById('spAmount').value);
     const date = document.getElementById('spDate').value;
 
@@ -3269,8 +3443,27 @@ function setupSettlementPaymentUI(year){
     const currentYear = parseInt(document.getElementById('adjustmentYear').value);
     if(!state.settlementPayments) state.settlementPayments = {};
     if(!state.settlementPayments[currentYear]) state.settlementPayments[currentYear] = [];
-    state.settlementPayments[currentYear].push({ id: uid(), from, to, amount, date, createdAt: Date.now() });
-    logAudit('Ausgleichszahlung erfasst (' + partyName(from) + ' → ' + partyName(to) + ', ' + fmtCHF(amount) + ')');
+    if(editingSpId){
+      let existing = null;
+      Object.keys(state.settlementPayments).forEach(y => {
+        const found = state.settlementPayments[y].find(s => s.id === editingSpId);
+        if(found) existing = found;
+        state.settlementPayments[y] = state.settlementPayments[y].filter(s => s.id !== editingSpId);
+      });
+      if(existing && !isAdminUser && isLocked(existing)){
+        alert('Diese Zahlung ist inzwischen gesperrt. Nur der Administrator kann sie noch ändern.');
+        editingSpId = null;
+        document.getElementById('addSettlementPaymentBtn').textContent = 'Zahlung erfassen';
+        return;
+      }
+      state.settlementPayments[currentYear].push({ id: editingSpId, from, to, amount, date, createdAt: (existing ? existing.createdAt : Date.now()) });
+      logAudit('Ausgleichszahlung bearbeitet (' + partyName(from) + ' → ' + partyName(to) + ', ' + fmtCHF(amount) + ')');
+      editingSpId = null;
+      document.getElementById('addSettlementPaymentBtn').textContent = 'Zahlung erfassen';
+    } else {
+      state.settlementPayments[currentYear].push({ id: uid(), from, to, amount, date, createdAt: Date.now() });
+      logAudit('Ausgleichszahlung erfasst (' + partyName(from) + ' → ' + partyName(to) + ', ' + fmtCHF(amount) + ')');
+    }
     await saveShared();
 
     document.getElementById('spAmount').value = '';
@@ -3864,7 +4057,7 @@ function renderAdminGeneralSection(){
       '<input id="shareLinkField" type="text" placeholder="https://claude.ai/public/artifacts/..." value="' + escapeHtml(state.settings.shareLink || '') + '" style="margin-bottom:0.7rem;">' +
       '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
         '<button class="btn" id="saveLinkBtn">Link speichern</button>' +
-        '<button class="btn" id="copyLinkBtn">Link kopieren</button>' +
+        '<button class="btn secondary" id="copyLinkBtn">Link kopieren</button>' +
       '</div>' +
       '<div class="gate-error" id="copyFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -3878,9 +4071,9 @@ function renderAdminGeneralSection(){
     '<div class="admin-box">' +
       '<div class="toggle-row">' +
         '<label class="switch"><input type="checkbox" id="unlockToggle"' + (state.settings.unlockAll ? ' checked' : '') + '><span class="slider"></span></label>' +
-        '<label for="unlockToggle">Bearbeitung von Einträgen älter als 24 Std. für alle freigeben</label>' +
+        '<label for="unlockToggle">Bearbeitung älterer Einträge für alle freigeben</label>' +
       '</div>' +
-      '<div class="hint">Normalerweise können Parteien einen Eintrag nur in den ersten 24 Stunden nach dem Erstellen bearbeiten oder löschen. Mit diesem Schalter hebst du die Sperre vorübergehend für alle auf.</div>' +
+      '<div class="hint">Gilt für Logbuch-Einträge, Fixkosten und Ausgleichszahlungen: Normalerweise können Parteien einen Eintrag nur in den ersten 24 Stunden nach dem Erstellen bearbeiten oder löschen. Mit diesem Schalter hebst du die Sperre vorübergehend für alle auf.</div>' +
     '</div>' +
     '<div class="admin-box">' +
       '<div class="toggle-row">' +
@@ -3935,8 +4128,8 @@ function renderAdminGeneralSection(){
       '<label>Export</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup. Der PDF-Export der Jahresübersicht steht allen Parteien direkt im Abrechnung-Tab zur Verfügung.</div>' +
       '<div style="display:flex; gap:0.5rem; flex-wrap:nowrap;">' +
-        '<button class="btn" id="exportCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">💾 Exportieren</button>' +
-        '<button class="btn" id="copyCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📋 Kopieren</button>' +
+        '<button class="btn secondary" id="exportCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">💾 Exportieren</button>' +
+        '<button class="btn secondary" id="copyCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📋 Kopieren</button>' +
       '</div>' +
       '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -4202,10 +4395,10 @@ function renderPartyCodeList(){
   wrap.innerHTML = state.parties.map(p =>
     '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">' +
       '<div style="display:flex; align-items:center; gap:0.6rem;"><span class="avatar">' + escapeHtml(initials(p.name || '?')) + '</span><b>' + escapeHtml(p.name) + '</b><span class="code-display" style="font-size:0.95rem; padding:0.2rem 0.6rem;">' + (isAdminUser ? escapeHtml(p.code || '') : '••••••') + '</span></div>' +
-      '<div class="party-code-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+      '<div class="party-code-actions" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem;">' +
         '<button class="icon-btn" data-action="copy" data-id="' + p.id + '" style="flex:none;">📋 Kopieren</button>' +
         '<button class="icon-btn" data-action="whatsapp" data-id="' + p.id + '" style="flex:none;">💬 WhatsApp</button>' +
-        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '" style="flex:none; grid-column:1 / -1;">🔄 Neuer Code</button>' +
+        '<button class="icon-btn" data-action="kick" data-id="' + p.id + '" style="flex:none; font-size:0.68rem; padding-left:0.2rem; padding-right:0.2rem;">🔄 Neuer Code</button>' +
       '</div>' +
       '<div class="gate-error" id="partyFeedback-' + p.id + '" style="color:#1C9A64;"></div>' +
     '</div>'
@@ -4348,8 +4541,25 @@ function setupAnnualCostUI(){
 
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
-    state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, createdAt: Date.now() });
-    logAudit('Fixkosten-Posten hinzugefügt: ' + type + ' (' + fmtCHF(amount) + ')');
+    if(editingAcId){
+      const existing = state.annualCosts[year].find(c => c.id === editingAcId) || Object.values(state.annualCosts).flat().find(c => c.id === editingAcId);
+      if(existing && !isAdminUser && isLocked(existing)){
+        alert('Dieser Posten ist inzwischen gesperrt. Nur der Administrator kann ihn noch ändern.');
+        editingAcId = null;
+        document.getElementById('addAnnualCostBtn').textContent = 'Kostenposten hinzufügen';
+        return;
+      }
+      Object.keys(state.annualCosts).forEach(y => {
+        state.annualCosts[y] = state.annualCosts[y].filter(c => c.id !== editingAcId);
+      });
+      state.annualCosts[year].push({ id: editingAcId, type, description: desc, amount, date, paidBy, createdAt: (existing ? existing.createdAt : Date.now()) });
+      logAudit('Fixkosten-Posten bearbeitet: ' + type + ' (' + fmtCHF(amount) + ')');
+      editingAcId = null;
+      document.getElementById('addAnnualCostBtn').textContent = 'Kostenposten hinzufügen';
+    } else {
+      state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, createdAt: Date.now() });
+      logAudit('Fixkosten-Posten hinzugefügt: ' + type + ' (' + fmtCHF(amount) + ')');
+    }
     await saveShared();
 
     document.getElementById('acDesc').value = '';
@@ -4393,7 +4603,10 @@ function renderAcPaidSplitArea(){
   document.getElementById('acUnequalToggle').addEventListener('change', (ev) => {
     document.getElementById('acAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
   });
-  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', updateAcSplitTotal));
+  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', () => {
+    autoFillLastAmountSplit(area, '.ac-split-input', inp, totalAmount);
+    updateAcSplitTotal();
+  }));
   updateAcSplitTotal();
 }
 
@@ -4417,20 +4630,28 @@ function updateAcSplitTotal(){
   el.className = 'split-total ' + (Math.abs(sum-totalAmount) < 0.02 ? 'ok' : 'bad');
 }
 
-function annualCostItemsHtml(year, withDelete){
+function annualCostItemsHtml(year, withActions){
   const items = (state.annualCosts && state.annualCosts[year]) || [];
   if(!items.length){ return '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; }
   return items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
     const payerIds = Object.keys(c.paidBy || {});
-    const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : escapeHtml(partyName(payerIds[0]));
+    const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : (payerIds.length ? escapeHtml(partyName(payerIds[0])) : '—');
+    const locked = isLocked(c);
+    const canEdit = withActions && (isAdminUser || !locked);
     return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">' +
       '<div style="display:flex; justify-content:space-between; width:100%;"><b>' + escapeHtml(c.type) + '</b><span>' + fmtCHF(c.amount) + '</span></div>' +
-      '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + (c.date ? ' · ' + c.date : '') + '</div>' +
-      '<div class="hint" style="margin:0;">Bezahlt: ' + escapeHtml(payerLabel) + '</div>' +
-      (withDelete ? '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' : '') +
+      '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + '</div>' +
+      (c.date ? '<div class="hint" style="margin:0;">' + fmtDateCH(c.date) + '</div>' : '') +
+      '<div class="hint" style="margin:0;">Bezahlt: ' + payerLabel + '</div>' +
+      (canEdit ? '<div style="display:flex; gap:0.6rem;">' +
+        '<button class="del-btn" data-ac-edit="' + c.id + '" data-ac-year="' + year + '">bearbeiten</button>' +
+        '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' +
+      '</div>' : (withActions ? '<div class="hint" style="margin:0;">Gesperrt (älter als 24 Std.) — nur Administrator kann ändern.</div>' : '')) +
     '</div>';
   }).join('');
 }
+
+let editingAcId = null;
 
 function renderAnnualCostList(){
   const yearSel = document.getElementById('annualCostYear');
@@ -4441,10 +4662,25 @@ function renderAnnualCostList(){
   wrap.querySelectorAll('.del-btn[data-ac-id]').forEach(btn => btn.addEventListener('click', async () => {
     const year = btn.dataset.acYear;
     const item = (state.annualCosts[year] || []).find(c => c.id === btn.dataset.acId);
+    if(item && isLocked(item)){ alert('Dieser Posten ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn ändern oder löschen.'); return; }
     state.annualCosts[year] = (state.annualCosts[year] || []).filter(c => c.id !== btn.dataset.acId);
     if(item) logAudit('Fixkosten-Posten gelöscht: ' + item.type + ' (' + fmtCHF(item.amount) + ')');
     await saveShared();
     renderAnnualCostList(); renderSettlement();
+  }));
+  wrap.querySelectorAll('.del-btn[data-ac-edit]').forEach(btn => btn.addEventListener('click', () => {
+    const year = btn.dataset.acYear;
+    const item = (state.annualCosts[year] || []).find(c => c.id === btn.dataset.acEdit);
+    if(!item) return;
+    if(isLocked(item)){ alert('Dieser Posten ist gesperrt (älter als 24 Std.). Nur der Administrator kann ihn ändern.'); return; }
+    editingAcId = item.id;
+    document.getElementById('acType').value = item.type;
+    document.getElementById('acDesc').value = item.description || '';
+    document.getElementById('acAmount').value = item.amount;
+    document.getElementById('acDate').value = item.date || '';
+    document.querySelectorAll('.ac-payer-check').forEach(cb => { cb.checked = Object.keys(item.paidBy||{}).includes(cb.value); });
+    document.getElementById('addAnnualCostBtn').textContent = 'Änderungen speichern';
+    document.getElementById('addAnnualCostBtn').scrollIntoView({ behavior:'smooth', block:'center' });
   }));
 }
 
@@ -4790,6 +5026,7 @@ async function init(){
       await saveShared();
       updateHeaderMeta();
       ev.target.value = '';
+      showBeerConfirmation();
     });
   }
   setupSeasonUI();
