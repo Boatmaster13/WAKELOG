@@ -533,7 +533,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .checkbox-item.disabled{ opacity:0.65; }
 .split-row{ display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
 .split-row .split-name{ flex:1; font-size:0.88rem; }
-.split-row input{ width:80px; text-align:right; }
+.split-row input{ width:110px; text-align:right; }
 .split-total{ font-size:0.82rem; margin-top:0.3rem; }
 .split-total.ok{ color:#1C9A64; }
 .split-total.bad{ color:var(--flare); font-weight:600; }
@@ -708,9 +708,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div id="calendarGrid" class="cal-grid"></div>
         <div id="calendarDayPanel" style="margin-top:1.1rem;"></div>
-        <div class="admin-box" style="margin-top:1.1rem;">
+        <div class="admin-box" id="calRangeBox" style="margin-top:1.1rem; display:none;">
           <label>Mehrere Tage auf einmal</label>
-          <div class="hint" style="margin-bottom:0.7rem;">Praktisch z. B. für Ferien: einen ganzen Zeitraum abgeben oder anfragen, statt jeden Tag einzeln.</div>
+          <div class="hint" style="margin-bottom:0.7rem;">Praktisch z. B. für Ferien: einen ganzen Zeitraum abgeben oder anfragen, statt jeden Tag einzeln. Dafür im Kalender mehrere Tage durch Ziehen auswählen.</div>
           <div class="type-toggle" id="calRangeModeToggle" style="margin-bottom:0.9rem;">
             <button type="button" data-mode="giveup" class="active">Abgeben</button>
             <button type="button" data-mode="request">Anfragen</button>
@@ -726,11 +726,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       </div>
       <div class="card">
         <h2>Saison</h2>
-        <div class="hint" style="margin-bottom:0.9rem;">Wann wurde das Boot dieses Jahr ins Wasser gelassen bzw. herausgenommen?</div>
+        <div class="hint" style="margin-bottom:0.9rem;" id="seasonHint">Wähle im Kalender oben einen einzelnen Tag, um Ein-/Auswasserung dafür zu erfassen.</div>
         <div id="seasonEventsList" style="margin-bottom:0.9rem;"></div>
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
-          <button type="button" class="btn secondary" id="seasonLaunchBtn">🚤 Boot eingewassert (heute)</button>
-          <button type="button" class="btn secondary" id="seasonHaulBtn">⚓ Boot ausgewassert (heute)</button>
+          <button type="button" class="btn secondary" id="seasonLaunchBtn">🚤 Eingewassert</button>
+          <button type="button" class="btn secondary" id="seasonHaulBtn">⚓ Ausgewassert</button>
         </div>
       </div>
     </div>
@@ -782,13 +782,13 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="row" id="refuelFields" style="display:none;">
           <div class="field"><label for="f-liters">Liter Benzin</label><input type="number" id="f-liters" step="0.1" min="0" placeholder="0.0"></div>
-          <div class="field"><label for="f-expense">Tankausgaben (CHF)</label><input type="number" id="f-expense" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
+          <div class="field"><label for="f-expense">Tankausgaben (CHF)</label><input type="text" inputmode="decimal" class="amount-input" id="f-expense" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-expense">Bitte Ausgaben grösser als 0 angeben.</div></div>
           <div class="field" style="grid-column:1 / -1;">
             <label class="checkbox-item" style="display:inline-flex;"><input type="checkbox" id="giftToggle"> Ein Teil (oder alles) wurde von einer externen Person geschenkt</label>
             <div id="giftBody" style="display:none; margin-top:0.7rem;">
               <div class="row">
                 <div class="field"><label for="giftName">Name der Person</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben.</div></div>
-                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF)</label><input type="number" id="giftAmount" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
+                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF)</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
               </div>
               <div class="hint">Dieser Betrag wird von den Ausgaben abgezogen, bevor sie auf die Parteien aufgeteilt werden — die Bootsgemeinschaft profitiert direkt davon.</div>
             </div>
@@ -823,7 +823,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="row" style="margin-top:0.9rem;">
           <div class="field"><label for="spFrom">Von (hat bezahlt) *</label><select id="spFrom"></select><div class="gate-error" id="err-sp-from">Bitte eine Partei wählen.</div></div>
           <div class="field"><label for="spTo">An (hat erhalten) *</label><select id="spTo"></select><div class="gate-error" id="err-sp-to">Bitte eine andere Partei als "Von" wählen.</div></div>
-          <div class="field"><label for="spAmount">Betrag (CHF) *</label><input id="spAmount" type="number" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-sp-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>
+          <div class="field"><label for="spAmount">Betrag (CHF) *</label><input id="spAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-sp-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>
           <div class="field"><label for="spDate">Datum *</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div id="spQrArea" style="margin-top:0.7rem;"></div>
@@ -918,7 +918,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-15-21';
+const APP_VERSION = '2026-07-15-22';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1138,7 +1138,7 @@ function updateHeaderMeta(){
         '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '</div>' +
       '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">' +
-        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="display:inline-flex; align-items:center; justify-content:center; width:fit-content; white-space:nowrap;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:' + partyColor(session.partyId) + '; margin-right:0.35rem; flex-shrink:0;"></span><span>User · ' + escapeHtml(partyName(session.partyId)) + '</span></span>' : '')) +
+        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; text-align:center;"><span style="color:' + partyColor(session.partyId) + ';">●</span> User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
         '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
     '</div>' +
@@ -1175,8 +1175,17 @@ function showBeerCallConfirm(){
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('beerConfirmNoBtn').addEventListener('click', () => overlay.remove());
-  document.getElementById('beerConfirmYesBtn').addEventListener('click', () => {
+  document.getElementById('beerConfirmYesBtn').addEventListener('click', async () => {
     overlay.remove();
+    playCheersSound();
+    if(!state.chatMessages) state.chatMessages = [];
+    const msgId = uid();
+    pendingBeerMessageId = msgId;
+    state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: null, type: 'beer', toPartyIds: null });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    await saveShared();
+    updateHeaderMeta();
+    showBeerConfirmation();
     const input = document.getElementById('beerPhotoInput');
     if(input) input.click();
   });
@@ -1435,6 +1444,8 @@ function updateDragHighlight(){
 }
 
 function selectCalendarDay(dateStr){
+  const rangeBox = document.getElementById('calRangeBox');
+  if(rangeBox) rangeBox.style.display = 'none';
   if(calendarSelectedDate === dateStr){
     calendarSelectedDate = null;
     calendarPendingAction = null;
@@ -1446,6 +1457,7 @@ function selectCalendarDay(dateStr){
     calendarPendingAction = null;
     renderCalendarDayPanel();
   }
+  updateSeasonButtonsState();
 }
 
 function finalizeCalendarDrag(){
@@ -1461,6 +1473,13 @@ function finalizeCalendarDrag(){
     return;
   }
   calendarJustDragged = true;
+  calendarSelectedDate = null;
+  calendarPendingAction = null;
+  const dayPanel = document.getElementById('calendarDayPanel');
+  if(dayPanel) dayPanel.innerHTML = '';
+  updateSeasonButtonsState();
+  const rangeBox = document.getElementById('calRangeBox');
+  if(rangeBox) rangeBox.style.display = 'block';
   const startField = document.getElementById('calRangeStart');
   const endField = document.getElementById('calRangeEnd');
   if(startField && endField){
@@ -1972,9 +1991,9 @@ function renderUsageSplitArea(){
   if(ids.length <= 1){ area.style.display = 'none'; area.innerHTML = ''; return; }
   area.style.display = 'block';
   area.innerHTML = '<div class="hint" style="margin-bottom:0.5rem;">Gemeinsame Nutzung — war jemand nur einen halben Tag an Bord? (Aufteilung wird automatisch berechnet)</div>' +
-    ids.map(id => '<div class="split-row">' +
-      '<span class="split-name">' + escapeHtml(partyName(id)) + '</span>' +
-      '<div class="type-toggle halfday-toggle" data-id="' + id + '" style="flex-shrink:0;">' +
+    ids.map(id => '<div style="margin-bottom:0.8rem;">' +
+      '<div class="split-name" style="margin-bottom:0.35rem;">' + escapeHtml(partyName(id)) + '</div>' +
+      '<div class="type-toggle halfday-toggle" data-id="' + id + '">' +
         '<button type="button" data-val="1" class="active">Ganzer Tag</button>' +
         '<button type="button" data-val="0.5">Halber Tag</button>' +
       '</div>' +
@@ -2035,9 +2054,9 @@ function renderPayerCheckboxes(){
 }
 
 function getPayableExpense(){
-  const total = parseFloat(document.getElementById('f-expense').value) || 0;
+  const total = parseSwissAmount(document.getElementById('f-expense').value);
   const giftToggle = document.getElementById('giftToggle');
-  const giftAmount = (giftToggle && giftToggle.checked) ? (parseFloat(document.getElementById('giftAmount').value) || 0) : 0;
+  const giftAmount = (giftToggle && giftToggle.checked) ? (parseSwissAmount(document.getElementById('giftAmount').value)) : 0;
   return Math.max(0, total - giftAmount);
 }
 
@@ -2054,7 +2073,7 @@ function renderPaidSplitArea(){
     '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="paidUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
     '<div id="paidAmountsBody" style="display:none;">' +
       '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
-      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="paid-split-input" data-id="' + id + '" step="0.01" min="0" value="' + equal + '"><span>CHF</span><span class="split-pct" id="paid-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="text" inputmode="decimal" class="paid-split-input amount-input" data-id="' + id + '" value="' + equal + '"><span>CHF</span><span class="split-pct" id="paid-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
       '<div class="split-total" id="paidSplitTotal"></div>' +
     '</div>';
   document.getElementById('paidUnequalToggle').addEventListener('change', (ev) => {
@@ -2072,7 +2091,7 @@ function autoFillLastAmountSplit(area, selector, changedInput, total){
   if(inputs.length < 2) return;
   const last = inputs[inputs.length - 1];
   if(changedInput === last) return;
-  const othersSum = inputs.slice(0, -1).reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const othersSum = inputs.slice(0, -1).reduce((s,i) => s + parseSwissAmount(i.value), 0);
   const remainder = Math.max(0, Math.round((total - othersSum) * 100) / 100);
   last.value = remainder;
 }
@@ -2083,11 +2102,11 @@ function updatePaidSplitTotal(){
   const totalExpense = getPayableExpense();
   const inputs = Array.from(area.querySelectorAll('.paid-split-input'));
   if(!inputs.length) return;
-  const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const sum = inputs.reduce((s,i) => s + parseSwissAmount(i.value), 0);
   inputs.forEach(i => {
     const pctEl = document.getElementById('paid-pct-' + i.dataset.id);
     if(pctEl){
-      const val = parseFloat(i.value) || 0;
+      const val = parseSwissAmount(i.value);
       const pct = totalExpense > 0 ? (val/totalExpense*100) : 0;
       pctEl.textContent = fmtNum(pct,1) + ' %';
     }
@@ -2100,6 +2119,7 @@ function updatePaidSplitTotal(){
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let weatherCache = {};
 let liveWeatherWidgetHtml = '';
+let pendingBeerMessageId = null;
 let liveWeatherLocationHtml = '';
 function renderLiveWeatherWidget(html, locationHtml){
   liveWeatherWidgetHtml = html;
@@ -2123,15 +2143,23 @@ async function fetchLiveWeatherWidget(){
       const res = await fetch(url);
       const data = await res.json();
       let placeName = '';
+      let meteoLink = 'https://www.meteoschweiz.admin.ch/';
       try{
         const geoRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&localityLanguage=de');
         const geoData = await geoRes.json();
         placeName = geoData.locality || geoData.city || geoData.principalSubdivision || '';
+        const postcode = geoData.postcode;
+        if(placeName && postcode){
+          const slug = placeName.toLowerCase()
+            .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/é/g,'e').replace(/è/g,'e')
+            .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+          meteoLink = 'https://www.meteoschweiz.admin.ch/local-forecasts/' + slug + '/' + postcode.replace(/\s/g,'') + '.html';
+        }
       } catch(e){}
       if(data.current){
         const cat = weatherCategory(data.current.weathercode);
         renderLiveWeatherWidget(
-          '<a href="https://www.meteoschweiz.admin.ch/" target="_blank" rel="noopener" class="weather-widget weather-' + cat + '" title="Tageswetter auf MeteoSchweiz ansehen">' +
+          '<a href="' + meteoLink + '" target="_blank" rel="noopener" class="weather-widget weather-' + cat + '" title="Tageswetter auf MeteoSchweiz ansehen">' +
             '<span class="weather-icon">' + weatherEmoji(data.current.weathercode) + '</span>' +
             '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
             '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
@@ -2224,6 +2252,35 @@ function lv95ToWgs84(E, N){
   return { lat: latAux * 100/36, lon: lonAux * 100/36 };
 }
 
+function parseSwissAmount(str){
+  if(typeof str !== 'string') return parseFloat(str) || 0;
+  const cleaned = str.replace(/'/g, '').replace(/[^0-9.\-]/g, '');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+}
+function formatSwissAmountLive(el){
+  const cursorFromEnd = el.value.length - (el.selectionStart || el.value.length);
+  let raw = el.value.replace(/[^0-9.]/g, '');
+  const firstDot = raw.indexOf('.');
+  if(firstDot !== -1){
+    raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+  }
+  let [intPart, decPart] = raw.split('.');
+  intPart = (intPart || '').replace(/^0+(?=\d)/, '');
+  if(decPart !== undefined) decPart = decPart.slice(0, 2);
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+  el.value = formattedInt + (decPart !== undefined ? '.' + decPart : (raw.endsWith('.') ? '.' : ''));
+  const newPos = Math.max(0, el.value.length - cursorFromEnd);
+  el.setSelectionRange(newPos, newPos);
+}
+function setupAmountInputFormatting(){
+  document.addEventListener('input', (ev) => {
+    if(ev.target.classList && ev.target.classList.contains('amount-input')){
+      formatSwissAmountLive(ev.target);
+    }
+  });
+}
+
 function fmtDateCH(dateStr){
   if(!dateStr) return '';
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -2312,14 +2369,14 @@ async function addEntry(){
   }
   if(data.hasRefuel){
     data.liters = parseFloat(document.getElementById('f-liters').value) || 0;
-    data.expense = parseFloat(document.getElementById('f-expense').value) || 0;
+    data.expense = parseSwissAmount(document.getElementById('f-expense').value);
     if(data.expense <= 0){ showErr('err-expense'); }
 
     const giftToggle = document.getElementById('giftToggle');
     let giftAmount = 0;
     if(giftToggle && giftToggle.checked){
       const giftName = document.getElementById('giftName').value.trim();
-      giftAmount = parseFloat(document.getElementById('giftAmount').value) || 0;
+      giftAmount = parseSwissAmount(document.getElementById('giftAmount').value);
       if(!giftName){ showErr('err-gift-name'); }
       if(giftAmount <= 0 || giftAmount > data.expense){ showErr('err-gift-amount'); }
       else { data.giftName = giftName; data.giftAmount = giftAmount; }
@@ -2333,12 +2390,12 @@ async function addEntry(){
     const unequalToggle = document.getElementById('paidUnequalToggle');
     if(payerIds.length > 1 && unequalToggle && unequalToggle.checked && payableAmount > 0){
       const pInputs = Array.from(document.querySelectorAll('#paidSplitArea .paid-split-input'));
-      const pSum = pInputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      const pSum = pInputs.reduce((s,i) => s + parseSwissAmount(i.value), 0);
       if(Math.abs(pSum - payableAmount) > 0.02){
         showErr('err-payer', 'Die Aufteilung muss in Summe dem verbleibenden Betrag entsprechen (aktuell ' + fmtNum(pSum,2) + ' von ' + fmtNum(payableAmount,2) + ' CHF).');
       } else {
         data.paidSplit = {};
-        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = (parseFloat(i.value)||0) / payableAmount * 100; });
+        pInputs.forEach(i => { data.paidSplit[i.dataset.id] = parseSwissAmount(i.value) / payableAmount * 100; });
       }
     } else if(payerIds.length > 1){
       const equalPct = 100 / payerIds.length;
@@ -2495,12 +2552,14 @@ function showChatModal(){
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
-      '<input type="file" id="chatPhotoInput" accept="image/*" style="display:none;">' +
+      '<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" style="display:none;">' +
+      '<input type="file" id="chatPhotoInputGallery" accept="image/*" style="display:none;">' +
       '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
-        '<button type="button" class="btn secondary" id="chatPhotoBtn" style="flex:1;">📷 Foto</button>' +
-        '<button type="button" class="btn" id="chatSendBtn" style="flex:1;">Senden</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1;">📷 Kamera</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1;">🖼️ Galerie</button>' +
       '</div>' +
+      '<button type="button" class="btn" id="chatSendBtn" style="width:100%; margin-top:0.6rem;">Senden</button>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -2524,10 +2583,12 @@ function showChatModal(){
     });
   });
 
-  const chatPhotoInput = document.getElementById('chatPhotoInput');
   const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
-  document.getElementById('chatPhotoBtn').addEventListener('click', () => chatPhotoInput.click());
-  chatPhotoInput.addEventListener('change', async (ev) => {
+  const chatCameraInput = document.getElementById('chatPhotoInputCamera');
+  const chatGalleryInput = document.getElementById('chatPhotoInputGallery');
+  document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => chatCameraInput.click());
+  document.getElementById('chatPhotoGalleryBtn').addEventListener('click', () => chatGalleryInput.click());
+  async function handleChatPhotoSelect(ev){
     const file = ev.target.files[0];
     if(!file) return;
     try{
@@ -2535,7 +2596,9 @@ function showChatModal(){
       chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
       document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; ev.target.value = ''; });
     } catch(e){}
-  });
+  }
+  chatCameraInput.addEventListener('change', handleChatPhotoSelect);
+  chatGalleryInput.addEventListener('change', handleChatPhotoSelect);
 
   document.getElementById('chatSendBtn').addEventListener('click', async () => {
     if(!session.partyId && !isAdminUser) return;
@@ -2548,7 +2611,8 @@ function showChatModal(){
     textInput.value = '';
     chatPendingPhoto = null;
     chatPreviewArea.innerHTML = '';
-    chatPhotoInput.value = '';
+    chatCameraInput.value = '';
+    chatGalleryInput.value = '';
     await saveShared();
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
@@ -3215,6 +3279,27 @@ function getYearComparisonData(){
   });
 }
 
+function buildComparisonBarsHtml(perYear, valueKey, maxVal, fmtFn){
+  function segmentsFor(p){
+    if(p[valueKey] <= 0) return '';
+    return p.rows.map(r => {
+      const val = valueKey === 'total' ? r.fairShare : r.hours;
+      const share = val / p[valueKey];
+      if(share <= 0) return '';
+      return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + '"></div>';
+    }).join('');
+  }
+  return '<div style="display:flex; gap:1.4rem; align-items:flex-end; height:120px; padding:0 0.3rem;">' +
+    perYear.map(p =>
+      '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
+        '<div style="width:28px; height:' + Math.max(4, (p[valueKey]/maxVal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:#eee;">' + segmentsFor(p) + '</div>' +
+        '<div style="margin:0; font-weight:700; font-size:0.78rem;">' + fmtFn(p[valueKey]) + '</div>' +
+        '<div style="margin:0; font-size:0.78rem;">' + p.year + '</div>' +
+      '</div>'
+    ).join('') +
+  '</div>';
+}
+
 function renderYearComparison(){
   const el = document.getElementById('yearComparisonChart');
   if(!el) return;
@@ -3222,43 +3307,8 @@ function renderYearComparison(){
   const maxTotal = Math.max(...perYear.map(p => p.total), 1);
   const maxHours = Math.max(...perYear.map(p => p.hours), 1);
 
-  function segments(p){
-    if(p.total <= 0) return '';
-    return p.rows.map(r => {
-      const share = r.fairShare / p.total;
-      if(share <= 0) return '';
-      return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + ': ' + fmtCHF(r.fairShare) + '"></div>';
-    }).join('');
-  }
-
-  // Balkendiagramm: Gesamtaufwand pro Jahr, nach Partei eingefärbt
-  const barsHtml = '<div style="display:flex; gap:1.4rem; align-items:flex-end; height:120px; padding:0 0.3rem;">' +
-    perYear.map(p =>
-      '<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:0.3rem; height:100%; justify-content:flex-end;">' +
-        '<div style="width:28px; height:' + Math.max(4, (p.total/maxTotal)*100) + '%; border-radius:3px 3px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; background:var(--foam);">' + segments(p) + '</div>' +
-        '<div class="hint" style="margin:0; font-weight:700;">' + fmtCHF(p.total) + '</div>' +
-        '<div class="hint" style="margin:0;">' + p.year + '</div>' +
-      '</div>'
-    ).join('') +
-  '</div>';
-
-  // Liniendiagramm: Motorstunden über die Jahre
-  const svgW = 300, svgH = 90, padX = 30, padY = 15;
-  const stepX = (svgW - padX*2) / (perYear.length - 1);
-  const points = perYear.map((p,i) => {
-    const x = padX + i*stepX;
-    const y = svgH - padY - (p.hours/maxHours)*(svgH - padY*2);
-    return { x, y, hours: p.hours, year: p.year };
-  });
-  const pathD = points.map((pt,i) => (i===0 ? 'M' : 'L') + pt.x + ',' + pt.y).join(' ');
-  const lineHtml =
-    '<svg viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%; max-width:320px; height:auto; display:block; margin:0 auto;">' +
-      '<path d="' + pathD + '" fill="none" stroke="#6E85A8" stroke-width="2"/>' +
-      points.map(pt => '<circle cx="' + pt.x + '" cy="' + pt.y + '" r="3.5" fill="#6E85A8"/>' +
-        '<text x="' + pt.x + '" y="' + (pt.y - 8) + '" text-anchor="middle" font-size="9" fill="var(--ink-soft)" font-family="Inter, sans-serif">' + fmtNum(pt.hours,1) + '</text>' +
-        '<text x="' + pt.x + '" y="' + (svgH - 2) + '" text-anchor="middle" font-size="9" fill="var(--ink-faint)" font-family="Inter, sans-serif">' + pt.year + '</text>'
-      ).join('') +
-    '</svg>';
+  const barsHtml = buildComparisonBarsHtml(perYear, 'total', maxTotal, fmtCHF);
+  const hoursHtml = buildComparisonBarsHtml(perYear, 'hours', maxHours, (v) => fmtNum(v,1) + ' Std.');
 
   const anyData = perYear.some(p => p.total > 0 || p.hours > 0);
 
@@ -3270,7 +3320,7 @@ function renderYearComparison(){
     '<h3 style="margin-bottom:0.5rem;">Gesamtaufwand (CHF)</h3>' +
     barsHtml +
     '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden</h3>' +
-    lineHtml;
+    hoursHtml;
 }
 
 function exportYearComparisonCsv(){
@@ -3288,13 +3338,17 @@ function exportYearComparisonPdf(){
   const printArea = document.getElementById('printArea');
   if(!printArea) return;
   const perYear = getYearComparisonData();
+  const maxTotal = Math.max(...perYear.map(p => p.total), 1);
+  const maxHours = Math.max(...perYear.map(p => p.hours), 1);
   let html = '<div class="print-header">' +
       '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
       '<div><h1>WakeLog</h1><div class="print-subtitle">Jahresvergleich</div></div>' +
     '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  html += '<h2>Gesamtaufwand (CHF)</h2>' + buildComparisonBarsHtml(perYear, 'total', maxTotal, fmtCHF);
+  html += '<h2>Motorstunden</h2>' + buildComparisonBarsHtml(perYear, 'hours', maxHours, (v) => fmtNum(v,1) + ' Std.');
   perYear.forEach(p => {
-    html += '<h2>' + p.year + '</h2>';
+    html += '<h2>' + p.year + ' — Details</h2>';
     html += '<div class="print-balance">Gesamtaufwand: ' + fmtCHF(p.total) + ' · Motorstunden: ' + fmtNum(p.hours,1) + '</div>';
     html += '<table><tr><th>Partei</th><th>Anteil Gesamtaufwand</th><th>Motorstunden</th></tr>';
     p.rows.forEach(r => {
@@ -3402,11 +3456,11 @@ function setupSettlementPaymentUI(year){
     ['err-sp-from','err-sp-to','err-sp-amount','err-sp-date'].forEach(id => document.getElementById(id).classList.remove('show'));
   };
   document.getElementById('spAmount').addEventListener('input', () => {
-    const v = parseFloat(document.getElementById('spAmount').value);
+    const v = parseSwissAmount(document.getElementById('spAmount').value);
     if(!isNaN(v) && v > 0) document.getElementById('err-sp-amount').classList.remove('show');
   });
   document.getElementById('spAmount').addEventListener('blur', () => {
-    const v = parseFloat(document.getElementById('spAmount').value);
+    const v = parseSwissAmount(document.getElementById('spAmount').value);
     if(isNaN(v) || v <= 0) document.getElementById('err-sp-amount').classList.add('show');
   });
   document.getElementById('spDate').addEventListener('input', () => {
@@ -3423,7 +3477,7 @@ function setupSettlementPaymentUI(year){
 
     const from = document.getElementById('spFrom').value;
     const to = document.getElementById('spTo').value;
-    const amount = parseFloat(document.getElementById('spAmount').value);
+    const amount = parseSwissAmount(document.getElementById('spAmount').value);
     const date = document.getElementById('spDate').value;
 
     if(!from) showSpErr('err-sp-from');
@@ -4025,7 +4079,7 @@ function renderAdminCostsSection(){
         '</select></div>' +
         '<div class="field" id="acCustomTypeField" style="display:none;"><label for="acCustomType">Kostenart benennen *</label><input id="acCustomType" type="text" placeholder="z. B. Reparatur Steg"><div class="gate-error" id="err-ac-customtype">Bitte einen Titel für die Kostenart angeben.</div></div>' +
         '<div class="field"><label for="acDesc">Beschreibung *</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"><div class="gate-error" id="err-ac-desc">Bitte eine Beschreibung angeben.</div></div>' +
-        '<div class="field"><label for="acAmount">Betrag (CHF) *</label><input id="acAmount" type="number" step="0.01" min="0" placeholder="0.00"><div class="gate-error" id="err-ac-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>' +
+        '<div class="field"><label for="acAmount">Betrag (CHF) *</label><input id="acAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-ac-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>' +
         '<div class="field"><label for="acDate">Datum *</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
       '</div>' +
       '<div class="field"><label>Wer hat bezahlt / vorgeschossen? *</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
@@ -4480,11 +4534,11 @@ function setupAnnualCostUI(){
     if(document.getElementById('acDesc').value.trim()) document.getElementById('err-ac-desc').classList.remove('show');
   });
   document.getElementById('acAmount').addEventListener('blur', () => {
-    const v = parseFloat(document.getElementById('acAmount').value);
+    const v = parseSwissAmount(document.getElementById('acAmount').value);
     document.getElementById('err-ac-amount').classList.toggle('show', isNaN(v) || v <= 0);
   });
   document.getElementById('acAmount').addEventListener('input', () => {
-    const v = parseFloat(document.getElementById('acAmount').value);
+    const v = parseSwissAmount(document.getElementById('acAmount').value);
     if(!isNaN(v) && v > 0) document.getElementById('err-ac-amount').classList.remove('show');
     updateAcSplitTotal();
   });
@@ -4523,12 +4577,12 @@ function setupAnnualCostUI(){
     const acUnequalToggle = document.getElementById('acUnequalToggle');
     if(payerIds.length > 1 && acUnequalToggle && acUnequalToggle.checked && amountValid){
       const inputs = Array.from(document.querySelectorAll('#acPaidSplitArea .ac-split-input'));
-      const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+      const sum = inputs.reduce((s,i) => s + parseSwissAmount(i.value), 0);
       if(Math.abs(sum - amount) > 0.02){
         document.getElementById('err-ac-payer').textContent = 'Die Aufteilung muss in Summe dem Betrag entsprechen (aktuell ' + fmtNum(sum,2) + ' von ' + fmtNum(amount,2) + ' CHF).';
         showAcErr('err-ac-payer');
       } else {
-        inputs.forEach(i => { paidBy[i.dataset.id] = (parseFloat(i.value)||0) / amount * 100; });
+        inputs.forEach(i => { paidBy[i.dataset.id] = parseSwissAmount(i.value) / amount * 100; });
       }
     } else if(payerIds.length > 1){
       const equalPct = 100 / payerIds.length;
@@ -4591,13 +4645,13 @@ function renderAcPaidSplitArea(){
   if(!wrap || !area) return;
   const ids = Array.from(wrap.querySelectorAll('.ac-payer-check:checked')).map(cb => cb.value);
   if(ids.length <= 1){ area.innerHTML = ''; return; }
-  const totalAmount = parseFloat(document.getElementById('acAmount').value) || 0;
+  const totalAmount = parseSwissAmount(document.getElementById('acAmount').value);
   const equal = ids.length ? Math.round((totalAmount/ids.length)*100)/100 : 0;
   area.innerHTML =
     '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="acUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
     '<div id="acAmountsBody" style="display:none;">' +
       '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
-      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="number" class="ac-split-input" data-id="' + id + '" step="0.01" min="0" value="' + equal + '"><span>CHF</span><span class="split-pct" id="ac-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="text" inputmode="decimal" class="ac-split-input amount-input" data-id="' + id + '" value="' + equal + '"><span>CHF</span><span class="split-pct" id="ac-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
       '<div class="split-total" id="acSplitTotal"></div>' +
     '</div>';
   document.getElementById('acUnequalToggle').addEventListener('change', (ev) => {
@@ -4613,14 +4667,14 @@ function renderAcPaidSplitArea(){
 function updateAcSplitTotal(){
   const area = document.getElementById('acPaidSplitArea');
   if(!area) return;
-  const totalAmount = parseFloat(document.getElementById('acAmount').value) || 0;
+  const totalAmount = parseSwissAmount(document.getElementById('acAmount').value);
   const inputs = Array.from(area.querySelectorAll('.ac-split-input'));
   if(!inputs.length) return;
-  const sum = inputs.reduce((s,i) => s + (parseFloat(i.value)||0), 0);
+  const sum = inputs.reduce((s,i) => s + parseSwissAmount(i.value), 0);
   inputs.forEach(i => {
     const pctEl = document.getElementById('ac-pct-' + i.dataset.id);
     if(pctEl){
-      const val = parseFloat(i.value) || 0;
+      const val = parseSwissAmount(i.value);
       const pct = totalAmount > 0 ? (val/totalAmount*100) : 0;
       pctEl.textContent = fmtNum(pct,1) + ' %';
     }
@@ -4958,11 +5012,9 @@ async function init(){
   document.getElementById('giftName').addEventListener('input', () => {
     if(document.getElementById('giftName').value.trim()) document.getElementById('err-gift-name').classList.remove('show');
   });
-  document.getElementById('photoCameraBtn').addEventListener('click', () => {
-    document.getElementById('f-photo-camera').click();
-  });
-  document.getElementById('photoGalleryBtn').addEventListener('click', () => {
-    document.getElementById('f-photo-gallery').click();
+  document.addEventListener('click', (ev) => {
+    if(ev.target.closest('#photoCameraBtn')){ document.getElementById('f-photo-camera').click(); return; }
+    if(ev.target.closest('#photoGalleryBtn')){ document.getElementById('f-photo-gallery').click(); return; }
   });
   const handlePhotoFile = async (ev) => {
     const file = ev.target.files[0];
@@ -5000,7 +5052,7 @@ async function init(){
     if(isNaN(v) || v <= 0) document.getElementById('err-consumption').classList.add('show');
   });
   document.getElementById('f-expense').addEventListener('blur', () => {
-    const v = parseFloat(document.getElementById('f-expense').value);
+    const v = parseSwissAmount(document.getElementById('f-expense').value);
     if(isNaN(v) || v <= 0) document.getElementById('err-expense').classList.add('show');
   });
   document.getElementById('f-expense').addEventListener('input', updatePaidSplitTotal);
@@ -5016,23 +5068,25 @@ async function init(){
   if(beerPhotoInput){
     beerPhotoInput.addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
-      if(!file) return;
+      if(!file || !pendingBeerMessageId) { ev.target.value = ''; return; }
       let photo = null;
       try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
-      if(!state.chatMessages) state.chatMessages = [];
-      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text: '', photo, type: 'beer', toPartyIds: null });
-      if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-      playCheersSound();
-      await saveShared();
-      updateHeaderMeta();
+      if(photo && state.chatMessages){
+        const msg = state.chatMessages.find(m => m.id === pendingBeerMessageId);
+        if(msg){
+          msg.photo = photo;
+          await saveShared();
+        }
+      }
+      pendingBeerMessageId = null;
       ev.target.value = '';
-      showBeerConfirmation();
     });
   }
   setupSeasonUI();
   fetchLiveWeatherWidget();
   setInterval(fetchLiveWeatherWidget, 15 * 60 * 1000);
   const adminStripEl = document.getElementById('adminStrip');
+  setupAmountInputFormatting();
   if(adminStripEl) adminStripEl.addEventListener('click', handleAdminStripClick);
 }
 
@@ -5045,6 +5099,19 @@ function renderSeasonEventsList(){
   ).join('') : '<div class="hint">Noch keine Einträge.</div>';
 }
 
+function updateSeasonButtonsState(){
+  const launchBtn = document.getElementById('seasonLaunchBtn');
+  const haulBtn = document.getElementById('seasonHaulBtn');
+  const hint = document.getElementById('seasonHint');
+  if(!launchBtn || !haulBtn) return;
+  const active = !!calendarSelectedDate;
+  launchBtn.disabled = !active;
+  haulBtn.disabled = !active;
+  if(hint){
+    hint.textContent = active ? 'Ausgewählter Tag: ' + fmtDateCH(calendarSelectedDate) : 'Wähle im Kalender oben einen einzelnen Tag, um Ein-/Auswasserung dafür zu erfassen.';
+  }
+}
+
 function setupSeasonUI(){
   const launchBtn = document.getElementById('seasonLaunchBtn');
   const haulBtn = document.getElementById('seasonHaulBtn');
@@ -5052,17 +5119,19 @@ function setupSeasonUI(){
   checkWindWarning();
   setInterval(checkWindWarning, 30 * 60 * 1000);
   renderSeasonEventsList();
+  updateSeasonButtonsState();
 
   async function toggleSeasonEvent(type, label){
-    const today = new Date().toISOString().slice(0,10);
+    if(!calendarSelectedDate) return;
+    const day = calendarSelectedDate;
     if(!state.seasonEvents) state.seasonEvents = [];
-    const existing = state.seasonEvents.find(ev => ev.date === today && ev.type === type);
+    const existing = state.seasonEvents.find(ev => ev.date === day && ev.type === type);
     if(existing){
       state.seasonEvents = state.seasonEvents.filter(ev => ev.id !== existing.id);
-      logAudit('Eintrag "Boot ' + label + ' am ' + fmtDateCH(today) + '" wieder entfernt');
+      logAudit('Eintrag "Boot ' + label + ' am ' + fmtDateCH(day) + '" wieder entfernt');
     } else {
-      state.seasonEvents.push({ id: uid(), date: today, type });
-      logAudit('Boot am ' + fmtDateCH(today) + ' ' + label);
+      state.seasonEvents.push({ id: uid(), date: day, type });
+      logAudit('Boot am ' + fmtDateCH(day) + ' ' + label);
     }
     await saveShared();
     renderSeasonEventsList();
