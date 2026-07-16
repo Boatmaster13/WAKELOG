@@ -105,7 +105,11 @@ body{
   line-height:1.6;
 }
 .admin-badge{
-  display:inline-block;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:0.28rem;
+  line-height:1;
   background:var(--volt);
   color:var(--hull);
   font-family:'Inter', sans-serif;
@@ -113,7 +117,7 @@ body{
   font-weight:700;
   letter-spacing:0.05em;
   text-transform:uppercase;
-  padding:0.15rem 0.5rem;
+  padding:0.28rem 0.7rem;
   border-radius:20px;
 }
 .admin-strip{
@@ -430,7 +434,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .tag.usage{ background:var(--surf-bg); color:var(--surf); }
 .tag.refuel{ background:var(--flare-bg); color:var(--flare); }
 .tag.locked{ background:var(--foam); color:var(--ink-faint); border:1px solid var(--line-strong); }
-.del-btn{ background:none; border:none; color:var(--ink-faint); cursor:pointer; font-family:'Inter', sans-serif; font-weight:600; font-size:0.76rem; }
+.del-btn{ background:none; border:none; padding:0; margin:0; color:var(--ink-faint); cursor:pointer; font-family:'Inter', sans-serif; font-weight:600; font-size:0.76rem; }
 .del-btn:hover{ color:var(--surf); }
 .locked-note{ font-family:'Inter', sans-serif; font-size:0.72rem; color:var(--ink-faint); font-style:italic; }
 .thumb{ width:38px; height:38px; object-fit:cover; border-radius:6px; cursor:zoom-in; border:1px solid var(--line-strong); display:block; }
@@ -535,6 +539,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .split-row .split-name{ flex:1; font-size:0.88rem; }
 .split-row input{ width:110px; text-align:right; }
 .split-total{ font-size:0.82rem; margin-top:0.3rem; }
+.split-input-auto{ background:rgba(24,23,21,0.06); color:var(--ink-soft); cursor:default; }
+/* Keep file inputs in the render tree (display:none blocks the camera on some mobile browsers) */
+.file-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; opacity:0; }
 .split-total.ok{ color:#1C9A64; }
 .split-total.bad{ color:var(--flare); font-weight:600; }
 
@@ -773,8 +780,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
               <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
               <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
             </div>
-            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" style="display:none;">
-            <input type="file" id="f-photo-gallery" accept="image/*" style="display:none;">
+            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-hidden">
+            <input type="file" id="f-photo-gallery" accept="image/*" class="file-hidden">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Foto auswählen — dieses Feld ist Pflicht.</div>
@@ -835,7 +842,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="hint" style="margin-bottom:0.9rem;">Lade deinen persönlichen TWINT-QR-Code hoch (in der TWINT-App unter "Profil" → "QR-Code" als Bild speichern). Er wird dann anderen Parteien angezeigt, wenn sie dir eine Ausgleichszahlung machen möchten — direkt scanbar.</div>
         <div id="myQrPreviewArea" style="margin-bottom:0.9rem;"></div>
         <div class="field" id="qrPartyField" style="display:none;"><label for="qrPartySelect">Für welche Partei</label><select id="qrPartySelect"></select></div>
-        <input type="file" id="qrUploadInput" accept="image/*" style="display:none;">
+        <input type="file" id="qrUploadInput" accept="image/*" class="file-hidden">
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
           <button class="btn secondary" id="qrUploadBtn">📷 QR-Code hochladen</button>
           <button class="btn secondary" id="qrRemoveBtn" style="display:none;">Entfernen</button>
@@ -878,7 +885,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 </div>
 
 <div id="printArea"></div>
-<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" style="display:none;">
+<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" class="file-hidden">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -1142,7 +1149,7 @@ function updateHeaderMeta(){
         '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
     '</div>' +
-    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem;"></div>';
+    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem; text-align:center;"></div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -1167,28 +1174,44 @@ function showBeerCallConfirm(){
     '<div class="gate-card" style="text-align:center;">' +
       '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
       '<h2>Ankerdose ausrufen?</h2>' +
-      '<p>Als <b>' + escapeHtml(name) + '</b> alle anderen Parteien jetzt zur Ankerdose rufen? Du kannst danach noch ein Foto machen.</p>' +
-      '<div style="display:flex; gap:0.6rem;">' +
-        '<button class="btn" id="beerConfirmYesBtn" style="flex:1;">Ja, ausrufen!</button>' +
-        '<button class="btn secondary" id="beerConfirmNoBtn" style="flex:1;">Abbrechen</button>' +
+      '<p>Als <b>' + escapeHtml(name) + '</b> alle anderen Parteien jetzt zur Ankerdose rufen?</p>' +
+      '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
+        '<button class="btn" id="beerConfirmPhotoBtn">📷 Foto aufnehmen &amp; ausrufen</button>' +
+        '<button class="btn secondary" id="beerConfirmNoPhotoBtn">Ohne Foto ausrufen</button>' +
+        '<button class="btn secondary" id="beerConfirmNoBtn">Abbrechen</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('beerConfirmNoBtn').addEventListener('click', () => overlay.remove());
-  document.getElementById('beerConfirmYesBtn').addEventListener('click', async () => {
+  document.getElementById('beerConfirmNoPhotoBtn').addEventListener('click', () => {
     overlay.remove();
-    playCheersSound();
-    if(!state.chatMessages) state.chatMessages = [];
-    const msgId = uid();
-    pendingBeerMessageId = msgId;
-    state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: null, type: 'beer', toPartyIds: null });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-    await saveShared();
-    updateHeaderMeta();
-    showBeerConfirmation();
-    const input = document.getElementById('beerPhotoInput');
-    if(input) input.click();
+    finalizeBeerCall(null);
   });
+  document.getElementById('beerConfirmPhotoBtn').addEventListener('click', () => {
+    overlay.remove();
+    const input = document.getElementById('beerPhotoInput');
+    if(!input){ finalizeBeerCall(null); return; }
+    // Kamera öffnen. Nach Aufnahme ODER Abbruch geht es zur Prost-Bestätigung.
+    beerCallAwaitingPhoto = true;
+    input.value = '';
+    // Fallback: falls die Kamera abgebrochen wird und weder 'change' noch 'cancel' feuert
+    window.addEventListener('focus', () => {
+      setTimeout(() => {
+        if(beerCallAwaitingPhoto){ beerCallAwaitingPhoto = false; finalizeBeerCall(null); }
+      }, 1500);
+    }, { once: true });
+    input.click();
+  });
+}
+
+async function finalizeBeerCall(photoDataUrl){
+  if(!state.chatMessages) state.chatMessages = [];
+  const msgId = uid();
+  state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
+  if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+  await saveShared();
+  updateHeaderMeta();
+  showBeerConfirmation();
 }
 
 async function logout(){
@@ -1871,7 +1894,7 @@ function showInboxModal(){
           '<div>' + escapeHtml(n.message) + '</div>' +
           '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
         '</div>').join('') +
-      '</div>' : '<div class="empty">Noch keine Mitteilungen.</div>') +
+      '</div>' : '<div class="empty">Noch keine Mitteilungen.<br><span style="font-size:0.82rem;">Hier erscheinen automatische Hinweise — z.&nbsp;B. zu Vorrechtstagen (Anfragen, Zu- und Absagen, Abgaben) und Ankerdose-Rufen. Persönliche Nachrichten laufen über den Chat.</span></div>') +
       '<button class="btn" id="inboxCloseBtn" style="margin-top:1.1rem;">Schliessen</button>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -2073,16 +2096,24 @@ function renderPaidSplitArea(){
     '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="paidUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
     '<div id="paidAmountsBody" style="display:none;">' +
       '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
-      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="text" inputmode="decimal" class="paid-split-input amount-input" data-id="' + id + '" value="' + equal + '"><span>CHF</span><span class="split-pct" id="paid-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      ids.map((id, idx) => { const isLast = idx === ids.length - 1; return '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + (isLast ? ' <span class="hint" style="margin:0;">(Rest)</span>' : '') + '</span><input type="text" inputmode="decimal" class="paid-split-input amount-input' + (isLast ? ' split-input-auto' : '') + '" data-id="' + id + '" value="' + equal + '"' + (isLast ? ' readonly title="Wird automatisch als Restbetrag berechnet"' : '') + '><span>CHF</span><span class="split-pct" id="paid-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>'; }).join('') +
       '<div class="split-total" id="paidSplitTotal"></div>' +
     '</div>';
   document.getElementById('paidUnequalToggle').addEventListener('change', (ev) => {
     document.getElementById('paidAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
   });
-  area.querySelectorAll('.paid-split-input').forEach(inp => inp.addEventListener('input', () => {
-    autoFillLastAmountSplit(area, '.paid-split-input', inp, totalExpense);
-    updatePaidSplitTotal();
-  }));
+  const paidInputs = Array.from(area.querySelectorAll('.paid-split-input'));
+  const recomputePaidLast = () => {
+    if(paidInputs.length < 2) return;
+    const last = paidInputs[paidInputs.length - 1];
+    const othersSum = paidInputs.slice(0, -1).reduce((s,i) => s + parseSwissAmount(i.value), 0);
+    last.value = Math.max(0, Math.round((getPayableExpense() - othersSum) * 100) / 100);
+  };
+  paidInputs.forEach((inp, idx) => {
+    if(idx === paidInputs.length - 1) return; // letzte Partei ist automatisch
+    inp.addEventListener('input', () => { recomputePaidLast(); updatePaidSplitTotal(); });
+  });
+  recomputePaidLast();
   updatePaidSplitTotal();
 }
 
@@ -2120,6 +2151,7 @@ function escapeHtml(s){ const d = document.createElement('div'); d.textContent =
 let weatherCache = {};
 let liveWeatherWidgetHtml = '';
 let pendingBeerMessageId = null;
+let beerCallAwaitingPhoto = false;
 let liveWeatherLocationHtml = '';
 function renderLiveWeatherWidget(html, locationHtml){
   liveWeatherWidgetHtml = html;
@@ -2139,32 +2171,46 @@ async function fetchLiveWeatherWidget(){
   if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
   navigator.geolocation.getCurrentPosition(async (pos) => {
     try{
-      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
       const res = await fetch(url);
       const data = await res.json();
       let placeName = '';
-      let meteoLink = 'https://www.meteoschweiz.admin.ch/';
+      let postcode = '';
+      // 1) OpenStreetMap Nominatim: liefert für die Schweiz zuverlässig Ort + PLZ
       try{
-        const geoRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&localityLanguage=de');
-        const geoData = await geoRes.json();
-        placeName = geoData.locality || geoData.city || geoData.principalSubdivision || '';
-        const postcode = geoData.postcode;
-        if(placeName && postcode){
-          const slug = placeName.toLowerCase()
-            .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/é/g,'e').replace(/è/g,'e')
-            .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-          meteoLink = 'https://www.meteoschweiz.admin.ch/local-forecasts/' + slug + '/' + postcode.replace(/\s/g,'') + '.html';
-        }
+        const nomRes = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon + '&zoom=14&addressdetails=1', { headers: { 'Accept': 'application/json' } });
+        const nom = await nomRes.json();
+        const a = nom.address || {};
+        placeName = a.city || a.town || a.village || a.municipality || a.suburb || a.county || '';
+        postcode = (a.postcode || '').replace(/\s/g,'');
       } catch(e){}
+      // 2) Fallback: bigdatacloud (füllt fehlende Werte auf)
+      if(!placeName || !postcode){
+        try{
+          const geoRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=de');
+          const geoData = await geoRes.json();
+          if(!placeName) placeName = geoData.city || geoData.locality || geoData.principalSubdivision || '';
+          if(!postcode) postcode = (geoData.postcode || '').replace(/\s/g,'');
+        } catch(e){}
+      }
+      let meteoLink = 'https://www.meteoswiss.admin.ch/';
+      if(placeName && postcode){
+        const slug = placeName.toLowerCase()
+          .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/é/g,'e').replace(/è/g,'e').replace(/ç/g,'c')
+          .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+        meteoLink = 'https://www.meteoswiss.admin.ch/local-forecasts/' + slug + '/' + postcode + '.html';
+      }
       if(data.current){
         const cat = weatherCategory(data.current.weathercode);
+        const locLabel = placeName ? escapeHtml(placeName) : 'Aktueller Standort';
         renderLiveWeatherWidget(
           '<a href="' + meteoLink + '" target="_blank" rel="noopener" class="weather-widget weather-' + cat + '" title="Tageswetter auf MeteoSchweiz ansehen">' +
             '<span class="weather-icon">' + weatherEmoji(data.current.weathercode) + '</span>' +
             '<span class="weather-temp">' + Math.round(data.current.temperature_2m) + '°</span>' +
             '<span class="weather-rain"></span><span class="weather-rain"></span><span class="weather-rain"></span>' +
           '</a>',
-          (placeName ? escapeHtml(placeName) : 'Aktueller Standort')
+          '<a href="' + meteoLink + '" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline; text-underline-offset:2px;">' + locLabel + '</a>'
         );
       }
     } catch(e){ renderLiveWeatherWidget(''); }
@@ -2456,12 +2502,14 @@ function showBeerConfirmation(){
     '<div class="gate-card" style="text-align:center;">' +
       '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
       '<h2>Ankerdose ausgerufen!</h2>' +
-      '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen.</p>' +
-      '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">Prost!</button>' +
+      '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen. Drück auf Prost! 🍻</p>' +
+      '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">🍻 Prost!</button>' +
     '</div>';
   document.body.appendChild(overlay);
-  document.getElementById('beerConfirmCloseBtn').addEventListener('click', () => overlay.remove());
-  setTimeout(() => { if(overlay.parentNode) overlay.remove(); }, 6000);
+  document.getElementById('beerConfirmCloseBtn').addEventListener('click', () => {
+    playCheersSound();
+    overlay.remove();
+  });
 }
 
 function checkNewBeerCalls(oldMessages, newMessages){
@@ -2484,14 +2532,43 @@ function checkNewBeerCalls(oldMessages, newMessages){
   });
 }
 
+let cheersAudioCtx = null;
+function playSynthCheers(){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    cheersAudioCtx = cheersAudioCtx || new AC();
+    const ctx = cheersAudioCtx;
+    if(ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C-E-G-C Arpeggio
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      const t = now + i * 0.12;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.28, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + 0.45);
+    });
+  } catch(e){}
+}
 function playCheersSound(){
+  // Zuerst die echten Sounds versuchen; falls sie fehlen oder blockiert sind,
+  // spielt ein synthetisierter Jingle als Fallback — so kommt IMMER ein Ton.
   try{
     const canOpen = new Audio('sound-can-open.mp3');
     const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
     const burp = new Audio('sound-burp-' + burpIndex + '.mp3');
     canOpen.addEventListener('ended', () => { burp.play().catch(() => {}); });
-    canOpen.play().catch(() => {});
-  } catch(e){}
+    const p = canOpen.play();
+    if(p && typeof p.then === 'function'){
+      p.catch(() => playSynthCheers());
+    }
+  } catch(e){ playSynthCheers(); }
 }
 
 function getChatLastSeen(){
@@ -2552,8 +2629,8 @@ function showChatModal(){
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
-      '<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" style="display:none;">' +
-      '<input type="file" id="chatPhotoInputGallery" accept="image/*" style="display:none;">' +
+      '<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" class="file-hidden">' +
+      '<input type="file" id="chatPhotoInputGallery" accept="image/*" class="file-hidden">' +
       '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
         '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1;">📷 Kamera</button>' +
@@ -3283,7 +3360,7 @@ function buildComparisonBarsHtml(perYear, valueKey, maxVal, fmtFn){
   function segmentsFor(p){
     if(p[valueKey] <= 0) return '';
     return p.rows.map(r => {
-      const val = valueKey === 'total' ? r.fairShare : r.hours;
+      const val = valueKey === 'total' ? r.paid : r.hours;
       const share = val / p[valueKey];
       if(share <= 0) return '';
       return '<div style="width:100%; height:' + (share*100) + '%; background:' + partyColor(r.id) + ';" title="' + escapeHtml(r.name) + '"></div>';
@@ -3317,9 +3394,11 @@ function renderYearComparison(){
       state.parties.map(p => '<div class="cal-legend-item"><span class="cal-legend-swatch" style="background:' + partyColor(p.id) + ';"></span>' + escapeHtml(p.name) + '</div>').join('') +
     '</div>' +
     (anyData ? '' : '<div class="hint" style="margin-bottom:0.9rem;">Für ' + perYear.map(p=>p.year).join('/') + '<br>liegen noch keine Daten vor.</div>') +
-    '<h3 style="margin-bottom:0.5rem;">Gesamtaufwand (CHF)</h3>' +
+    '<h3 style="margin-bottom:0.5rem;">Gesamtaufwand (CHF) — nach Zahler</h3>' +
+    '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die tatsächlich bezahlten Beträge auf die Parteien verteilen.</div>' +
     barsHtml +
-    '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden</h3>' +
+    '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden — nach Nutzung</h3>' +
+    '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die gefahrenen Stunden verteilen. Weicht die Verteilung vom Balken oben ab, hat eine Partei im Verhältnis zur Nutzung mehr oder weniger bezahlt.</div>' +
     hoursHtml;
 }
 
@@ -4069,10 +4148,9 @@ function renderAdminCostsSection(){
   const content = document.getElementById('adminSubContent');
   content.innerHTML =
     '<div class="admin-box">' +
-      '<label>Jährliche Fixkosten</label>' +
+      '<label>Neuer Fixkosten-Eintrag</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Verkehrssteuer, Winterlager, Versicherung, Service, Rückstellungen usw. — laufend übers Jahr erfassen, sobald eine Rechnung eintrifft. Wird bei der Jahresabrechnung automatisch nach Nutzungsanteil (gefahrene Stunden) auf die Parteien verteilt, nicht mehr fix 50:50.</div>' +
       '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
-      '<div id="annualCostList"></div>' +
       '<div class="row" style="margin-top:0.9rem;">' +
         '<div class="field"><label for="acType">Kostenart *</label><select id="acType">' +
           '<option>Anschaffung Neuboot</option><option>Bootsequipment</option><option>Rückstellung / Abschreibung</option><option>Service</option><option>Verkehrssteuer</option><option>Versicherung</option><option>Winterlager</option><option>Sonstiges</option>' +
@@ -4085,6 +4163,11 @@ function renderAdminCostsSection(){
       '<div class="field"><label>Wer hat bezahlt / vorgeschossen? *</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
       '<button class="btn" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
       '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Erfasste Fixkosten</label>' +
+      '<div class="hint" style="margin-bottom:0.9rem;">Bereits getätigte Ausgaben für das oben gewählte Jahr.</div>' +
+      '<div id="annualCostList"></div>' +
     '</div>';
 
   setupAnnualCostUI();
@@ -4651,16 +4734,25 @@ function renderAcPaidSplitArea(){
     '<label class="checkbox-item" style="margin-bottom:0.6rem;"><input type="checkbox" id="acUnequalToggle"> Nicht zu gleichen Teilen aufteilen</label>' +
     '<div id="acAmountsBody" style="display:none;">' +
       '<div class="hint" style="margin-bottom:0.5rem;">Betrag pro Partei in CHF eingeben — der Prozentsatz wird automatisch berechnet.</div>' +
-      ids.map(id => '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + '</span><input type="text" inputmode="decimal" class="ac-split-input amount-input" data-id="' + id + '" value="' + equal + '"><span>CHF</span><span class="split-pct" id="ac-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>').join('') +
+      ids.map((id, idx) => { const isLast = idx === ids.length - 1; return '<div class="split-row"><span class="split-name">' + escapeHtml(partyName(id)) + (isLast ? ' <span class="hint" style="margin:0;">(Rest)</span>' : '') + '</span><input type="text" inputmode="decimal" class="ac-split-input amount-input' + (isLast ? ' split-input-auto' : '') + '" data-id="' + id + '" value="' + equal + '"' + (isLast ? ' readonly title="Wird automatisch als Restbetrag berechnet"' : '') + '><span>CHF</span><span class="split-pct" id="ac-pct-' + id + '" style="min-width:3.5rem; text-align:right; font-size:0.82rem; color:var(--ink-faint);"></span></div>'; }).join('') +
       '<div class="split-total" id="acSplitTotal"></div>' +
     '</div>';
   document.getElementById('acUnequalToggle').addEventListener('change', (ev) => {
     document.getElementById('acAmountsBody').style.display = ev.target.checked ? 'block' : 'none';
   });
-  area.querySelectorAll('.ac-split-input').forEach(inp => inp.addEventListener('input', () => {
-    autoFillLastAmountSplit(area, '.ac-split-input', inp, totalAmount);
-    updateAcSplitTotal();
-  }));
+  const acInputs = Array.from(area.querySelectorAll('.ac-split-input'));
+  const recomputeAcLast = () => {
+    if(acInputs.length < 2) return;
+    const last = acInputs[acInputs.length - 1];
+    const total = parseSwissAmount(document.getElementById('acAmount').value);
+    const othersSum = acInputs.slice(0, -1).reduce((s,i) => s + parseSwissAmount(i.value), 0);
+    last.value = Math.max(0, Math.round((total - othersSum) * 100) / 100);
+  };
+  acInputs.forEach((inp, idx) => {
+    if(idx === acInputs.length - 1) return;
+    inp.addEventListener('input', () => { recomputeAcLast(); updateAcSplitTotal(); });
+  });
+  recomputeAcLast();
   updateAcSplitTotal();
 }
 
@@ -5068,18 +5160,18 @@ async function init(){
   if(beerPhotoInput){
     beerPhotoInput.addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
-      if(!file || !pendingBeerMessageId) { ev.target.value = ''; return; }
-      let photo = null;
-      try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
-      if(photo && state.chatMessages){
-        const msg = state.chatMessages.find(m => m.id === pendingBeerMessageId);
-        if(msg){
-          msg.photo = photo;
-          await saveShared();
-        }
-      }
-      pendingBeerMessageId = null;
       ev.target.value = '';
+      if(!beerCallAwaitingPhoto) return;
+      beerCallAwaitingPhoto = false;
+      let photo = null;
+      if(file){ try{ photo = await compressImage(file, 700, 0.6); } catch(e){} }
+      finalizeBeerCall(photo);
+    });
+    // Wird die Kamera abgebrochen, trotzdem ausrufen (ohne Foto)
+    beerPhotoInput.addEventListener('cancel', () => {
+      if(!beerCallAwaitingPhoto) return;
+      beerCallAwaitingPhoto = false;
+      finalizeBeerCall(null);
     });
   }
   setupSeasonUI();
