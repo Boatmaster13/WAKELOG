@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>WakeLog</title>
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
@@ -82,6 +82,7 @@ body{
 .scene-strip svg{ width:100%; height:100%; display:block; }
 .hero-inner{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:0.8rem; }
 .hero-meta-row{ position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; margin-top:0.9rem; }
+#adminStrip{ width:100%; box-sizing:border-box; }
 .hero h1{
   font-family:'Big Shoulders Display', sans-serif;
   font-weight:800;
@@ -303,6 +304,28 @@ input, select{
   padding:0.6rem 0.7rem;
   transition:border-color 0.15s ease;
   box-sizing:border-box;
+}
+input[type="date"]{
+  /* iOS rendert Datums-Felder sonst mit Systemschrift, eigener Höhe und
+     fester Mindestbreite (ragt über den Bildschirmrand hinaus). */
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:2.6rem;
+  display:flex;
+  align-items:center;
+  font-family:'JetBrains Mono', monospace;
+  font-size:1rem;
+  line-height:1.2;
+}
+input[type="date"]::-webkit-date-and-time-value{ text-align:left; margin:0; }
+textarea{
+  font-family:'Inter', sans-serif;
+  color:var(--ink);
+  box-sizing:border-box;
+  max-width:100%;
 }
 input:focus, select:focus{
   outline:none;
@@ -588,6 +611,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 @media (max-width: 420px){
   #panel-settlement h2{ font-size:1.1rem; }
   .icon-btn{ font-size:0.66rem; padding:0.38rem 0.35rem; gap:0.2rem; }
+  label{ font-size:0.62rem; letter-spacing:0.03em; }
+  input, select, input[type="date"]{ font-size:0.95rem; }
 }
 @media (orientation: landscape) and (max-height: 480px){
   .hero-container{ padding:calc(1.5vh + env(safe-area-inset-top, 0px)) 4.5% 1.2vh; }
@@ -763,28 +788,28 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="hint" style="margin-bottom:1.1rem;">Beides antippen, wenn an diesem Tag gefahren <b>und</b> getankt wurde.</div>
         <div class="row">
           <div class="field" style="grid-column:1 / -1;">
-            <label>Wer war heute auf dem Boot? *</label>
+            <label>Wer war heute auf dem Boot?&nbsp;*</label>
             <div id="partyCheckboxes" class="checkbox-list"></div>
             <div class="gate-error" id="err-party">Bitte mindestens eine Partei wählen.</div>
             <div id="usageSplitArea" style="display:none; margin-top:0.6rem;"></div>
           </div>
-          <div class="field"><label for="f-date">Datum *</label><input type="date" id="f-date" required><div class="gate-error" id="err-date">Bitte ein Datum angeben.</div></div>
+          <div class="field"><label for="f-date">Datum&nbsp;*</label><input type="date" id="f-date" required><div class="gate-error" id="err-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div class="row" id="usageFields">
           <div class="field">
-            <label for="f-reading">Stundenstand *</label>
+            <label for="f-reading">Stundenstand&nbsp;*</label>
             <input type="number" id="f-reading" step="0.1" min="0" placeholder="z. B. 1234.5" required>
             <div class="hint">Der aktuelle Stand des Motorenstundenzählers (wie der km-Stand beim Auto) — die gefahrenen Stunden werden automatisch aus der Differenz zum letzten Eintrag berechnet. Bei mehreren Parteien werden die Stunden gemäss Aufteilung oben verteilt.</div>
             <div class="gate-error" id="err-reading"></div>
           </div>
           <div class="field">
-            <label for="f-consumption">Tagesverbrauch (l/h) *</label>
+            <label for="f-consumption">Tagesverbrauch (l/h)&nbsp;*</label>
             <input type="number" id="f-consumption" step="0.1" min="0" placeholder="0.0" required>
             <div class="hint">Hängt von der Fahrweise ab — ruhige Fahrt niedriger, Wakesurfen mit vollen Ballasttanks deutlich höher.</div>
             <div class="gate-error" id="err-consumption">Bitte den Durchschnittsverbrauch (l/h) angeben.</div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label id="photoLabel">Foto Bordcomputer (Tagesverbrauch) *</label>
+            <label id="photoLabel">Foto Bordcomputer (Tagesverbrauch)&nbsp;*</label>
             <div style="display:flex; gap:0.4rem; flex-wrap:nowrap;">
               <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
               <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
@@ -801,14 +826,15 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
             <label class="checkbox-item" style="display:inline-flex;"><input type="checkbox" id="giftToggle"> Ein Teil (oder alles) wurde von einer externen Person geschenkt</label>
             <div id="giftBody" style="display:none; margin-top:0.7rem;">
               <div class="row">
-                <div class="field"><label for="giftName">Name der Person *</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben — dieses Feld ist Pflicht.</div></div>
-                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF) *</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
+                <div class="field"><label for="giftName">Name der Person&nbsp;*</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben — dieses Feld ist Pflicht.</div></div>
+                <div class="field"><label for="giftAmount">Geschenkbetrag (CHF)&nbsp;*</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
               </div>
               <div class="hint">Die Schenkung wird den Parteien gutgeschrieben, die an diesem Tag auf dem Boot eingetragen sind (gemäss Aufteilung oben) — sie kommt also genau jenen zugute, die mit der Drittperson unterwegs waren. Sind alle Parteien eingetragen, profitieren alle.</div>
             </div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
-            <label id="payerLabel">Wer hat das Benzin bezahlt? *</label>
+            <label id="payerLabel">Wer hat das Benzin bezahlt?&nbsp;*</label>
+            <div class="hint" id="payerRemainingHint" style="display:none; margin:0 0 0.5rem;"></div>
             <div id="payerCheckboxes" class="checkbox-list"></div>
             <div class="gate-error" id="err-payer">Bitte mindestens eine zahlende Partei wählen.</div>
             <div id="paidSplitArea" style="display:none; margin-top:0.6rem;"></div>
@@ -834,10 +860,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="hint" style="margin-bottom:0.9rem;">Wenn ihr zwischendurch schon eine Ausgleichszahlung gemacht habt (z. B. weil eine Partei stark im Rückstand war), trag sie hier ein — sie wird sofort in den Saldo in der Abrechnung eingerechnet.</div>
         <div class="year-select"><label>Jahr</label><select id="adjustmentYear"></select></div>
         <div class="row" style="margin-top:0.9rem;">
-          <div class="field"><label for="spFrom">Von (hat bezahlt) *</label><select id="spFrom"></select><div class="gate-error" id="err-sp-from">Bitte eine Partei wählen.</div></div>
-          <div class="field"><label for="spTo">An (hat erhalten) *</label><select id="spTo"></select><div class="gate-error" id="err-sp-to">Bitte eine andere Partei als "Von" wählen.</div></div>
-          <div class="field"><label for="spAmount">Betrag (CHF) *</label><input id="spAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-sp-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>
-          <div class="field"><label for="spDate">Datum *</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
+          <div class="field"><label for="spFrom">Von (hat bezahlt)&nbsp;*</label><select id="spFrom"></select><div class="gate-error" id="err-sp-from">Bitte eine Partei wählen.</div></div>
+          <div class="field"><label for="spTo">An (hat erhalten)&nbsp;*</label><select id="spTo"></select><div class="gate-error" id="err-sp-to">Bitte eine andere Partei als "Von" wählen.</div></div>
+          <div class="field"><label for="spAmount">Betrag (CHF)&nbsp;*</label><input id="spAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-sp-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>
+          <div class="field"><label for="spDate">Datum&nbsp;*</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div id="spQrArea" style="margin-top:0.7rem;"></div>
         <button class="btn" id="addSettlementPaymentBtn" style="margin-top:1rem;">Zahlung erfassen</button>
@@ -1201,25 +1227,11 @@ function showBeerCallConfirm(){
   });
   document.getElementById('beerConfirmPhotoBtn').addEventListener('click', () => {
     overlay.remove();
-    // Kamera öffnen. Nach Aufnahme ODER Abbruch geht es zur Prost-Bestätigung.
-    beerCallAwaitingPhoto = true;
-    // Fallback: falls die Kamera abgebrochen wird und weder 'change' noch 'cancel' feuert
-    window.addEventListener('focus', () => {
-      setTimeout(() => {
-        if(beerCallAwaitingPhoto){ beerCallAwaitingPhoto = false; finalizeBeerCall(null); }
-      }, 1500);
-    }, { once: true });
-    openImagePicker(true, async (file) => {
-      if(!beerCallAwaitingPhoto) return;
-      beerCallAwaitingPhoto = false;
-      let photo = null;
-      try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
-      finalizeBeerCall(photo);
-    }, () => {
-      if(!beerCallAwaitingPhoto) return;
-      beerCallAwaitingPhoto = false;
-      finalizeBeerCall(null);
-    });
+    // In-App-Kamera öffnen. Erst NACH dem Auslösen wird der Ruf gesendet;
+    // bei Abbruch wird NICHTS gesendet.
+    openInAppCamera((photoDataUrl) => {
+      finalizeBeerCall(photoDataUrl);
+    }, () => { /* abgebrochen — kein Ruf */ }, 700, 0.6);
   });
 }
 
@@ -2089,7 +2101,22 @@ function getPayableExpense(){
   return Math.max(0, total - giftAmount);
 }
 
+function updatePayerRemainingHint(){
+  const hintEl = document.getElementById('payerRemainingHint');
+  if(!hintEl) return;
+  const giftToggle = document.getElementById('giftToggle');
+  const expense = parseSwissAmount(document.getElementById('f-expense').value);
+  const gift = (giftToggle && giftToggle.checked) ? parseSwissAmount(document.getElementById('giftAmount').value) : 0;
+  if(!(gift > 0) || !(expense > 0)){ hintEl.style.display = 'none'; hintEl.innerHTML = ''; return; }
+  const remaining = Math.max(0, expense - gift);
+  hintEl.style.display = 'block';
+  hintEl.innerHTML = remaining > 0.005
+    ? '🎁 Schenkung von <b>' + fmtCHF(Math.min(gift, expense)) + '</b> abgezogen — von den Parteien zu bezahlen: <b>' + fmtCHF(remaining) + '</b>'
+    : '🎁 Die Schenkung deckt die gesamten Tankausgaben — für die Parteien verbleibt nichts zu bezahlen.';
+}
+
 function renderPaidSplitArea(){
+  updatePayerRemainingHint();
   const wrap = document.getElementById('payerCheckboxes');
   const area = document.getElementById('paidSplitArea');
   if(!wrap || !area) return;
@@ -2134,6 +2161,7 @@ function autoFillLastAmountSplit(area, selector, changedInput, total){
 }
 
 function updatePaidSplitTotal(){
+  updatePayerRemainingHint();
   const area = document.getElementById('paidSplitArea');
   if(!area) return;
   const totalExpense = getPayableExpense();
@@ -2157,7 +2185,6 @@ function escapeHtml(s){ const d = document.createElement('div'); d.textContent =
 let weatherCache = {};
 let liveWeatherWidgetHtml = '';
 let pendingBeerMessageId = null;
-let beerCallAwaitingPhoto = false;
 let liveWeatherLocationHtml = '';
 function renderLiveWeatherWidget(html, locationHtml){
   liveWeatherWidgetHtml = html;
@@ -2551,12 +2578,14 @@ function showBeerConfirmation(){
       '<h2>Ankerdöschen ausgerufen!</h2>' +
       '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen. Drück auf Prost! 🍻</p>' +
       '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">🍻 Prost!</button>' +
+      '<button class="btn secondary" id="beerConfirmSilentBtn" style="width:100%; margin-top:0.5rem;">Schliessen (ohne Prost)</button>' +
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('beerConfirmCloseBtn').addEventListener('click', () => {
     playCheersSound();
     overlay.remove();
   });
+  document.getElementById('beerConfirmSilentBtn').addEventListener('click', () => overlay.remove());
 }
 
 function checkNewBeerCalls(oldMessages, newMessages){
@@ -2677,7 +2706,7 @@ function renderChatMessageListInto(list){
       const isBeer = m.type === 'beer';
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
-        '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.6rem 0.8rem;">' +
+        '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.55rem 0.75rem; font-size:0.88rem;">' +
           (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zum Ankerdöschen!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + toLabel + '</div>') +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
@@ -2714,10 +2743,10 @@ function showChatModal(){
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
-      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
-        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; text-align:center;">📷 Aufnehmen</button>' +
-        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; text-align:center;">🖼️ Galerie</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.4rem; font-size:0.78rem;">📷 Aufnehmen</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.4rem; font-size:0.78rem;">🖼️ Galerie</button>' +
       '</div>' +
       '<button type="button" class="btn" id="chatSendBtn" style="width:100%; margin-top:0.6rem;">Senden</button>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
@@ -2746,15 +2775,16 @@ function showChatModal(){
   const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
   // Kamera/Galerie über ein pro Tipp frisch erzeugtes Datei-Feld (openImagePicker) —
   // zuverlässiger als wiederverwendete versteckte Inputs oder Label-Overlays.
+  function applyChatPhoto(dataUrl){
+    chatPendingPhoto = dataUrl;
+    chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
+    document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; });
+  }
   async function handleChatPhotoSelect(file){
     if(!file) return;
-    try{
-      chatPendingPhoto = await compressImage(file, 700, 0.6);
-      chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
-      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; });
-    } catch(e){}
+    try{ applyChatPhoto(await compressImage(file, 700, 0.6)); } catch(e){}
   }
-  document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => openImagePicker(true, handleChatPhotoSelect));
+  document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => openInAppCamera(applyChatPhoto, null, 700, 0.6));
   document.getElementById('chatPhotoGalleryBtn').addEventListener('click', () => openImagePicker(false, handleChatPhotoSelect));
 
   document.getElementById('pushToggle').addEventListener('change', (ev) => {
@@ -2788,6 +2818,60 @@ function showChatModal(){
 
 let chatPendingPhoto = null;
 let beerPendingPhoto = null;
+
+// In-App-Kamera über getUserMedia: zeigt eine Live-Vorschau mit Auslöser direkt
+// in der App. Das umgeht das Problem, dass <input type=file capture> auf manchen
+// Android-Geräten die Kamera-App gar nicht startet (trotz erteilter Berechtigung).
+// Schlägt getUserMedia fehl, öffnet sich als Fallback der Datei-Wähler (dort kann
+// ebenfalls die Kamera gewählt werden).
+function openInAppCamera(onDataUrl, onCancel, maxDim, quality){
+  maxDim = maxDim || 700; quality = quality || 0.6;
+  const fallback = () => {
+    openImagePicker(false, async (file) => {
+      try{ onDataUrl(await compressImage(file, maxDim, quality)); }
+      catch(e){ if(typeof onCancel === 'function') onCancel(); }
+    }, onCancel);
+  };
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ fallback(); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(stream => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay';
+    overlay.style.display = 'flex';
+    overlay.style.zIndex = '9999';
+    overlay.innerHTML =
+      '<div class="gate-card" style="text-align:center; max-width:480px;">' +
+        '<video id="inAppCamVideo" autoplay playsinline muted style="width:100%; max-height:55vh; border-radius:var(--radius-sm); background:#000;"></video>' +
+        '<div style="display:flex; gap:0.6rem; margin-top:0.8rem;">' +
+          '<button type="button" class="btn" id="inAppCamShotBtn" style="flex:1;">📸 Auslösen</button>' +
+          '<button type="button" class="btn secondary" id="inAppCamCancelBtn" style="flex:1;">Abbrechen</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const video = overlay.querySelector('#inAppCamVideo');
+    video.srcObject = stream;
+    const stop = () => { try{ stream.getTracks().forEach(t => t.stop()); } catch(e){} overlay.remove(); };
+    overlay.querySelector('#inAppCamCancelBtn').addEventListener('click', () => {
+      stop();
+      if(typeof onCancel === 'function') onCancel();
+    });
+    overlay.querySelector('#inAppCamShotBtn').addEventListener('click', () => {
+      try{
+        let w = video.videoWidth || 1280, h = video.videoHeight || 720;
+        if(w > h){ if(w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; } }
+        else { if(h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        const url = canvas.toDataURL('image/jpeg', quality);
+        stop();
+        onDataUrl(url);
+      } catch(e){
+        stop();
+        fallback();
+      }
+    });
+  }).catch(() => fallback());
+}
 
 // Öffnet Kamera bzw. Galerie über ein bei JEDEM Tipp frisch erzeugtes
 // <input type="file">. Wiederverwendete/versteckte Inputs werden von manchen
@@ -3225,10 +3309,15 @@ function exportYearOverviewCsv(year){
   const totalLiters = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.liters||0) : 0), 0);
   const totalExpense = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.expense||0) : 0), 0);
   const totalGiftsCsv = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel && typeof e.giftAmount === 'number' ? (e.giftAmount||0) : 0), 0);
+  // Letzter Zählerstand des Jahres und gewichtete Ø-Rate über alle Stunden
+  let lastReading = '';
+  yearEntries.forEach(e => { if(getEntryFlags(e).hasUsage && typeof e.reading === 'number') lastReading = e.reading; });
+  const avgRate = totalHours > 0 ? totalConsumedL / totalHours : 0;
   rows.push([
-    'Total', '', '', '',
+    'Total', '', '',
+    lastReading !== '' ? lastReading : '',
     fmtNum(totalHours,1),
-    '',
+    avgRate > 0 ? fmtNum(avgRate,1) : '',
     totalConsumedL ? fmtNum(totalConsumedL,1) : '',
     totalLiters ? fmtNum(totalLiters,1) : '',
     totalLiters > 0 && totalExpense > 0 ? (totalExpense / totalLiters).toFixed(2) : '',
@@ -3347,7 +3436,7 @@ function renderSettlement(){
     '<div class="stat stat-highlight"><div class="num">' + fmtCHF(totalFuelExpense + totalAnnual) + '</div><div class="lbl">Gesamtaufwand</div></div>' +
   '</div>';
 
-  html += '<h3>Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
+  html += '<h3 style="margin:2.6rem 0 0.4rem;">Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
 
   const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
   html += '<h3>Saldo je Partei</h3>';
@@ -4286,10 +4375,10 @@ function renderAdminAuditSection(){
   content.innerHTML =
     '<div class="admin-box">' +
       '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:nowrap;">' +
-        '<label style="margin:0;">Änderungsprotokoll</label>' +
+        '<label style="margin:0; flex:1; min-width:0; overflow-wrap:anywhere;">Änderungsprotokoll</label>' +
         '<div style="display:flex; gap:0.4rem; flex-shrink:0;">' +
-          '<button type="button" class="btn secondary" id="exportAuditPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
-          '<button type="button" class="btn secondary" id="exportAuditCsvBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>' +
+          '<button type="button" class="btn secondary" id="exportAuditPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.6rem; white-space:nowrap;">📄 PDF</button>' +
+          '<button type="button" class="btn secondary" id="exportAuditCsvBtn" style="font-size:0.76rem; padding:0.5rem 0.6rem; white-space:nowrap;">📊 CSV</button>' +
         '</div>' +
       '</div>' +
       '<div class="hint" style="margin:0.6rem 0 0.9rem;">Zeigt die letzten Änderungen an WakeLog — wer was wann gemacht hat. Die letzten 300 Einträge werden aufbewahrt.</div>' +
@@ -4377,15 +4466,15 @@ function renderAdminCostsSection(){
       '<div class="hint" style="margin-bottom:0.9rem;">Verkehrssteuer, Winterlager, Versicherung, Service, Rückstellungen usw. — laufend übers Jahr erfassen, sobald eine Rechnung eintrifft. Wird bei der Jahresabrechnung automatisch nach Nutzungsanteil (gefahrene Stunden) auf die Parteien verteilt, nicht mehr fix 50:50.</div>' +
       '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
       '<div class="row" style="margin-top:0.9rem;">' +
-        '<div class="field"><label for="acType">Kostenart *</label><select id="acType">' +
+        '<div class="field"><label for="acType">Kostenart&nbsp;*</label><select id="acType">' +
           '<option>Anschaffung Neuboot</option><option>Bootsequipment</option><option>Rückstellung / Abschreibung</option><option>Service</option><option>Verkehrssteuer</option><option>Versicherung</option><option>Winterlager</option><option>Sonstiges</option>' +
         '</select></div>' +
-        '<div class="field" id="acCustomTypeField" style="display:none;"><label for="acCustomType">Kostenart benennen *</label><input id="acCustomType" type="text" placeholder="z. B. Reparatur Steg"><div class="gate-error" id="err-ac-customtype">Bitte einen Titel für die Kostenart angeben.</div></div>' +
-        '<div class="field"><label for="acDesc">Beschreibung *</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"><div class="gate-error" id="err-ac-desc">Bitte eine Beschreibung angeben.</div></div>' +
-        '<div class="field"><label for="acAmount">Betrag (CHF) *</label><input id="acAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-ac-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>' +
-        '<div class="field"><label for="acDate">Datum *</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
+        '<div class="field" id="acCustomTypeField" style="display:none;"><label for="acCustomType">Kostenart benennen&nbsp;*</label><input id="acCustomType" type="text" placeholder="z. B. Reparatur Steg"><div class="gate-error" id="err-ac-customtype">Bitte einen Titel für die Kostenart angeben.</div></div>' +
+        '<div class="field"><label for="acDesc">Beschreibung&nbsp;*</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"><div class="gate-error" id="err-ac-desc">Bitte eine Beschreibung angeben.</div></div>' +
+        '<div class="field"><label for="acAmount">Betrag (CHF)&nbsp;*</label><input id="acAmount" type="text" inputmode="decimal" class="amount-input" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-ac-amount">Bitte einen Betrag grösser als 0 angeben.</div></div>' +
+        '<div class="field"><label for="acDate">Datum&nbsp;*</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
       '</div>' +
-      '<div class="field"><label>Wer hat bezahlt / vorgeschossen? *</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
+      '<div class="field"><label>Wer hat bezahlt / vorgeschossen?&nbsp;*</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
       '<button class="btn" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
       '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -5011,7 +5100,7 @@ function updateAcSplitTotal(){
 function annualCostItemsHtml(year, withActions){
   const items = (state.annualCosts && state.annualCosts[year]) || [];
   if(!items.length){ return '<div class="empty">Noch keine Fixkosten für ' + year + ' erfasst.</div>'; }
-  return items.slice().sort((a,b) => (a.date||'').localeCompare(b.date||'')).map(c => {
+  return items.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.createdAt||0) - (a.createdAt||0)).map(c => {
     const payerIds = Object.keys(c.paidBy || {});
     const payerLabel = payerIds.length > 1 ? splitLabel(payerIds, c.paidBy) : (payerIds.length ? escapeHtml(partyName(payerIds[0])) : '—');
     const locked = isLocked(c);
@@ -5344,21 +5433,24 @@ async function init(){
   // Aufnehmen/Galerie: bei jedem Tipp wird ein frisches Datei-Feld erzeugt und
   // im selben User-Tap geöffnet (openImagePicker) — zuverlässiger als ein
   // wiederverwendetes verstecktes Input, das manche Mobil-Browser ignorieren.
+  const applyLogPhoto = (dataUrl) => {
+    pendingPhotoDataUrl = dataUrl;
+    const preview = document.getElementById('photoPreview');
+    preview.src = dataUrl; preview.style.display = 'block';
+    document.getElementById('photoStatus').textContent = 'Foto hinzugefügt.';
+    document.getElementById('err-photo').classList.remove('show');
+  };
   const handlePhotoFile = async (file) => {
     if(!file) return;
     const status = document.getElementById('photoStatus');
     status.textContent = 'Foto wird verarbeitet …';
     try{
-      pendingPhotoDataUrl = await compressImage(file, 640, 0.55);
-      const preview = document.getElementById('photoPreview');
-      preview.src = pendingPhotoDataUrl; preview.style.display = 'block';
-      status.textContent = 'Foto hinzugefügt.';
-      document.getElementById('err-photo').classList.remove('show');
+      applyLogPhoto(await compressImage(file, 640, 0.55));
     } catch(e){
       status.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
     }
   };
-  document.getElementById('photoCameraBtn').addEventListener('click', () => openImagePicker(true, handlePhotoFile));
+  document.getElementById('photoCameraBtn').addEventListener('click', () => openInAppCamera(applyLogPhoto, null, 640, 0.55));
   document.getElementById('photoGalleryBtn').addEventListener('click', () => openImagePicker(false, handlePhotoFile));
   [['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
     const el = document.getElementById(fieldId);
@@ -5404,8 +5496,19 @@ function renderSeasonEventsList(){
   if(!el) return;
   const events = (state.seasonEvents || []).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.type === 'launch' ? -1 : 1)).slice(-6);
   el.innerHTML = events.length ? events.map(ev =>
-    '<div class="hint">' + (ev.type === 'launch' ? '🚤 Eingewassert' : '⚓ Ausgewassert') + ': ' + fmtDateCH(ev.date) + '</div>'
+    '<div class="hint" style="display:flex; align-items:center; gap:0.5rem;">' +
+      '<span>' + (ev.type === 'launch' ? '🚤 Eingewassert' : '⚓ Ausgewassert') + ': ' + fmtDateCH(ev.date) + '</span>' +
+      '<button type="button" class="del-btn" data-season-del="' + ev.id + '">entfernen</button>' +
+    '</div>'
   ).join('') : '<div class="hint">Noch keine Einträge.</div>';
+  el.querySelectorAll('.del-btn[data-season-del]').forEach(btn => btn.addEventListener('click', async () => {
+    const ev = (state.seasonEvents || []).find(x => x.id === btn.dataset.seasonDel);
+    if(!ev) return;
+    state.seasonEvents = (state.seasonEvents || []).filter(x => x.id !== ev.id);
+    logAudit('Eintrag "Boot ' + (ev.type === 'launch' ? 'eingewassert' : 'ausgewassert') + ' am ' + fmtDateCH(ev.date) + '" wieder entfernt');
+    await saveShared();
+    renderSeasonEventsList();
+  }));
 }
 
 function updateSeasonButtonsState(){
