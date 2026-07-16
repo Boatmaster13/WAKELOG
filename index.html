@@ -1164,16 +1164,16 @@ function updateHeaderMeta(){
   if(!el) return;
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10);
-  // Zusammenhängende Blöcke (Datum+Zeit / KW / Vorrecht) bleiben je auf einer
-  // Zeile und werden gleichmässig über die Bildschirmbreite verteilt.
-  const metaBlocks = [];
-  metaBlocks.push('<span style="white-space:nowrap;">' + now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</span>');
-  metaBlocks.push('<span style="white-space:nowrap;">KW ' + isoWeekNumber(todayStr) + '</span>');
+  // Links: "Tag, dd.mm.yyyy, hh:mm Uhr (KW xx)" — rechts: Vorrecht-Partei.
+  const dateBlock = '<span style="white-space:nowrap;">' +
+    now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) +
+    ', ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr' +
+    ' (KW ' + isoWeekNumber(todayStr) + ')</span>';
   const prio = currentPriorityLabel();
-  if(prio){
-    metaBlocks.push('<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>');
-  }
-  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + metaBlocks.join('') + '</div>';
+  const prioBlock = prio
+    ? '<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>'
+    : '';
+  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>';
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
@@ -2899,9 +2899,9 @@ function openInAppCamera(onDataUrl, onCancel, maxDim, quality){
       '<div class="gate-card" style="text-align:center; max-width:480px;">' +
         '<video id="inAppCamVideo" autoplay playsinline muted style="width:100%; max-height:55vh; border-radius:var(--radius-sm); background:#000;"></video>' +
         '<div style="display:flex; gap:0.5rem; margin-top:0.8rem;">' +
-          '<button type="button" class="btn" id="inAppCamShotBtn" style="flex:1.4; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">📸 Auslösen</button>' +
-          '<button type="button" class="btn secondary" id="inAppCamFlipBtn" title="Zwischen Rück- und Selfie-Kamera wechseln" style="flex:1; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">🔄 Wechseln</button>' +
-          '<button type="button" class="btn secondary" id="inAppCamCancelBtn" style="flex:1; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">Abbrechen</button>' +
+          '<button type="button" class="btn" id="inAppCamShotBtn" style="flex:1 1 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.6rem 0.3rem; font-size:0.78rem;">📸 Auslösen</button>' +
+          '<button type="button" class="btn secondary" id="inAppCamFlipBtn" title="Zwischen Rück- und Selfie-Kamera wechseln" style="flex:1 1 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.6rem 0.3rem; font-size:0.78rem;">🔄 Wechseln</button>' +
+          '<button type="button" class="btn secondary" id="inAppCamCancelBtn" style="flex:1 1 0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.6rem 0.3rem; font-size:0.78rem;">Abbrechen</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
