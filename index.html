@@ -108,6 +108,7 @@ body{
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  text-align:center;
   gap:0.28rem;
   line-height:1;
   background:var(--volt);
@@ -118,6 +119,7 @@ body{
   letter-spacing:0.05em;
   text-transform:uppercase;
   padding:0.28rem 0.7rem;
+  border:1px solid transparent;
   border-radius:20px;
 }
 .admin-strip{
@@ -501,7 +503,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   position:absolute; top:3px; right:3px; width:8px; height:8px; border-radius:50%;
   background:#C0392B; border:1px solid #fff;
 }
-.cal-day.open{ background:repeating-linear-gradient(45deg, #e3e1db, #e3e1db 4px, #d3d1cb 4px, #d3d1cb 8px); color:var(--ink-faint); }
+.cal-day.open{ background:repeating-linear-gradient(45deg, #c7c4bd, #c7c4bd 4px, #a9a69f 4px, #a9a69f 8px); color:#403d38; }
 .cal-day.drag-selected{ outline:2px solid var(--hull); outline-offset:-2px; }
 .cal-legend{ display:flex; flex-wrap:wrap; gap:0.6rem; }
 .cal-legend-item{ display:flex; align-items:center; gap:0.4rem; font-size:0.76rem; color:var(--ink-soft); }
@@ -542,6 +544,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .split-input-auto{ background:rgba(24,23,21,0.06); color:var(--ink-soft); cursor:default; }
 /* Keep file inputs in the render tree (display:none blocks the camera on some mobile browsers) */
 .file-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; opacity:0; }
+.file-label{ position:relative; overflow:hidden; }
+.file-inlabel{ position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; font-size:0; z-index:2; }
 .split-total.ok{ color:#1C9A64; }
 .split-total.bad{ color:var(--flare); font-weight:600; }
 
@@ -777,11 +781,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div class="field" style="grid-column:1 / -1;">
             <label id="photoLabel">Foto Bordcomputer (Tagesverbrauch) *</label>
             <div style="display:flex; gap:0.4rem; flex-wrap:nowrap;">
-              <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
-              <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
+              <label class="btn secondary file-label" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem; text-align:center; cursor:pointer;">📷 Aufnehmen<input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-inlabel"></label>
+              <label class="btn secondary file-label" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem; text-align:center; cursor:pointer;">🖼️ Galerie<input type="file" id="f-photo-gallery" accept="image/*" class="file-inlabel"></label>
             </div>
-            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-hidden">
-            <input type="file" id="f-photo-gallery" accept="image/*" class="file-hidden">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Foto auswählen — dieses Feld ist Pflicht.</div>
@@ -826,7 +828,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <h2>Ausgleichszahlung erfassen</h2>
         <div class="hint" style="margin-bottom:0.9rem;">Wenn ihr zwischendurch schon eine Ausgleichszahlung gemacht habt (z. B. weil eine Partei stark im Rückstand war), trag sie hier ein — sie wird sofort in den Saldo in der Abrechnung eingerechnet.</div>
         <div class="year-select"><label>Jahr</label><select id="adjustmentYear"></select></div>
-        <div id="settlementPaymentList"></div>
         <div class="row" style="margin-top:0.9rem;">
           <div class="field"><label for="spFrom">Von (hat bezahlt) *</label><select id="spFrom"></select><div class="gate-error" id="err-sp-from">Bitte eine Partei wählen.</div></div>
           <div class="field"><label for="spTo">An (hat erhalten) *</label><select id="spTo"></select><div class="gate-error" id="err-sp-to">Bitte eine andere Partei als "Von" wählen.</div></div>
@@ -836,6 +837,11 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div id="spQrArea" style="margin-top:0.7rem;"></div>
         <button class="btn" id="addSettlementPaymentBtn" style="margin-top:1rem;">Zahlung erfassen</button>
         <div class="gate-error" id="err-sp-general" style="color:#1C9A64;"></div>
+      </div>
+      <div class="card">
+        <h2>Erfasste Ausgleichszahlungen</h2>
+        <div class="hint" style="margin-bottom:0.9rem;">Bereits erfasste Zahlungen für das oben gewählte Jahr.</div>
+        <div id="settlementPaymentList"></div>
       </div>
       <div class="card">
         <h2>Mein TWINT-QR-Code</h2>
@@ -1145,11 +1151,11 @@ function updateHeaderMeta(){
         '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '</div>' +
       '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">' +
-        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; text-align:center;"><span style="color:' + partyColor(session.partyId) + ';">●</span> User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
+        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
         '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
     '</div>' +
-    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem; text-align:center;"></div>';
+    '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; margin-top:0.3rem; text-align:left;"></div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -1209,6 +1215,8 @@ async function finalizeBeerCall(photoDataUrl){
   const msgId = uid();
   state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
   if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+  const callerName = isAdminUser ? 'Administrator' : (session.partyId ? partyName(session.partyId) : 'Jemand');
+  pushNotification('⚓ ' + callerName + ' hat zur Ankerdose gerufen! 🍺', null);
   await saveShared();
   updateHeaderMeta();
   showBeerConfirmation();
@@ -1430,7 +1438,7 @@ function effectivePriority(dateStr){
   const base = basePriorityPartyId(dateStr);
   if(!base) return { partyId: null, open: false, base: null };
   const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
-  if(!ov || ov.givenUpBy !== base) return { partyId: base, open: false, base };
+  if(!ov) return { partyId: base, open: false, base };
   if(ov.claimedBy) return { partyId: ov.claimedBy, open: false, base };
   return { partyId: null, open: true, base };
 }
@@ -1574,7 +1582,7 @@ function renderCalendarTab(){
       const eff = effectivePriority(dateStr);
       let style = '', cls = 'cal-day';
       if(dateStr === todayStr) cls += ' today';
-      if(eff.open) cls += ' open';
+      if(eff.open){ cls += ' open'; style = 'background:repeating-linear-gradient(45deg,#c7c4bd,#c7c4bd 4px,#a9a69f 4px,#a9a69f 8px); color:#403d38; border-color:#a9a69f;'; }
       else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
       const hasRequest = state.priorityRequests && state.priorityRequests[dateStr];
       const requestDot = hasRequest ? '<span class="cal-request-dot" title="Anfrage pendent"></span>' : '';
@@ -1860,6 +1868,18 @@ function getUnreadNotifications(){
   if(!session.partyId) return [];
   return getRelevantNotifications().filter(n => n.ts > getInboxLastSeen());
 }
+// Für die Anzeige im Posteingang: zeigt auch eigene Rundmeldungen und eigene
+// Aktionen (z. B. selbst ausgerufene Ankerdose, selbst abgegebene Tage), damit
+// der Posteingang nicht leer wirkt, wenn man selbst der Auslöser war.
+function getInboxListNotifications(){
+  if(!state.notifications) return [];
+  return state.notifications.filter(n => {
+    if(n.targetPartyId === null) return true;                 // Rundmeldung an alle
+    if(n.targetPartyId === session.partyId) return true;       // an mich gerichtet
+    if(n.fromPartyId && n.fromPartyId === session.partyId) return true; // von mir ausgelöst
+    return isAdminUser && !session.partyId;                    // Admin sieht alles
+  });
+}
 function updateAppBadge(){
   if(!navigator.setAppBadge) return;
   const count = getUnreadNotifications().length;
@@ -1876,7 +1896,7 @@ function setPushEnabled(on){
 }
 
 function showInboxModal(){
-  const items = getRelevantNotifications();
+  const items = getInboxListNotifications();
   const overlay = document.createElement('div');
   overlay.className = 'gate-overlay';
   overlay.style.display = 'flex';
@@ -2168,24 +2188,51 @@ function renderLiveWeatherWidgetCache(){
   if(locEl) locEl.innerHTML = liveWeatherLocationHtml;
 }
 async function fetchLiveWeatherWidget(){
+  // Admin kann in den Einstellungen einen festen Standort setzen — dann brauchen
+  // wir keine GPS-Abfrage und der MeteoSchweiz-Link stimmt garantiert.
+  const s = state.settings || {};
+  if(typeof s.weatherLat === 'number' && typeof s.weatherLon === 'number'){
+    renderWeatherForCoords(s.weatherLat, s.weatherLon);
+    return;
+  }
   if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
-  navigator.geolocation.getCurrentPosition(async (pos) => {
+  navigator.geolocation.getCurrentPosition((pos) => {
+    renderWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
+  }, () => { renderLiveWeatherWidget(''); }, { timeout: 8000 });
+}
+async function renderWeatherForCoords(lat, lon){
     try{
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const s = state.settings || {};
       const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
       const res = await fetch(url);
       const data = await res.json();
       let placeName = '';
       let postcode = '';
-      // 1) OpenStreetMap Nominatim: liefert für die Schweiz zuverlässig Ort + PLZ
-      try{
-        const nomRes = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon + '&zoom=14&addressdetails=1', { headers: { 'Accept': 'application/json' } });
-        const nom = await nomRes.json();
-        const a = nom.address || {};
-        placeName = a.city || a.town || a.village || a.municipality || a.suburb || a.county || '';
-        postcode = (a.postcode || '').replace(/\s/g,'');
-      } catch(e){}
-      // 2) Fallback: bigdatacloud (füllt fehlende Werte auf)
+      // Admin-Override für Ort + PLZ (aus den Einstellungen) hat Vorrang.
+      const ovName = (s.meteoPlaceName || '').trim();
+      const ovPlz = (s.meteoPostcode || '').trim();
+      if(ovName && ovPlz){ placeName = ovName; postcode = ovPlz.replace(/\s/g,''); }
+      // 1) Photon (komoot): CORS-freundlich, liefert für die Schweiz zuverlässig Ort + PLZ
+      if(!placeName || !postcode){
+        try{
+          const phRes = await fetch('https://photon.komoot.io/reverse?lat=' + lat + '&lon=' + lon + '&lang=de');
+          const ph = await phRes.json();
+          const pr = (ph.features && ph.features[0] && ph.features[0].properties) || {};
+          if(!placeName) placeName = pr.city || pr.town || pr.village || pr.name || pr.locality || '';
+          if(!postcode) postcode = (pr.postcode || '').replace(/\s/g,'');
+        } catch(e){}
+      }
+      // 2) OpenStreetMap Nominatim als Fallback
+      if(!placeName || !postcode){
+        try{
+          const nomRes = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon + '&zoom=14&addressdetails=1', { headers: { 'Accept': 'application/json' } });
+          const nom = await nomRes.json();
+          const a = nom.address || {};
+          if(!placeName) placeName = a.city || a.town || a.village || a.municipality || a.suburb || a.county || '';
+          if(!postcode) postcode = (a.postcode || '').replace(/\s/g,'');
+        } catch(e){}
+      }
+      // 3) bigdatacloud als letzter Fallback (füllt fehlende Werte auf)
       if(!placeName || !postcode){
         try{
           const geoRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=de');
@@ -2214,7 +2261,6 @@ async function fetchLiveWeatherWidget(){
         );
       }
     } catch(e){ renderLiveWeatherWidget(''); }
-  }, () => { renderLiveWeatherWidget(''); }, { timeout: 8000 });
 }
 function weatherEmoji(code){
   if(code === 0) return '☀️';
@@ -2324,6 +2370,16 @@ function setupAmountInputFormatting(){
     if(ev.target.classList && ev.target.classList.contains('amount-input')){
       formatSwissAmountLive(ev.target);
     }
+  });
+  document.addEventListener('focusout', (ev) => {
+    const t = ev.target;
+    if(!t.classList || !t.classList.contains('amount-input')) return;
+    if(t.readOnly || t.disabled) return;
+    const raw = (t.value || '').trim();
+    if(!raw || !/\d/.test(raw)) return;
+    const num = parseSwissAmount(raw);
+    if(isNaN(num)) return;
+    t.value = num.toLocaleString('de-CH', { minimumFractionDigits:2, maximumFractionDigits:2 });
   });
 }
 
@@ -2556,18 +2612,34 @@ function playSynthCheers(){
     });
   } catch(e){}
 }
-function playCheersSound(){
-  // Zuerst die echten Sounds versuchen; falls sie fehlen oder blockiert sind,
-  // spielt ein synthetisierter Jingle als Fallback — so kommt IMMER ein Ton.
-  try{
-    const canOpen = new Audio('sound-can-open.mp3');
-    const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
-    const burp = new Audio('sound-burp-' + burpIndex + '.mp3');
-    canOpen.addEventListener('ended', () => { burp.play().catch(() => {}); });
-    const p = canOpen.play();
+// Dateiname des hochgeladenen Ankerdose-Jingles im Repo-Wurzelverzeichnis.
+// Lege deine Sounddatei genau so benannt neben index.html ab, dann wird sie
+// zuerst abgespielt. Erlaubt sind mehrere Kandidaten (der erste, der lädt, gewinnt).
+const ANKER_JINGLE_SRC = ['ankerdose-jingle.mp3', 'ankerdose.mp3', 'jingle.mp3'];
+function tryPlayAudioChain(sources, onFail){
+  // Versucht die Quellen der Reihe nach; spielt die erste, die erfolgreich lädt/startet.
+  let i = 0;
+  function attempt(){
+    if(i >= sources.length){ onFail(); return; }
+    const src = sources[i++];
+    const a = new Audio(src);
+    let started = false;
+    a.addEventListener('playing', () => { started = true; }, { once: true });
+    a.addEventListener('error', () => { if(!started) attempt(); }, { once: true });
+    const p = a.play();
     if(p && typeof p.then === 'function'){
-      p.catch(() => playSynthCheers());
+      p.catch(() => { if(!started) attempt(); });
     }
+  }
+  attempt();
+}
+function playCheersSound(){
+  // Reihenfolge: 1) hochgeladener Jingle, 2) alte can-open/burp-Sounds,
+  // 3) synthetisierter Jingle — so kommt IMMER ein Ton.
+  const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
+  const chain = ANKER_JINGLE_SRC.concat(['sound-can-open.mp3', 'sound-burp-' + burpIndex + '.mp3']);
+  try{
+    tryPlayAudioChain(chain, () => playSynthCheers());
   } catch(e){ playSynthCheers(); }
 }
 
@@ -2629,12 +2701,10 @@ function showChatModal(){
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
-      '<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" class="file-hidden">' +
-      '<input type="file" id="chatPhotoInputGallery" accept="image/*" class="file-hidden">' +
       '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
-        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1;">📷 Kamera</button>' +
-        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1;">🖼️ Galerie</button>' +
+        '<label class="btn secondary file-label" id="chatPhotoCameraBtn" style="flex:1; text-align:center; cursor:pointer;">📷 Kamera<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" class="file-inlabel"></label>' +
+        '<label class="btn secondary file-label" id="chatPhotoGalleryBtn" style="flex:1; text-align:center; cursor:pointer;">🖼️ Galerie<input type="file" id="chatPhotoInputGallery" accept="image/*" class="file-inlabel"></label>' +
       '</div>' +
       '<button type="button" class="btn" id="chatSendBtn" style="width:100%; margin-top:0.6rem;">Senden</button>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
@@ -2663,8 +2733,7 @@ function showChatModal(){
   const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
   const chatCameraInput = document.getElementById('chatPhotoInputCamera');
   const chatGalleryInput = document.getElementById('chatPhotoInputGallery');
-  document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => chatCameraInput.click());
-  document.getElementById('chatPhotoGalleryBtn').addEventListener('click', () => chatGalleryInput.click());
+  // Kamera/Galerie im Chat öffnen jetzt nativ über <label for=...> — kein JS-.click().
   async function handleChatPhotoSelect(ev){
     const file = ev.target.files[0];
     if(!file) return;
@@ -3377,6 +3446,35 @@ function buildComparisonBarsHtml(perYear, valueKey, maxVal, fmtFn){
   '</div>';
 }
 
+function buildComparisonBreakdown(perYear, valueKey, fmtFn){
+  const rowVal = (r) => valueKey === 'total' ? (r.paid || 0) : (r.hours || 0);
+  const cell = (v, weight) => '<td style="text-align:right; padding:0.35rem 0.5rem; white-space:nowrap; border-bottom:1px solid var(--line);' + (weight ? ' font-weight:700;' : '') + '">' + v + '</td>';
+  let html = '<div style="overflow-x:auto; margin-top:0.6rem;">' +
+    '<table style="width:100%; border-collapse:collapse; font-size:0.8rem;">' +
+      '<thead><tr>' +
+        '<th style="text-align:left; padding:0.35rem 0.5rem; border-bottom:1px solid var(--line-strong);">Partei</th>' +
+        perYear.map(p => '<th style="text-align:right; padding:0.35rem 0.5rem; border-bottom:1px solid var(--line-strong);">' + p.year + '</th>').join('') +
+      '</tr></thead><tbody>';
+  html += state.parties.map(party => {
+    return '<tr>' +
+      '<td style="padding:0.35rem 0.5rem; white-space:nowrap; border-bottom:1px solid var(--line);"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:' + partyColor(party.id) + '; vertical-align:middle; margin-right:0.4rem;"></span>' + escapeHtml(party.name) + '</td>' +
+      perYear.map(p => {
+        const r = (p.rows || []).find(x => x.id === party.id);
+        const denom = p[valueKey] || 0;
+        const val = r ? rowVal(r) : 0;
+        const pct = denom > 0 ? (val / denom * 100) : 0;
+        return cell(fmtFn(val) + ' <span style="color:var(--ink-faint);">(' + fmtNum(pct, 0) + '%)</span>', false);
+      }).join('') +
+    '</tr>';
+  }).join('');
+  html += '<tr>' +
+    '<td style="padding:0.35rem 0.5rem; font-weight:700;">Total</td>' +
+    perYear.map(p => cell(fmtFn(p[valueKey] || 0), true)).join('') +
+  '</tr>';
+  html += '</tbody></table></div>';
+  return html;
+}
+
 function renderYearComparison(){
   const el = document.getElementById('yearComparisonChart');
   if(!el) return;
@@ -3397,9 +3495,11 @@ function renderYearComparison(){
     '<h3 style="margin-bottom:0.5rem;">Gesamtaufwand (CHF) — nach Zahler</h3>' +
     '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die tatsächlich bezahlten Beträge auf die Parteien verteilen.</div>' +
     barsHtml +
+    buildComparisonBreakdown(perYear, 'total', fmtCHF) +
     '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden — nach Nutzung</h3>' +
     '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die gefahrenen Stunden verteilen. Weicht die Verteilung vom Balken oben ab, hat eine Partei im Verhältnis zur Nutzung mehr oder weniger bezahlt.</div>' +
-    hoursHtml;
+    hoursHtml +
+    buildComparisonBreakdown(perYear, 'hours', (v) => fmtNum(v, 1) + ' Std.');
 }
 
 function exportYearComparisonCsv(){
@@ -4255,6 +4355,11 @@ function renderAdminGeneralSection(){
         '<div class="field"><label for="weatherEField">E (LV95)</label><input type="number" id="weatherEField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).E) : '') + '" placeholder="z. B. 2681100"></div>' +
         '<div class="field"><label for="weatherNField">N (LV95)</label><input type="number" id="weatherNField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).N) : '') + '" placeholder="z. B. 1224200"></div>' +
       '</div>' +
+      '<div class="row" style="margin-top:0.4rem;">' +
+        '<div class="field"><label for="meteoPlaceField">MeteoSchweiz-Ort</label><input type="text" id="meteoPlaceField" value="' + escapeHtml((state.settings.meteoPlaceName || '')) + '" placeholder="z. B. Rotkreuz"></div>' +
+        '<div class="field"><label for="meteoPlzField">PLZ</label><input type="text" id="meteoPlzField" inputmode="numeric" value="' + escapeHtml((state.settings.meteoPostcode || '')) + '" placeholder="z. B. 6343"></div>' +
+      '</div>' +
+      '<div class="hint" style="margin:-0.3rem 0 0.6rem;">Optional: Ort und PLZ genau wie auf MeteoSchweiz. Dann öffnet das Wetter-Widget zuverlässig die richtige Lokalprognose (z. B. Rotkreuz / 6343). Leer lassen = automatische Standorterkennung.</div>' +
       '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
         '<button type="button" class="btn secondary" id="useMyLocationBtn">📍 Aktuellen Standort verwenden</button>' +
         '<button class="btn" id="saveWeatherLocationBtn">Speichern</button>' +
@@ -4442,19 +4547,28 @@ function renderAdminGeneralSection(){
   });
 
   document.getElementById('saveWeatherLocationBtn').addEventListener('click', async () => {
-    const E = parseFloat(document.getElementById('weatherEField').value);
-    const N = parseFloat(document.getElementById('weatherNField').value);
+    const eRaw = document.getElementById('weatherEField').value.trim();
+    const nRaw = document.getElementById('weatherNField').value.trim();
+    const E = parseFloat(eRaw);
+    const N = parseFloat(nRaw);
     const fb = document.getElementById('weatherLocationFeedback');
-    if(isNaN(E) || isNaN(N)){
-      fb.style.color = '#C0392B'; fb.textContent = 'Bitte gültige Koordinaten angeben.'; fb.classList.add('show'); return;
+    state.settings.meteoPlaceName = document.getElementById('meteoPlaceField').value.trim();
+    state.settings.meteoPostcode = document.getElementById('meteoPlzField').value.trim();
+    if(eRaw === '' && nRaw === ''){
+      delete state.settings.weatherLat;
+      delete state.settings.weatherLon;
+    } else if(isNaN(E) || isNaN(N)){
+      fb.style.color = '#C0392B'; fb.textContent = 'Bitte gültige Koordinaten angeben (oder beide Felder leer lassen).'; fb.classList.add('show'); return;
+    } else {
+      const { lat, lon } = lv95ToWgs84(E, N);
+      state.settings.weatherLat = lat;
+      state.settings.weatherLon = lon;
     }
-    const { lat, lon } = lv95ToWgs84(E, N);
-    state.settings.weatherLat = lat;
-    state.settings.weatherLon = lon;
     logAudit('Standort für Wetteranzeige gesetzt');
     await saveShared();
     fb.style.color = '#1C9A64'; fb.textContent = 'Gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     weatherCache = {};
+    if(typeof fetchLiveWeatherWidget === 'function') fetchLiveWeatherWidget();
     renderEntriesTable();
   });
 
@@ -5104,10 +5218,8 @@ async function init(){
   document.getElementById('giftName').addEventListener('input', () => {
     if(document.getElementById('giftName').value.trim()) document.getElementById('err-gift-name').classList.remove('show');
   });
-  document.addEventListener('click', (ev) => {
-    if(ev.target.closest('#photoCameraBtn')){ document.getElementById('f-photo-camera').click(); return; }
-    if(ev.target.closest('#photoGalleryBtn')){ document.getElementById('f-photo-gallery').click(); return; }
-  });
+  // Aufnehmen/Galerie öffnen die Datei-Auswahl jetzt nativ über <label for=...>.
+  // Kein JS-.click() mehr — das wurde auf einigen Mobil-Browsern blockiert.
   const handlePhotoFile = async (ev) => {
     const file = ev.target.files[0];
     if(!file) return;
@@ -5185,7 +5297,7 @@ async function init(){
 function renderSeasonEventsList(){
   const el = document.getElementById('seasonEventsList');
   if(!el) return;
-  const events = (state.seasonEvents || []).slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0,6);
+  const events = (state.seasonEvents || []).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.type === 'launch' ? -1 : 1)).slice(-6);
   el.innerHTML = events.length ? events.map(ev =>
     '<div class="hint">' + (ev.type === 'launch' ? '🚤 Eingewassert' : '⚓ Ausgewassert') + ': ' + fmtDateCH(ev.date) + '</div>'
   ).join('') : '<div class="hint">Noch keine Einträge.</div>';
