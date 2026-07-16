@@ -102,8 +102,8 @@ body{
   font-family:'JetBrains Mono', monospace;
   font-size:0.72rem;
   color:rgba(255,255,255,0.55);
-  text-align:right;
   line-height:1.6;
+  width:100%;
 }
 .admin-badge{
   display:inline-flex;
@@ -1164,29 +1164,34 @@ function updateHeaderMeta(){
   if(!el) return;
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10);
-  let html = now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr · KW ' + isoWeekNumber(todayStr);
+  // Zusammenhängende Blöcke (Datum+Zeit / KW / Vorrecht) bleiben je auf einer
+  // Zeile und werden gleichmässig über die Bildschirmbreite verteilt.
+  const metaBlocks = [];
+  metaBlocks.push('<span style="white-space:nowrap;">' + now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) + ' · ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</span>');
+  metaBlocks.push('<span style="white-space:nowrap;">KW ' + isoWeekNumber(todayStr) + '</span>');
   const prio = currentPriorityLabel();
   if(prio){
-    html += ' · <span style="display:inline-flex; align-items:center; gap:0.35rem; vertical-align:middle;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>';
+    metaBlocks.push('<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>');
   }
-  el.innerHTML = html;
+  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + metaBlocks.join('') + '</div>';
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
-    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start;">' +
-      '<div style="display:flex; align-items:flex-start; gap:0.4rem;">' +
-        '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
-          '<div id="liveWeatherWidget"></div>' +
-          '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; text-align:center;"></div>' +
-        '</div>' +
-        '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
-        '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdöschen ausrufen">🍺</button>' +
-        '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
+    // Alle Elemente (Widget, Icons, Badge, Abmelden) gleichmässig über die
+    // Bildschirmbreite verteilt; die Standortzeile bleibt zentriert unter dem Widget.
+    const badgeHtml = isAdminUser
+      ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Admin</span>'
+      : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '');
+    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start; width:100%; gap:0.3rem;">' +
+      '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
+        '<div id="liveWeatherWidget"></div>' +
+        '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; text-align:center;"></div>' +
       '</div>' +
-      '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0; min-height:32px;">' +
-        (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
-        '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
-      '</div>' +
+      '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
+      '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdöschen ausrufen">🍺</button>' +
+      '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
+      badgeHtml +
+      '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Abmelden</button>' +
     '</div>';
     renderLiveWeatherWidgetCache();
   }
@@ -2826,14 +2831,66 @@ let beerPendingPhoto = null;
 // ebenfalls die Kamera gewählt werden).
 function openInAppCamera(onDataUrl, onCancel, maxDim, quality){
   maxDim = maxDim || 700; quality = quality || 0.6;
-  const fallback = () => {
+  const galleryFallback = () => {
     openImagePicker(false, async (file) => {
       try{ onDataUrl(await compressImage(file, maxDim, quality)); }
       catch(e){ if(typeof onCancel === 'function') onCancel(); }
     }, onCancel);
   };
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ fallback(); return; }
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(stream => {
+  // Bei Kamera-Fehlern NICHT stillschweigend die Galerie öffnen, sondern den
+  // Grund anzeigen — sonst wirkt es, als würde "Aufnehmen" die Galerie öffnen.
+  const showCameraError = (err) => {
+    const name = (err && err.name) ? err.name : 'Unbekannt';
+    let reason;
+    if(name === 'NotAllowedError' || name === 'SecurityError'){
+      reason = 'Der Browser hat den Kamera-Zugriff für diese Website blockiert. Wichtig: Das ist eine <b>eigene Website-Berechtigung im Browser</b>, unabhängig von den Android-App-Berechtigungen. Tippe in der Adressleiste auf das Schloss- bzw. Einstellungs-Symbol → Berechtigungen → Kamera → Zulassen (in Samsung Internet: Menü → Einstellungen → Websites und Downloads → Website-Berechtigungen → Kamera).';
+    } else if(name === 'NotFoundError' || name === 'OverconstrainedError'){
+      reason = 'Es wurde keine passende Kamera gefunden.';
+    } else if(name === 'NotReadableError'){
+      reason = 'Die Kamera ist gerade von einer anderen App belegt. Schliesse andere Kamera-Apps und versuche es nochmals.';
+    } else {
+      reason = 'Die Kamera konnte nicht gestartet werden.';
+    }
+    const errOverlay = document.createElement('div');
+    errOverlay.className = 'gate-overlay';
+    errOverlay.style.display = 'flex';
+    errOverlay.style.zIndex = '9999';
+    errOverlay.innerHTML =
+      '<div class="gate-card" style="max-width:420px;">' +
+        '<h2>Kamera nicht verfügbar</h2>' +
+        '<p style="margin-bottom:0.5rem;">' + reason + '</p>' +
+        '<p class="hint" style="margin:0 0 1rem;">Technischer Fehlercode: ' + escapeHtml(name) + '</p>' +
+        '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
+          '<button type="button" class="btn" id="camErrRetryBtn">🔄 Nochmals versuchen</button>' +
+          '<button type="button" class="btn secondary" id="camErrGalleryBtn">🖼️ Stattdessen Galerie öffnen</button>' +
+          '<button type="button" class="btn secondary" id="camErrCancelBtn">Abbrechen</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(errOverlay);
+    errOverlay.querySelector('#camErrRetryBtn').addEventListener('click', () => {
+      errOverlay.remove();
+      openInAppCamera(onDataUrl, onCancel, maxDim, quality);
+    });
+    errOverlay.querySelector('#camErrGalleryBtn').addEventListener('click', () => {
+      errOverlay.remove();
+      galleryFallback();
+    });
+    errOverlay.querySelector('#camErrCancelBtn').addEventListener('click', () => {
+      errOverlay.remove();
+      if(typeof onCancel === 'function') onCancel();
+    });
+  };
+  if(!window.isSecureContext){ showCameraError({ name: 'SecurityError' }); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ showCameraError({ name: 'NotFoundError' }); return; }
+  // Erst Rückkamera versuchen; scheitert das an der Einschränkung, nochmals
+  // mit irgendeiner Kamera — erst wenn auch das scheitert, Fehler anzeigen.
+  const requestStream = (facing) => navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false })
+    .catch((firstErr) => {
+      if(firstErr && (firstErr.name === 'NotAllowedError' || firstErr.name === 'SecurityError')) throw firstErr;
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    });
+  let facing = 'environment';
+  requestStream(facing).then(stream => {
     const overlay = document.createElement('div');
     overlay.className = 'gate-overlay';
     overlay.style.display = 'flex';
@@ -2841,15 +2898,40 @@ function openInAppCamera(onDataUrl, onCancel, maxDim, quality){
     overlay.innerHTML =
       '<div class="gate-card" style="text-align:center; max-width:480px;">' +
         '<video id="inAppCamVideo" autoplay playsinline muted style="width:100%; max-height:55vh; border-radius:var(--radius-sm); background:#000;"></video>' +
-        '<div style="display:flex; gap:0.6rem; margin-top:0.8rem;">' +
-          '<button type="button" class="btn" id="inAppCamShotBtn" style="flex:1;">📸 Auslösen</button>' +
-          '<button type="button" class="btn secondary" id="inAppCamCancelBtn" style="flex:1;">Abbrechen</button>' +
+        '<div style="display:flex; gap:0.5rem; margin-top:0.8rem;">' +
+          '<button type="button" class="btn" id="inAppCamShotBtn" style="flex:1.4; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">📸 Auslösen</button>' +
+          '<button type="button" class="btn secondary" id="inAppCamFlipBtn" title="Zwischen Rück- und Selfie-Kamera wechseln" style="flex:1; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">🔄 Wechseln</button>' +
+          '<button type="button" class="btn secondary" id="inAppCamCancelBtn" style="flex:1; min-width:0; white-space:nowrap; padding-left:0.5rem; padding-right:0.5rem;">Abbrechen</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
     const video = overlay.querySelector('#inAppCamVideo');
-    video.srcObject = stream;
-    const stop = () => { try{ stream.getTracks().forEach(t => t.stop()); } catch(e){} overlay.remove(); };
+    let currentStream = stream;
+    const applyStream = (st) => {
+      currentStream = st;
+      video.srcObject = st;
+      // Selfie-Kamera in der Vorschau spiegeln (wie in Kamera-Apps üblich);
+      // das gespeicherte Foto bleibt ungespiegelt.
+      video.style.transform = (facing === 'user') ? 'scaleX(-1)' : 'none';
+    };
+    applyStream(stream);
+    const stopTracks = () => { try{ currentStream.getTracks().forEach(t => t.stop()); } catch(e){} };
+    const stop = () => { stopTracks(); overlay.remove(); };
+    overlay.querySelector('#inAppCamFlipBtn').addEventListener('click', () => {
+      const flipBtn = overlay.querySelector('#inAppCamFlipBtn');
+      flipBtn.disabled = true;
+      const nextFacing = (facing === 'environment') ? 'user' : 'environment';
+      stopTracks();
+      requestStream(nextFacing).then(st => {
+        facing = nextFacing;
+        applyStream(st);
+        flipBtn.disabled = false;
+      }).catch(() => {
+        // Wechsel fehlgeschlagen — zurück zur bisherigen Kamera
+        requestStream(facing).then(st => { applyStream(st); flipBtn.disabled = false; })
+          .catch((err) => { overlay.remove(); showCameraError(err); });
+      });
+    });
     overlay.querySelector('#inAppCamCancelBtn').addEventListener('click', () => {
       stop();
       if(typeof onCancel === 'function') onCancel();
@@ -2867,10 +2949,10 @@ function openInAppCamera(onDataUrl, onCancel, maxDim, quality){
         onDataUrl(url);
       } catch(e){
         stop();
-        fallback();
+        galleryFallback();
       }
     });
-  }).catch(() => fallback());
+  }).catch((err) => showCameraError(err));
 }
 
 // Öffnet Kamera bzw. Galerie über ein bei JEDEM Tipp frisch erzeugtes
