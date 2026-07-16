@@ -2188,31 +2188,32 @@ function renderLiveWeatherWidgetCache(){
   if(locEl) locEl.innerHTML = liveWeatherLocationHtml;
 }
 async function fetchLiveWeatherWidget(){
-  // Admin kann in den Einstellungen einen festen Standort setzen — dann brauchen
-  // wir keine GPS-Abfrage und der MeteoSchweiz-Link stimmt garantiert.
-  const s = state.settings || {};
-  if(typeof s.weatherLat === 'number' && typeof s.weatherLon === 'number'){
-    renderWeatherForCoords(s.weatherLat, s.weatherLon);
-    return;
-  }
+  // Standort des Geräts automatisch erkennen (GPS) und mit MeteoSchweiz verknüpfen.
   if(!navigator.geolocation){ renderLiveWeatherWidget(''); return; }
   navigator.geolocation.getCurrentPosition((pos) => {
     renderWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
-  }, () => { renderLiveWeatherWidget(''); }, { timeout: 8000 });
+  }, () => { renderLiveWeatherWidget(''); }, { timeout: 8000, maximumAge: 600000 });
 }
 async function renderWeatherForCoords(lat, lon){
     try{
-      const s = state.settings || {};
       const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&models=meteoswiss_icon_ch1&current=temperature_2m,weathercode&timezone=Europe%2FZurich';
       const res = await fetch(url);
       const data = await res.json();
       let placeName = '';
       let postcode = '';
-      // Admin-Override für Ort + PLZ (aus den Einstellungen) hat Vorrang.
-      const ovName = (s.meteoPlaceName || '').trim();
-      const ovPlz = (s.meteoPostcode || '').trim();
-      if(ovName && ovPlz){ placeName = ovName; postcode = ovPlz.replace(/\s/g,''); }
-      // 1) Photon (komoot): CORS-freundlich, liefert für die Schweiz zuverlässig Ort + PLZ
+      // 0) GeoAdmin (swisstopo): amtlich für die Schweiz, CORS-freundlich, liefert Ortschaft + PLZ.
+      try{
+        const { E, N } = wgs84ToLv95(lat, lon);
+        const gaUrl = 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify?geometry=' + E + ',' + N +
+          '&geometryType=esriGeometryPoint&layers=all:ch.swisstopo-vd.ortschaftenverzeichnis_plz&tolerance=100&sr=2056&geometryFormat=geojson&returnGeometry=false&lang=de';
+        const gaRes = await fetch(gaUrl);
+        const ga = await gaRes.json();
+        const pr = (ga.results && ga.results[0] && (ga.results[0].properties || ga.results[0].attributes)) || {};
+        placeName = pr.langtext || pr.ortschaftsname || pr.gemeindename || pr.label || placeName || '';
+        const plzRaw = pr.plz || pr.zip || pr.postleitzahl || '';
+        postcode = String(plzRaw).replace(/\D/g,'') || postcode;
+      } catch(e){}
+      // 1) Photon (komoot) als Fallback
       if(!placeName || !postcode){
         try{
           const phRes = await fetch('https://photon.komoot.io/reverse?lat=' + lat + '&lon=' + lon + '&lang=de');
@@ -2612,34 +2613,25 @@ function playSynthCheers(){
     });
   } catch(e){}
 }
-// Dateiname des hochgeladenen Ankerdose-Jingles im Repo-Wurzelverzeichnis.
-// Lege deine Sounddatei genau so benannt neben index.html ab, dann wird sie
-// zuerst abgespielt. Erlaubt sind mehrere Kandidaten (der erste, der lädt, gewinnt).
-const ANKER_JINGLE_SRC = ['ankerdose-jingle.mp3', 'ankerdose.mp3', 'jingle.mp3'];
-function tryPlayAudioChain(sources, onFail){
-  // Versucht die Quellen der Reihe nach; spielt die erste, die erfolgreich lädt/startet.
-  let i = 0;
-  function attempt(){
-    if(i >= sources.length){ onFail(); return; }
-    const src = sources[i++];
-    const a = new Audio(src);
-    let started = false;
-    a.addEventListener('playing', () => { started = true; }, { once: true });
-    a.addEventListener('error', () => { if(!started) attempt(); }, { once: true });
-    const p = a.play();
-    if(p && typeof p.then === 'function'){
-      p.catch(() => { if(!started) attempt(); });
-    }
-  }
-  attempt();
-}
 function playCheersSound(){
-  // Reihenfolge: 1) hochgeladener Jingle, 2) alte can-open/burp-Sounds,
-  // 3) synthetisierter Jingle — so kommt IMMER ein Ton.
+  // Immer zuerst "sound-can-open.mp3", danach ein zufälliger "sound-burp-N.mp3"
+  // (N = 1..10). Beide liegen im selben Ordner wie index.html.
   const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
-  const chain = ANKER_JINGLE_SRC.concat(['sound-can-open.mp3', 'sound-burp-' + burpIndex + '.mp3']);
   try{
-    tryPlayAudioChain(chain, () => playSynthCheers());
+    const canOpen = new Audio('sound-can-open.mp3');
+    const burp = new Audio('sound-burp-' + burpIndex + '.mp3');
+    burp.load();
+    let burpStarted = false;
+    const playBurp = () => {
+      if(burpStarted) return; burpStarted = true;
+      burp.play().catch(() => playSynthCheers());
+    };
+    canOpen.addEventListener('ended', playBurp, { once: true });
+    canOpen.addEventListener('error', playBurp, { once: true });
+    const p = canOpen.play();
+    if(p && typeof p.then === 'function'){
+      p.catch(() => playBurp());
+    }
   } catch(e){ playSynthCheers(); }
 }
 
@@ -4355,11 +4347,6 @@ function renderAdminGeneralSection(){
         '<div class="field"><label for="weatherEField">E (LV95)</label><input type="number" id="weatherEField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).E) : '') + '" placeholder="z. B. 2681100"></div>' +
         '<div class="field"><label for="weatherNField">N (LV95)</label><input type="number" id="weatherNField" step="1" value="' + ((typeof state.settings.weatherLat === 'number') ? Math.round(wgs84ToLv95(state.settings.weatherLat, state.settings.weatherLon).N) : '') + '" placeholder="z. B. 1224200"></div>' +
       '</div>' +
-      '<div class="row" style="margin-top:0.4rem;">' +
-        '<div class="field"><label for="meteoPlaceField">MeteoSchweiz-Ort</label><input type="text" id="meteoPlaceField" value="' + escapeHtml((state.settings.meteoPlaceName || '')) + '" placeholder="z. B. Rotkreuz"></div>' +
-        '<div class="field"><label for="meteoPlzField">PLZ</label><input type="text" id="meteoPlzField" inputmode="numeric" value="' + escapeHtml((state.settings.meteoPostcode || '')) + '" placeholder="z. B. 6343"></div>' +
-      '</div>' +
-      '<div class="hint" style="margin:-0.3rem 0 0.6rem;">Optional: Ort und PLZ genau wie auf MeteoSchweiz. Dann öffnet das Wetter-Widget zuverlässig die richtige Lokalprognose (z. B. Rotkreuz / 6343). Leer lassen = automatische Standorterkennung.</div>' +
       '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
         '<button type="button" class="btn secondary" id="useMyLocationBtn">📍 Aktuellen Standort verwenden</button>' +
         '<button class="btn" id="saveWeatherLocationBtn">Speichern</button>' +
@@ -4552,8 +4539,6 @@ function renderAdminGeneralSection(){
     const E = parseFloat(eRaw);
     const N = parseFloat(nRaw);
     const fb = document.getElementById('weatherLocationFeedback');
-    state.settings.meteoPlaceName = document.getElementById('meteoPlaceField').value.trim();
-    state.settings.meteoPostcode = document.getElementById('meteoPlzField').value.trim();
     if(eRaw === '' && nRaw === ''){
       delete state.settings.weatherLat;
       delete state.settings.weatherLon;
