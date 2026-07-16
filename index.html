@@ -546,6 +546,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .file-hidden{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; opacity:0; }
 .file-label{ position:relative; overflow:hidden; }
 .file-inlabel{ position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; font-size:0; z-index:2; }
+.comp-table-wrap{ overflow-x:auto; margin-top:0.6rem; padding-bottom:2px; scrollbar-width:thin; scrollbar-color:var(--line-strong) var(--line); }
+.comp-table-wrap::-webkit-scrollbar{ height:4px; }
+.comp-table-wrap::-webkit-scrollbar-track{ background:var(--line); border-radius:2px; }
+.comp-table-wrap::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:2px; }
 .split-total.ok{ color:#1C9A64; }
 .split-total.bad{ color:var(--flare); font-weight:600; }
 
@@ -609,6 +613,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 @media print{
   body > *:not(#printArea){ display:none !important; }
   #printArea{ display:block; position:static; width:100%; padding:1.5rem; background:#fff; }
+  #printArea, #printArea *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   #printArea .print-header{ display:flex; align-items:center; gap:0.8rem; border-bottom:3px solid var(--volt); padding-bottom:0.7rem; margin-bottom:0.4rem; }
   #printArea .print-logo{ width:44px; height:44px; }
   #printArea h1{ font-family:'Big Shoulders Display', sans-serif; font-size:1.6rem; margin:0; color:var(--hull); text-transform:uppercase; }
@@ -784,8 +789,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
               <button type="button" class="btn secondary" id="photoCameraBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📷 Aufnehmen</button>
               <button type="button" class="btn secondary" id="photoGalleryBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">🖼️ Galerie</button>
             </div>
-            <input type="file" id="f-photo-camera" accept="image/*" capture="environment" class="file-hidden">
-            <input type="file" id="f-photo-gallery" accept="image/*" class="file-hidden">
             <div class="hint" id="photoStatus">Foto des Bordcomputers mit Motorstunden und Verbrauch aufnehmen oder auswählen. Wird automatisch verkleinert und nach 1 Jahr automatisch gelöscht.</div>
             <img id="photoPreview" style="display:none; margin-top:0.6rem; max-width:160px; border-radius:var(--radius-sm); border:1px solid var(--line-strong);">
             <div class="gate-error" id="err-photo">Bitte ein Foto auswählen — dieses Feld ist Pflicht.</div>
@@ -801,7 +804,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
                 <div class="field"><label for="giftName">Name der Person *</label><input type="text" id="giftName" placeholder="z. B. Kollege Peter"><div class="gate-error" id="err-gift-name">Bitte einen Namen angeben — dieses Feld ist Pflicht.</div></div>
                 <div class="field"><label for="giftAmount">Geschenkbetrag (CHF) *</label><input type="text" inputmode="decimal" class="amount-input" id="giftAmount" placeholder="0.00" style="min-width:140px;"><div class="gate-error" id="err-gift-amount">Bitte einen Betrag grösser als 0 und höchstens die Ausgaben angeben.</div></div>
               </div>
-              <div class="hint">Dieser Betrag wird von den Ausgaben abgezogen, bevor sie auf die Parteien aufgeteilt werden — die Bootsgemeinschaft profitiert direkt davon.</div>
+              <div class="hint">Die Schenkung wird den Parteien gutgeschrieben, die an diesem Tag auf dem Boot eingetragen sind (gemäss Aufteilung oben) — sie kommt also genau jenen zugute, die mit der Drittperson unterwegs waren. Sind alle Parteien eingetragen, profitieren alle.</div>
             </div>
           </div>
           <div class="field" style="grid-column:1 / -1;">
@@ -893,7 +896,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 </div>
 
 <div id="printArea"></div>
-<input type="file" id="beerPhotoInput" accept="image/*" capture="environment" class="file-hidden">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -1145,17 +1147,17 @@ function updateHeaderMeta(){
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
-    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between;">' +
-      '<div style="display:flex; align-items:center; gap:0.4rem;">' +
+    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start;">' +
+      '<div style="display:flex; align-items:flex-start; gap:0.4rem;">' +
         '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
           '<div id="liveWeatherWidget"></div>' +
           '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; text-align:center;"></div>' +
         '</div>' +
         '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
-        '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdose ausrufen">🍺</button>' +
-        '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang &amp; Chat">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
+        '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdöschen ausrufen">🍺</button>' +
+        '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       '</div>' +
-      '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">' +
+      '<div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0; min-height:32px;">' +
         (isAdminUser ? '<span class="admin-badge" style="white-space:nowrap;">Admin</span>' : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '')) +
         '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap;">Abmelden</button>' +
       '</div>' +
@@ -1183,8 +1185,8 @@ function showBeerCallConfirm(){
   overlay.innerHTML =
     '<div class="gate-card" style="text-align:center;">' +
       '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
-      '<h2>Ankerdose ausrufen?</h2>' +
-      '<p>Als <b>' + escapeHtml(name) + '</b> alle anderen Parteien jetzt zur Ankerdose rufen?</p>' +
+      '<h2>Ankerdöschen ausrufen?</h2>' +
+      '<p>Als <b>' + escapeHtml(name) + '</b> alle anderen Parteien jetzt zum Ankerdöschen rufen?</p>' +
       '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
         '<button class="btn" id="beerConfirmPhotoBtn">📷 Foto aufnehmen &amp; ausrufen</button>' +
         '<button class="btn secondary" id="beerConfirmNoPhotoBtn">Ohne Foto ausrufen</button>' +
@@ -1199,18 +1201,25 @@ function showBeerCallConfirm(){
   });
   document.getElementById('beerConfirmPhotoBtn').addEventListener('click', () => {
     overlay.remove();
-    const input = document.getElementById('beerPhotoInput');
-    if(!input){ finalizeBeerCall(null); return; }
     // Kamera öffnen. Nach Aufnahme ODER Abbruch geht es zur Prost-Bestätigung.
     beerCallAwaitingPhoto = true;
-    input.value = '';
     // Fallback: falls die Kamera abgebrochen wird und weder 'change' noch 'cancel' feuert
     window.addEventListener('focus', () => {
       setTimeout(() => {
         if(beerCallAwaitingPhoto){ beerCallAwaitingPhoto = false; finalizeBeerCall(null); }
       }, 1500);
     }, { once: true });
-    input.click();
+    openImagePicker(true, async (file) => {
+      if(!beerCallAwaitingPhoto) return;
+      beerCallAwaitingPhoto = false;
+      let photo = null;
+      try{ photo = await compressImage(file, 700, 0.6); } catch(e){}
+      finalizeBeerCall(photo);
+    }, () => {
+      if(!beerCallAwaitingPhoto) return;
+      beerCallAwaitingPhoto = false;
+      finalizeBeerCall(null);
+    });
   });
 }
 
@@ -1219,7 +1228,7 @@ async function finalizeBeerCall(photoDataUrl){
   const msgId = uid();
   state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
   if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-  // Ankerdose-Rufe erscheinen nur noch im Chat — keine zusätzliche Kopie im Posteingang.
+  // Ankerdöschen-Rufe erscheinen nur noch im Chat — keine zusätzliche Kopie im Posteingang.
   await saveShared();
   updateHeaderMeta();
   showBeerConfirmation();
@@ -1878,7 +1887,7 @@ function getUnreadNotifications(){
   return getRelevantNotifications().filter(n => n.ts > getInboxLastSeen());
 }
 // Für die Anzeige im Posteingang: zeigt auch eigene Rundmeldungen und eigene
-// Aktionen (z. B. selbst ausgerufene Ankerdose, selbst abgegebene Tage), damit
+// Aktionen (z. B. selbst ausgerufene Ankerdöschen, selbst abgegebene Tage), damit
 // der Posteingang nicht leer wirkt, wenn man selbst der Auslöser war.
 function getInboxListNotifications(){
   if(!state.notifications) return [];
@@ -1904,42 +1913,10 @@ function setPushEnabled(on){
   try{ localStorage.setItem('wakelog-push-enabled', on ? 'on' : 'off'); } catch(e){}
 }
 
+// Chat = Posteingang: eine gemeinsame Ansicht für Nachrichten, Ankerdöschen-Rufe
+// und automatische Mitteilungen.
 function showInboxModal(){
-  const items = getInboxListNotifications();
-  const overlay = document.createElement('div');
-  overlay.className = 'gate-overlay';
-  overlay.style.display = 'flex';
-  const pushOn = getPushEnabled();
-  overlay.innerHTML =
-    '<div class="gate-card">' +
-      '<h2>Posteingang</h2>' +
-      '<button class="btn secondary" id="openChatFromInboxBtn" style="width:100%; margin-bottom:1rem;">💬 Chat öffnen' + (getUnreadChatCount() > 0 ? ' (' + getUnreadChatCount() + ' neu)' : '') + '</button>' +
-      '<div class="toggle-row" style="margin-bottom:1rem; padding-bottom:0.9rem; border-bottom:1px solid var(--line);">' +
-        '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
-        '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
-      '</div>' +
-      (items.length ? '<div style="max-height:55vh; overflow-y:auto; margin-bottom:1rem;">' +
-        items.map(n => '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
-          '<div>' + escapeHtml(n.message) + '</div>' +
-          '<div class="hint" style="margin:0;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
-        '</div>').join('') +
-      '</div>' : '<div class="empty">Noch keine Mitteilungen.<br><span style="font-size:0.82rem;">Hier erscheinen automatische Hinweise — z.&nbsp;B. zu Vorrechtstagen (Anfragen, Zu- und Absagen, Abgaben). Persönliche Nachrichten und Ankerdose-Rufe laufen über den Chat.</span></div>') +
-      '<button class="btn" id="inboxCloseBtn" style="margin-top:1.1rem;">Schliessen</button>' +
-    '</div>';
-  document.body.appendChild(overlay);
-  document.getElementById('openChatFromInboxBtn').addEventListener('click', () => {
-    overlay.remove();
-    showChatModal();
-  });
-  document.getElementById('pushToggle').addEventListener('change', (ev) => {
-    setPushEnabled(ev.target.checked);
-    if(ev.target.checked) requestNotificationPermission();
-  });
-  document.getElementById('inboxCloseBtn').addEventListener('click', () => {
-    setInboxLastSeen(Date.now());
-    overlay.remove();
-    updateHeaderMeta();
-  });
+  showChatModal();
 }
 function initials(name){ return name.trim().split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase(); }
 
@@ -2571,7 +2548,7 @@ function showBeerConfirmation(){
   overlay.innerHTML =
     '<div class="gate-card" style="text-align:center;">' +
       '<div style="font-size:2.5rem; margin-bottom:0.6rem;">🍺</div>' +
-      '<h2>Ankerdose ausgerufen!</h2>' +
+      '<h2>Ankerdöschen ausgerufen!</h2>' +
       '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen. Drück auf Prost! 🍻</p>' +
       '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">🍻 Prost!</button>' +
     '</div>';
@@ -2591,8 +2568,8 @@ function checkNewBeerCalls(oldMessages, newMessages){
       // Kein pushNotification mehr: der Ruf steht bereits im Chat — sonst doppelt im Posteingang.
       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && getPushEnabled()){
         try{
-          new Notification('⚓ Ankerdose!', {
-            body: partyName(m.fromPartyId) + ' ruft zur Ankerdose — Prost mitmachen?',
+          new Notification('⚓ Ankerdöschen!', {
+            body: partyName(m.fromPartyId) + ' ruft zum Ankerdöschen — Prost mitmachen?',
             icon: 'icon-192.png'
           });
         } catch(e){}
@@ -2627,23 +2604,36 @@ function playSynthCheers(){
   } catch(e){}
 }
 function playCheersSound(){
-  // Immer zuerst "sound-can-open.mp3", danach ein zufälliger "sound-burp-N.mp3"
-  // (N = 1..10). Beide liegen im selben Ordner wie index.html.
+  // Feste Reihenfolge: 1. "sound-can-open.mp3", 2. "drink-sip-and-swallow.mp3",
+  // 3. ein zufälliger "sound-burp-N.mp3" (N = 1..10).
+  // Alle Dateien liegen im selben Ordner wie index.html.
   const burpIndex = Math.floor(Math.random() * BURP_SOUND_COUNT) + 1;
   try{
     const canOpen = new Audio('sound-can-open.mp3');
+    const sip = new Audio('drink-sip-and-swallow.mp3');
     const burp = new Audio('sound-burp-' + burpIndex + '.mp3');
-    burp.load();
-    let burpStarted = false;
+    sip.load(); burp.load();
+    let sipFailed = false, burpFailed = false;
+    sip.addEventListener('error', () => { sipFailed = true; }, { once: true });
+    burp.addEventListener('error', () => { burpFailed = true; }, { once: true });
+    let sipStarted = false, burpStarted = false;
     const playBurp = () => {
       if(burpStarted) return; burpStarted = true;
+      if(burpFailed){ playSynthCheers(); return; }
       burp.play().catch(() => playSynthCheers());
     };
-    canOpen.addEventListener('ended', playBurp, { once: true });
-    canOpen.addEventListener('error', playBurp, { once: true });
+    const playSip = () => {
+      if(sipStarted) return; sipStarted = true;
+      if(sipFailed){ playBurp(); return; }
+      sip.addEventListener('ended', playBurp, { once: true });
+      const p2 = sip.play();
+      if(p2 && typeof p2.then === 'function'){ p2.catch(() => playBurp()); }
+    };
+    canOpen.addEventListener('ended', playSip, { once: true });
+    canOpen.addEventListener('error', playSip, { once: true });
     const p = canOpen.play();
     if(p && typeof p.then === 'function'){
-      p.catch(() => playBurp());
+      p.catch(() => playSip());
     }
   } catch(e){ playSynthCheers(); }
 }
@@ -2666,17 +2656,29 @@ function getUnreadChatCount(){
 let chatRecipientIds = null; // null = alle
 
 function renderChatMessageListInto(list){
-  const msgs = getRelevantChatMessages().slice().sort((a,b) => a.ts - b.ts);
-  if(!msgs.length){
-    list.innerHTML = '<div class="empty">Noch keine Nachrichten.</div>';
+  // Chat = Posteingang: Chat-Nachrichten und automatische Mitteilungen
+  // erscheinen zeitlich sortiert in EINEM Verlauf.
+  const chatItems = getRelevantChatMessages().map(m => ({ kind: 'chat', ts: m.ts, m }));
+  const noteItems = getInboxListNotifications().map(n => ({ kind: 'note', ts: n.ts || 0, n }));
+  const items = chatItems.concat(noteItems).sort((a,b) => a.ts - b.ts);
+  if(!items.length){
+    list.innerHTML = '<div class="empty">Noch keine Nachrichten oder Mitteilungen.<br><span style="font-size:0.82rem;">Hier erscheinen persönliche Nachrichten, Ankerdöschen-Rufe und automatische Hinweise — z.&nbsp;B. zu Vorrechtstagen.</span></div>';
   } else {
-    list.innerHTML = msgs.map(m => {
+    list.innerHTML = items.map(item => {
+      if(item.kind === 'note'){
+        const n = item.n;
+        return '<div style="align-self:center; max-width:92%;">' +
+          '<div style="background:var(--foam); border:1.5px dashed var(--bronze-line); border-radius:12px; padding:0.5rem 0.75rem; font-size:0.84rem; text-align:center;">🔔 ' + escapeHtml(n.message) + '</div>' +
+          '<div class="hint" style="margin-top:0.15rem; text-align:center;">' + new Date(n.ts).toLocaleDateString('de-CH') + ', ' + new Date(n.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+        '</div>';
+      }
+      const m = item.m;
       const mine = m.fromPartyId === session.partyId;
       const isBeer = m.type === 'beer';
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
         '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.6rem 0.8rem;">' +
-          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zur Ankerdose!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + toLabel + '</div>') +
+          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zum Ankerdöschen!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + toLabel + '</div>') +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
         '</div>' +
@@ -2689,14 +2691,20 @@ function renderChatMessageListInto(list){
 
 function showChatModal(){
   setChatLastSeen(Date.now());
+  setInboxLastSeen(Date.now());
   updateHeaderMeta();
   const overlay = document.createElement('div');
   overlay.className = 'gate-overlay';
   overlay.style.display = 'flex';
   const otherParties = state.parties.filter(p => p.id !== session.partyId);
+  const pushOn = getPushEnabled();
   overlay.innerHTML =
     '<div class="gate-card" style="max-width:480px;">' +
-      '<h2>Chat</h2>' +
+      '<h2>Posteingang</h2>' +
+      '<div class="toggle-row" style="margin-bottom:0.9rem; padding-bottom:0.8rem; border-bottom:1px solid var(--line);">' +
+        '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
+        '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
+      '</div>' +
       '<div id="chatMessageList" style="max-height:45vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
         '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
@@ -2708,8 +2716,8 @@ function showChatModal(){
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="2" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
-        '<label class="btn secondary file-label" id="chatPhotoCameraBtn" style="flex:1; text-align:center; cursor:pointer;">📷 Kamera<input type="file" id="chatPhotoInputCamera" accept="image/*" capture="environment" class="file-inlabel"></label>' +
-        '<label class="btn secondary file-label" id="chatPhotoGalleryBtn" style="flex:1; text-align:center; cursor:pointer;">🖼️ Galerie<input type="file" id="chatPhotoInputGallery" accept="image/*" class="file-inlabel"></label>' +
+        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; text-align:center;">📷 Aufnehmen</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; text-align:center;">🖼️ Galerie</button>' +
       '</div>' +
       '<button type="button" class="btn" id="chatSendBtn" style="width:100%; margin-top:0.6rem;">Senden</button>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
@@ -2736,20 +2744,23 @@ function showChatModal(){
   });
 
   const chatPreviewArea = document.getElementById('chatPhotoPreviewArea');
-  const chatCameraInput = document.getElementById('chatPhotoInputCamera');
-  const chatGalleryInput = document.getElementById('chatPhotoInputGallery');
-  // Kamera/Galerie im Chat öffnen jetzt nativ über <label for=...> — kein JS-.click().
-  async function handleChatPhotoSelect(ev){
-    const file = ev.target.files[0];
+  // Kamera/Galerie über ein pro Tipp frisch erzeugtes Datei-Feld (openImagePicker) —
+  // zuverlässiger als wiederverwendete versteckte Inputs oder Label-Overlays.
+  async function handleChatPhotoSelect(file){
     if(!file) return;
     try{
       chatPendingPhoto = await compressImage(file, 700, 0.6);
       chatPreviewArea.innerHTML = '<img src="' + chatPendingPhoto + '" style="max-width:120px; border-radius:8px; border:1px solid var(--bronze-line);"> <button type="button" class="del-btn" id="chatPhotoRemoveBtn">entfernen</button>';
-      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; ev.target.value = ''; });
+      document.getElementById('chatPhotoRemoveBtn').addEventListener('click', () => { chatPendingPhoto = null; chatPreviewArea.innerHTML = ''; });
     } catch(e){}
   }
-  chatCameraInput.addEventListener('change', handleChatPhotoSelect);
-  chatGalleryInput.addEventListener('change', handleChatPhotoSelect);
+  document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => openImagePicker(true, handleChatPhotoSelect));
+  document.getElementById('chatPhotoGalleryBtn').addEventListener('click', () => openImagePicker(false, handleChatPhotoSelect));
+
+  document.getElementById('pushToggle').addEventListener('change', (ev) => {
+    setPushEnabled(ev.target.checked);
+    if(ev.target.checked) requestNotificationPermission();
+  });
 
   document.getElementById('chatSendBtn').addEventListener('click', async () => {
     if(!session.partyId && !isAdminUser) return;
@@ -2762,8 +2773,6 @@ function showChatModal(){
     textInput.value = '';
     chatPendingPhoto = null;
     chatPreviewArea.innerHTML = '';
-    chatCameraInput.value = '';
-    chatGalleryInput.value = '';
     await saveShared();
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
@@ -2771,6 +2780,7 @@ function showChatModal(){
 
   document.getElementById('chatCloseBtn').addEventListener('click', () => {
     setChatLastSeen(Date.now());
+    setInboxLastSeen(Date.now());
     overlay.remove();
     updateHeaderMeta();
   });
@@ -2778,6 +2788,34 @@ function showChatModal(){
 
 let chatPendingPhoto = null;
 let beerPendingPhoto = null;
+
+// Öffnet Kamera bzw. Galerie über ein bei JEDEM Tipp frisch erzeugtes
+// <input type="file">. Wiederverwendete/versteckte Inputs werden von manchen
+// Android-/iOS-Browsern beim zweiten Mal oder in der installierten App
+// ignoriert — ein frisches Element im selben User-Tap ist der zuverlässigste Weg.
+function openImagePicker(useCamera, onFile, onCancel){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  if(useCamera) input.setAttribute('capture', 'environment');
+  input.style.position = 'fixed';
+  input.style.top = '-1000px';
+  input.style.left = '-1000px';
+  input.style.width = '1px';
+  input.style.height = '1px';
+  input.style.opacity = '0';
+  document.body.appendChild(input);
+  let done = false;
+  const finish = (file) => {
+    if(done) return; done = true;
+    setTimeout(() => { try{ input.remove(); } catch(e){} }, 1000);
+    if(file){ onFile(file); }
+    else if(typeof onCancel === 'function'){ onCancel(); }
+  };
+  input.addEventListener('change', () => finish(input.files && input.files[0]), { once: true });
+  input.addEventListener('cancel', () => finish(null), { once: true });
+  input.click();
+}
 
 async function compressImage(file, maxDim, quality){
   return new Promise((resolve, reject) => {
@@ -2820,10 +2858,6 @@ function pruneOldPhotos(){
 function resetPhotoField(){
   pendingPhotoDataUrl = null;
   existingPhotoDataUrl = null;
-  const camInput = document.getElementById('f-photo-camera');
-  if(camInput) camInput.value = '';
-  const galInput = document.getElementById('f-photo-gallery');
-  if(galInput) galInput.value = '';
   const preview = document.getElementById('photoPreview');
   if(preview){ preview.style.display = 'none'; preview.src = ''; }
   const status = document.getElementById('photoStatus');
@@ -3061,6 +3095,7 @@ function computeSettlement(year){
     if(flags.hasRefuel){
       const giftAmt = (typeof e.giftAmount === 'number' && e.giftAmount > 0) ? e.giftAmount : 0;
       totalGifts += giftAmt;
+      // Die Parteien zahlen effektiv nur (Ausgaben - Geschenk) …
       const effectiveExpense = Math.max(0, (e.expense || 0) - giftAmt);
       const payer = getEntryPaidSplit(e);
       payer.ids.forEach(id => {
@@ -3068,6 +3103,19 @@ function computeSettlement(year){
         const pct = (payer.split[id] || 0) / 100;
         paid[id] += effectiveExpense * pct;
       });
+      // … die Schenkung wird aber wie eine Zahlung der Parteien behandelt, die an
+      // diesem Tag auf dem Boot eingetragen waren (gemäss Nutzungs-Aufteilung).
+      // So kommt sie genau diesen Parteien zugute; sind alle eingetragen, allen.
+      // Die vollen Ausgaben bleiben im Kostenpool, die Rechnung geht auf (Summe = 0).
+      if(giftAmt > 0){
+        const usage = getEntryUsageSplit(e);
+        const creditIds = usage.ids.length ? usage.ids : payer.ids;
+        const creditSplit = usage.ids.length ? usage.split : payer.split;
+        creditIds.forEach(id => {
+          if(!(id in paid)) return;
+          paid[id] += giftAmt * ((creditSplit[id] || 0) / 100);
+        });
+      }
     }
   });
 
@@ -3151,27 +3199,42 @@ function downloadCsv(filename, rows){
 function exportYearOverviewCsv(year){
   const yearEntries = state.entries.filter(e => yearOf(e.date) === year).sort((a,b) => a.date.localeCompare(b.date));
   const hoursMap = computeHoursMap();
-  const rows = [['Datum','Partei(en)','Typ','Zaehlerstand [h]','Std. [h]','Ø-Rate [l/h]','Verbrauch [l]','Getankt [l]','Preis [CHF/l]','Ausgaben [CHF]']];
+  const rows = [['Datum','Partei(en)','Typ','Zaehlerstand [h]','Std. [h]','Ø-Rate [l/h]','Verbrauch [l]','Getankt [l]','Preis [CHF/l]','Ausgaben [CHF]','Geschenk [CHF]']];
   yearEntries.forEach(e => {
     const flags = getEntryFlags(e);
     const usage = getEntryUsageSplit(e);
     const names = usage.ids.map(id => partyName(id)).join(' + ');
+    const h = hoursMap[e.id] || 0;
+    const rate = (typeof e.consumption === 'number') ? e.consumption : 0;
     rows.push([
       fmtDateCH(e.date),
       names,
       (flags.hasUsage ? 'Nutzung' : '') + (flags.hasUsage && flags.hasRefuel ? ' + ' : '') + (flags.hasRefuel ? 'Tanken' : ''),
       flags.hasUsage && typeof e.reading === 'number' ? e.reading : '',
-      flags.hasUsage ? fmtNum(hoursMap[e.id] || 0, 1) : '',
+      flags.hasUsage ? fmtNum(h, 1) : '',
       typeof e.consumption === 'number' ? e.consumption : '',
+      flags.hasUsage && rate > 0 ? fmtNum(h * rate, 1) : '',
       flags.hasRefuel ? e.liters : '',
       flags.hasRefuel && e.liters > 0 ? (e.expense / e.liters).toFixed(2) : '',
-      flags.hasRefuel ? e.expense : ''
+      flags.hasRefuel ? e.expense : '',
+      (flags.hasRefuel && typeof e.giftAmount === 'number' && e.giftAmount > 0) ? fmtNum(e.giftAmount, 2) : ''
     ]);
   });
   const totalHours = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
+  const totalConsumedL = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasUsage && typeof e.consumption === 'number' ? (hoursMap[e.id]||0) * e.consumption : 0), 0);
   const totalLiters = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.liters||0) : 0), 0);
   const totalExpense = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel ? (e.expense||0) : 0), 0);
-  rows.push(['Total', '', '', '', fmtNum(totalHours,1), '', totalLiters ? fmtNum(totalLiters,1) : '', '', totalExpense ? fmtNum(totalExpense,2) : '']);
+  const totalGiftsCsv = yearEntries.reduce((s,e) => s + (getEntryFlags(e).hasRefuel && typeof e.giftAmount === 'number' ? (e.giftAmount||0) : 0), 0);
+  rows.push([
+    'Total', '', '', '',
+    fmtNum(totalHours,1),
+    '',
+    totalConsumedL ? fmtNum(totalConsumedL,1) : '',
+    totalLiters ? fmtNum(totalLiters,1) : '',
+    totalLiters > 0 && totalExpense > 0 ? (totalExpense / totalLiters).toFixed(2) : '',
+    totalExpense ? fmtNum(totalExpense,2) : '',
+    totalGiftsCsv ? fmtNum(totalGiftsCsv,2) : ''
+  ]);
   downloadCsv('wakelog-' + year + '.csv', rows);
 }
 
@@ -3199,7 +3262,7 @@ function exportYearOverviewPdf(year){
     '<table><tr><th>Position</th><th>Betrag</th></tr>' +
     '<tr><td>Benzin gesamt</td><td>' + fmtCHF(totalFuelExpense) + '</td></tr>' +
     '<tr><td>Fixkosten gesamt</td><td>' + fmtCHF(totalAnnual) + '</td></tr>' +
-    (totalGifts > 0 ? '<tr><td>Geschenke von Dritten (bereits abgezogen)</td><td>' + fmtCHF(totalGifts) + '</td></tr>' : '') +
+    (totalGifts > 0 ? '<tr><td>Geschenke von Dritten (den anwesenden Parteien gutgeschrieben)</td><td>' + fmtCHF(totalGifts) + '</td></tr>' : '') +
     '</table>';
 
   const annualItems = (state.annualCosts && state.annualCosts[year]) || [];
@@ -3274,7 +3337,7 @@ function renderSettlement(){
     html += '<div class="notice warn">Für ' + year + ' liegen keine Nutzungsstunden vor — die jährlichen Fixkosten wurden daher gleichmässig auf alle Parteien aufgeteilt, nicht nach Nutzungsanteil.</div>';
   }
   if(totalGifts > 0){
-    html += '<div class="notice">🎁 ' + fmtCHF(totalGifts) + ' wurden ' + year + ' von externen Personen geschenkt und sind bereits von den Benzinkosten abgezogen — die Parteien teilen sich nur den Rest.</div>';
+    html += '<div class="notice">🎁 ' + fmtCHF(totalGifts) + ' wurden ' + year + ' von externen Personen geschenkt. Die Schenkung ist den Parteien gutgeschrieben, die an den jeweiligen Tagen auf dem Boot eingetragen waren.</div>';
   }
 
   html += '<div class="stat-row">' +
@@ -3454,7 +3517,7 @@ function buildComparisonBarsHtml(perYear, valueKey, maxVal, fmtFn){
 function buildComparisonBreakdown(perYear, valueKey, fmtFn){
   const rowVal = (r) => valueKey === 'total' ? (r.paid || 0) : (r.hours || 0);
   const cell = (v, weight) => '<td style="text-align:right; padding:0.35rem 0.5rem; white-space:nowrap; border-bottom:1px solid var(--line);' + (weight ? ' font-weight:700;' : '') + '">' + v + '</td>';
-  let html = '<div style="overflow-x:auto; margin-top:0.6rem;">' +
+  let html = '<div class="comp-table-wrap">' +
     '<table style="width:100%; border-collapse:collapse; font-size:0.8rem;">' +
       '<thead><tr>' +
         '<th style="text-align:left; padding:0.35rem 0.5rem; border-bottom:1px solid var(--line-strong);">Partei</th>' +
@@ -3501,7 +3564,7 @@ function renderYearComparison(){
     '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die tatsächlich bezahlten Beträge auf die Parteien verteilen.</div>' +
     barsHtml +
     buildComparisonBreakdown(perYear, 'total', fmtCHF) +
-    '<h3 style="margin:1.4rem 0 0.5rem;">Motorstunden — nach Nutzung</h3>' +
+    '<h3 style="margin:2.6rem 0 0.5rem;">Motorstunden — nach Nutzung</h3>' +
     '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die gefahrenen Stunden verteilen. Weicht die Verteilung vom Balken oben ab, hat eine Partei im Verhältnis zur Nutzung mehr oder weniger bezahlt.</div>' +
     hoursHtml +
     buildComparisonBreakdown(perYear, 'hours', (v) => fmtNum(v, 1) + ' Std.');
@@ -3509,13 +3572,65 @@ function renderYearComparison(){
 
 function exportYearComparisonCsv(){
   const perYear = getYearComparisonData();
-  const rows = [['Jahr','Partei','Anteil Gesamtaufwand [CHF]','Anteil Motorstunden [h]']];
+  const rows = [['Jahr','Partei','Bezahlt [CHF]','Anteil Kosten [%]','Fairer Anteil [CHF]','Motorstunden [h]','Anteil Stunden [%]']];
   perYear.forEach(p => {
     p.rows.forEach(r => {
-      rows.push([p.year, r.name, r.fairShare.toFixed(2), fmtNum(r.hours,1)]);
+      const costPct = p.total > 0 ? (r.paid / p.total * 100) : 0;
+      const hourPct = p.hours > 0 ? (r.hours / p.hours * 100) : 0;
+      rows.push([p.year, r.name, (r.paid||0).toFixed(2), fmtNum(costPct,0), (r.fairShare||0).toFixed(2), fmtNum(r.hours,1), fmtNum(hourPct,0)]);
     });
+    rows.push([p.year, 'Total', (p.total||0).toFixed(2), p.total > 0 ? '100' : '0', (p.total||0).toFixed(2), fmtNum(p.hours,1), p.hours > 0 ? '100' : '0']);
   });
   downloadCsv('wakelog-jahresvergleich.csv', rows);
+}
+
+function buildPrintComparisonBars(perYear, valueKey, maxVal, fmtFn){
+  // Druckfeste Variante: feste Pixel-Höhen statt Prozent-Höhen in Flexboxen
+  // (die viele Druck-Engines verwerfen) und explizites print-color-adjust,
+  // damit die farbigen Balken im PDF sichtbar bleiben.
+  const CHART_H = 110;
+  const cellStyle = 'vertical-align:bottom; text-align:center; border:none; padding:0 10px;';
+  let html = '<table style="width:100%; border-collapse:collapse; margin-bottom:0.4rem;"><tr>';
+  perYear.forEach(p => {
+    const barH = Math.max(4, Math.round((p[valueKey] / maxVal) * CHART_H));
+    let segs = '';
+    if(p[valueKey] > 0){
+      p.rows.forEach(r => {
+        const val = valueKey === 'total' ? (r.paid || 0) : (r.hours || 0);
+        const share = val / p[valueKey];
+        if(share <= 0) return;
+        const segH = Math.max(1, Math.round(share * barH));
+        segs = '<div style="width:100%; height:' + segH + 'px; background:' + partyColor(r.id) + '; -webkit-print-color-adjust:exact; print-color-adjust:exact;"></div>' + segs;
+      });
+    }
+    html += '<td style="' + cellStyle + '">' +
+      '<div style="height:' + CHART_H + 'px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;">' +
+        '<div style="width:30px; height:' + barH + 'px; border-radius:3px 3px 0 0; overflow:hidden; background:#eee; -webkit-print-color-adjust:exact; print-color-adjust:exact;">' + segs + '</div>' +
+      '</div>' +
+      '<div style="font-weight:700; font-size:0.82rem; margin-top:0.25rem;">' + fmtFn(p[valueKey]) + '</div>' +
+      '<div style="font-size:0.82rem;">' + p.year + '</div>' +
+    '</td>';
+  });
+  html += '</tr></table>';
+  return html;
+}
+
+function buildPrintComparisonTable(perYear, valueKey, fmtFn){
+  let html = '<table><tr><th>Partei</th>' + perYear.map(p => '<th style="text-align:right;">' + p.year + '</th>').join('') + '</tr>';
+  state.parties.forEach(party => {
+    html += '<tr><td><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:' + partyColor(party.id) + '; vertical-align:middle; margin-right:0.35rem; -webkit-print-color-adjust:exact; print-color-adjust:exact;"></span>' + escapeHtml(party.name) + '</td>';
+    perYear.forEach(p => {
+      const r = (p.rows || []).find(x => x.id === party.id);
+      const val = r ? (valueKey === 'total' ? (r.paid || 0) : (r.hours || 0)) : 0;
+      const denom = p[valueKey] || 0;
+      const pct = denom > 0 ? (val / denom * 100) : 0;
+      html += '<td style="text-align:right;">' + fmtFn(val) + ' (' + fmtNum(pct,0) + '%)</td>';
+    });
+    html += '</tr>';
+  });
+  html += '<tr class="print-result-row"><td>Total</td>' + perYear.map(p => '<td style="text-align:right;">' + fmtFn(p[valueKey] || 0) + '</td>').join('') + '</tr>';
+  html += '</table>';
+  return html;
 }
 
 function exportYearComparisonPdf(){
@@ -3529,14 +3644,19 @@ function exportYearComparisonPdf(){
       '<div><h1>WakeLog</h1><div class="print-subtitle">Jahresvergleich</div></div>' +
     '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
-  html += '<h2>Gesamtaufwand (CHF)</h2>' + buildComparisonBarsHtml(perYear, 'total', maxTotal, fmtCHF);
-  html += '<h2>Motorstunden</h2>' + buildComparisonBarsHtml(perYear, 'hours', maxHours, (v) => fmtNum(v,1) + ' Std.');
+  html += '<div style="margin-bottom:0.6rem;">' + state.parties.map(p => '<span style="display:inline-block; margin-right:1rem; font-size:0.85rem;"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:' + partyColor(p.id) + '; vertical-align:middle; margin-right:0.35rem; -webkit-print-color-adjust:exact; print-color-adjust:exact;"></span>' + escapeHtml(p.name) + '</span>').join('') + '</div>';
+  html += '<h2>Gesamtaufwand (CHF) — nach Zahler</h2>';
+  html += buildPrintComparisonBars(perYear, 'total', maxTotal, fmtCHF);
+  html += buildPrintComparisonTable(perYear, 'total', fmtCHF);
+  html += '<h2>Motorstunden — nach Nutzung</h2>';
+  html += buildPrintComparisonBars(perYear, 'hours', maxHours, (v) => fmtNum(v,1) + ' Std.');
+  html += buildPrintComparisonTable(perYear, 'hours', (v) => fmtNum(v,1) + ' Std.');
   perYear.forEach(p => {
     html += '<h2>' + p.year + ' — Details</h2>';
     html += '<div class="print-balance">Gesamtaufwand: ' + fmtCHF(p.total) + ' · Motorstunden: ' + fmtNum(p.hours,1) + '</div>';
-    html += '<table><tr><th>Partei</th><th>Anteil Gesamtaufwand</th><th>Motorstunden</th></tr>';
+    html += '<table><tr><th>Partei</th><th>Bezahlt</th><th>Fairer Anteil</th><th>Motorstunden</th></tr>';
     p.rows.forEach(r => {
-      html += '<tr><td>' + escapeHtml(r.name) + '</td><td>' + fmtCHF(r.fairShare) + '</td><td>' + fmtNum(r.hours,1) + '</td></tr>';
+      html += '<tr><td>' + escapeHtml(r.name) + '</td><td>' + fmtCHF(r.paid || 0) + '</td><td>' + fmtCHF(r.fairShare || 0) + '</td><td>' + fmtNum(r.hours,1) + '</td></tr>';
     });
     html += '</table>';
   });
@@ -5221,11 +5341,10 @@ async function init(){
   document.getElementById('giftName').addEventListener('input', () => {
     if(document.getElementById('giftName').value.trim()) document.getElementById('err-gift-name').classList.remove('show');
   });
-  // Aufnehmen/Galerie: echte Buttons, die das versteckte Datei-Feld per .click() im
-  // User-Tap öffnen — gleiches Muster wie beim Ankerdose-Foto, das zuverlässig die
-  // Kamera-App startet. (Das Label-Overlay davor funktionierte auf iOS nicht immer.)
-  const handlePhotoFile = async (ev) => {
-    const file = ev.target.files[0];
+  // Aufnehmen/Galerie: bei jedem Tipp wird ein frisches Datei-Feld erzeugt und
+  // im selben User-Tap geöffnet (openImagePicker) — zuverlässiger als ein
+  // wiederverwendetes verstecktes Input, das manche Mobil-Browser ignorieren.
+  const handlePhotoFile = async (file) => {
     if(!file) return;
     const status = document.getElementById('photoStatus');
     status.textContent = 'Foto wird verarbeitet …';
@@ -5239,18 +5358,8 @@ async function init(){
       status.textContent = 'Foto konnte nicht gelesen werden. Bitte erneut versuchen.';
     }
   };
-  document.getElementById('f-photo-camera').addEventListener('change', handlePhotoFile);
-  document.getElementById('f-photo-gallery').addEventListener('change', handlePhotoFile);
-  document.getElementById('photoCameraBtn').addEventListener('click', () => {
-    const inp = document.getElementById('f-photo-camera');
-    inp.value = '';
-    inp.click();
-  });
-  document.getElementById('photoGalleryBtn').addEventListener('click', () => {
-    const inp = document.getElementById('f-photo-gallery');
-    inp.value = '';
-    inp.click();
-  });
+  document.getElementById('photoCameraBtn').addEventListener('click', () => openImagePicker(true, handlePhotoFile));
+  document.getElementById('photoGalleryBtn').addEventListener('click', () => openImagePicker(false, handlePhotoFile));
   [['f-date','err-date'],['f-reading','err-reading'],['f-consumption','err-consumption'],['f-expense','err-expense']].forEach(([fieldId, errId]) => {
     const el = document.getElementById(fieldId);
     el.addEventListener('input', () => document.getElementById(errId).classList.remove('show'));
@@ -5282,24 +5391,6 @@ async function init(){
   setupUpdateChecking();
   setupSceneStripTracking();
   setupChatUI();
-  const beerPhotoInput = document.getElementById('beerPhotoInput');
-  if(beerPhotoInput){
-    beerPhotoInput.addEventListener('change', async (ev) => {
-      const file = ev.target.files[0];
-      ev.target.value = '';
-      if(!beerCallAwaitingPhoto) return;
-      beerCallAwaitingPhoto = false;
-      let photo = null;
-      if(file){ try{ photo = await compressImage(file, 700, 0.6); } catch(e){} }
-      finalizeBeerCall(photo);
-    });
-    // Wird die Kamera abgebrochen, trotzdem ausrufen (ohne Foto)
-    beerPhotoInput.addEventListener('cancel', () => {
-      if(!beerCallAwaitingPhoto) return;
-      beerCallAwaitingPhoto = false;
-      finalizeBeerCall(null);
-    });
-  }
   setupSeasonUI();
   fetchLiveWeatherWidget();
   setInterval(fetchLiveWeatherWidget, 15 * 60 * 1000);
