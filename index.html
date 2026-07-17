@@ -950,6 +950,11 @@ const BOOTKEY_STORAGE = 'boot-logbuch-bootkey';
 const LEGACY_DATA_PATH = 'bootslogbuch/data';
 let dataRef = null;
 
+function randomBootKey(){
+  // Bewusst anderes Format als der Wiederherstellungscode (XXXX-XXXX-XXXX),
+  // damit die beiden Codes nie verwechselt werden können.
+  return 'BOOT-' + randomCode(4) + '-' + randomCode(4);
+}
 function normalizeBootKey(raw){
   return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -995,10 +1000,34 @@ async function resolveDataRef(){
             '<button type="button" class="btn secondary" id="bootKeyMigrateBtn" style="width:100%;">🔒 Daten absichern & Schlüssel erstellen</button>' +
           '</div>'
         : '') +
+        '<div style="text-align:center; margin-top:1rem;"><a href="#" id="bootKeyLostLink" style="font-size:0.78rem; color:var(--ink-faint);">Bootsschlüssel verloren?</a></div>' +
+        '<div id="bootKeyLostBox" style="display:none; margin-top:0.8rem; padding-top:0.8rem; border-top:1px solid var(--line); text-align:left;">' +
+          '<p class="hint" style="margin:0 0 0.5rem;"><b>1.</b> Zuerst bei allen Parteien nachfragen: Jedes Gerät, das den Schlüssel je eingegeben hat, kann ihn unter Verwaltung → Allg. Einstellungen → Bootsschlüssel → "👁 Anzeigen" wieder zeigen.</p>' +
+          '<p class="hint" style="margin:0 0 0.5rem;"><b>2.</b> Hat ihn wirklich niemand mehr: Der Inhaber des Firebase-Projekts kann die Daten retten. In der Firebase-Konsole (Realtime Database → Daten) den Knoten unter <code>bootslogbuch/v2</code> öffnen, über das ⋮-Menü <b>JSON exportieren</b>. Dann hier einen neuen Wunsch-Schlüssel eingeben und den Pfad berechnen lassen:</p>' +
+          '<div style="display:flex; gap:0.4rem; margin-bottom:0.4rem;">' +
+            '<input type="text" id="bootKeyLostNewKey" placeholder="Neuer Wunsch-Schlüssel" autocomplete="off" style="flex:1; min-width:0;">' +
+            '<button type="button" class="btn secondary" id="bootKeyLostCalcBtn" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.6rem;">Pfad berechnen</button>' +
+          '</div>' +
+          '<div id="bootKeyLostPathOut" style="display:none; font-family:\'JetBrains Mono\', monospace; font-size:0.68rem; word-break:break-all; background:var(--foam); border:1px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem;"></div>' +
+          '<p class="hint" style="margin:0.5rem 0 0;"><b>3.</b> In der Konsole unter genau diesem Pfad das exportierte JSON importieren, danach oben den neuen Schlüssel eingeben — fertig. Den alten Knoten anschliessend löschen.</p>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(overlay);
     const errEl = overlay.querySelector('#bootKeyErr');
     const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
+
+    overlay.querySelector('#bootKeyLostLink').addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const box = overlay.querySelector('#bootKeyLostBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+    overlay.querySelector('#bootKeyLostCalcBtn').addEventListener('click', async () => {
+      const raw = overlay.querySelector('#bootKeyLostNewKey').value;
+      if(normalizeBootKey(raw).length < 6) return;
+      const out = overlay.querySelector('#bootKeyLostPathOut');
+      out.textContent = await bootKeyToPath(raw);
+      out.style.display = 'block';
+    });
 
     overlay.querySelector('#bootKeySubmitBtn').addEventListener('click', async () => {
       const raw = overlay.querySelector('#bootKeyInput').value;
@@ -1007,11 +1036,13 @@ async function resolveDataRef(){
       let snap = null;
       try{ snap = await get(ref(db, path)); } catch(e){ showErr('Verbindung fehlgeschlagen — bitte nochmals versuchen.'); return; }
       if(!snap.exists()){
-        if(hasLegacy){
-          showErr('Unter diesem Schlüssel wurden keine Daten gefunden. Prüfe die Eingabe — oder nutze unten die einmalige Absicherung, falls sie noch niemand durchgeführt hat.');
-          return;
-        }
-        if(!confirm('Unter diesem Schlüssel existieren noch keine Daten. Neuen Datenbestand mit diesem Schlüssel anlegen?')) return;
+        // WICHTIG: Ein Schlüssel ohne Daten ist ein falscher Schlüssel — hier
+        // wird NIEMALS ein neuer Datenbestand angelegt (sonst landet man in
+        // einer Ersteinrichtung, die wie ein Zurücksetzen der Codes aussieht).
+        showErr(hasLegacy
+          ? 'Unter diesem Schlüssel wurden keine Daten gefunden. Prüfe die Eingabe — oder nutze unten die einmalige Absicherung, falls sie noch niemand durchgeführt hat.'
+          : 'Unter diesem Schlüssel wurden keine Daten gefunden — vermutlich ein Tippfehler. Bitte den Schlüssel exakt so eingeben, wie er dir mitgeteilt wurde.');
+        return;
       }
       storeBootKey(raw);
       dataRef = ref(db, path);
@@ -1022,7 +1053,7 @@ async function resolveDataRef(){
     const migrateBtn = overlay.querySelector('#bootKeyMigrateBtn');
     if(migrateBtn) migrateBtn.addEventListener('click', async () => {
       migrateBtn.disabled = true;
-      const newKey = randomRecoveryCode();
+      const newKey = randomBootKey();
       try{
         const freshSnap = await get(legacyRef);
         const legacyVal = freshSnap.exists() ? freshSnap.val() : null;
@@ -1150,9 +1181,12 @@ function defaultData(){
   return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], seasonEvents: [], serviceReminder: null };
 }
 
+let sharedLoadFailed = false;
+
 async function loadShared(){
   try{
     const snap = await get(dataRef);
+    sharedLoadFailed = false;
     if(snap.exists()){
       const loaded = snap.val() || {};
       state.parties = (loaded.parties && loaded.parties.length) ? loaded.parties : defaultData().parties;
@@ -1175,6 +1209,7 @@ async function loadShared(){
     }
   } catch(e){
     console.error('Laden fehlgeschlagen', e);
+    sharedLoadFailed = true;
     if(!state.parties.length) state = defaultData();
   }
   let migrated = false;
@@ -4424,7 +4459,7 @@ function renderRecoveryFlow(){
       '<button type="button" data-method="totp">Authenticator-App</button>' +
     '</div>' : '') +
     '<div id="recoveryMethodBody">' +
-      '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"></div>' +
+      '<div class="field"><label for="recoveryInput">Wiederherstellungscode</label><input id="recoveryInput" type="text" placeholder="XXXX-XXXX-XXXX"><div class="hint" style="margin-top:0.25rem;">Gemeint ist der geheime Wiederherstellungscode des Administrators — <b>nicht</b> der gemeinsame Bootsschlüssel.</div></div>' +
     '</div>' +
     '<div class="field"><label for="newAdminInput">Neuer Administrator-Code</label><input id="newAdminInput" type="text" placeholder="z. B. AB3F7K2P"></div>' +
     '<button class="btn" id="recoverySubmitBtn">Code zurücksetzen</button>' +
@@ -4448,12 +4483,41 @@ function renderRecoveryFlow(){
     });
   }
 
+  // Schutz gegen Durchprobieren: nach 5 Fehlversuchen ist das Zurücksetzen
+  // auf diesem Gerät 15 Minuten gesperrt; jeder Fehlversuch landet im Protokoll.
+  const RECOVERY_LOCK_KEY = 'wakelog-recovery-lock';
+  const getRecoveryLock = () => {
+    try{ return JSON.parse(localStorage.getItem(RECOVERY_LOCK_KEY) || '{"fails":0,"until":0}'); } catch(e){ return { fails:0, until:0 }; }
+  };
+  const setRecoveryLock = (v) => { try{ localStorage.setItem(RECOVERY_LOCK_KEY, JSON.stringify(v)); } catch(e){} };
+
   document.getElementById('recoverySubmitBtn').addEventListener('click', async () => {
     const errEl = document.getElementById('recoveryError');
     errEl.classList.remove('show');
+    const lock = getRecoveryLock();
+    if(lock.until && Date.now() < lock.until){
+      const mins = Math.ceil((lock.until - Date.now()) / 60000);
+      errEl.textContent = 'Zu viele Fehlversuche — bitte in ' + mins + ' Min. nochmals versuchen.';
+      errEl.classList.add('show');
+      return;
+    }
     const enteredCode = document.getElementById('recoveryInput').value.trim().toUpperCase();
     const newAdmin = document.getElementById('newAdminInput').value.trim();
     if(!enteredCode || !newAdmin){ errEl.textContent = 'Bitte beide Felder ausfüllen.'; errEl.classList.add('show'); return; }
+
+    // Der gemeinsame Bootsschlüssel ist allen Parteien bekannt und berechtigt
+    // NIEMALS zum Zurücksetzen — hier klar abweisen statt nur "ungültig".
+    const storedBk = getStoredBootKey();
+    if(storedBk && normalizeBootKey(enteredCode) === normalizeBootKey(storedBk)){
+      try{
+        if(!state.auditLog) state.auditLog = [];
+        state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'System', action: 'Versuch, den Administrator-Code mit dem Bootsschlüssel zurückzusetzen — abgewiesen' });
+        await saveShared();
+      } catch(e){}
+      errEl.textContent = 'Das ist der gemeinsame Bootsschlüssel — er ist KEIN Wiederherstellungscode und berechtigt nicht zum Zurücksetzen. Der Versuch wurde protokolliert.';
+      errEl.classList.add('show');
+      return;
+    }
 
     let verified = false;
     if(method === 'totp'){
@@ -4464,7 +4528,22 @@ function renderRecoveryFlow(){
       const enteredHash = await sha256(enteredCode);
       verified = (enteredHash === state.settings.recoveryHash);
     }
-    if(!verified){ errEl.classList.add('show'); return; }
+    if(!verified){
+      // Fehlversuch protokollieren (für alle sichtbar) und lokal drosseln
+      const l = getRecoveryLock();
+      l.fails = (l.fails || 0) + 1;
+      if(l.fails >= 5){ l.until = Date.now() + 15 * 60 * 1000; l.fails = 0; }
+      setRecoveryLock(l);
+      try{
+        if(!state.auditLog) state.auditLog = [];
+        state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'System', action: 'Fehlgeschlagener Versuch, den Administrator-Code zurückzusetzen (' + (method === 'totp' ? 'Authenticator-App' : 'Wiederherstellungscode') + ')' });
+        await saveShared();
+      } catch(e){}
+      errEl.textContent = 'Code ungültig. Der Versuch wurde protokolliert.';
+      errEl.classList.add('show');
+      return;
+    }
+    setRecoveryLock({ fails: 0, until: 0 });
 
     const newRecoveryCode = randomRecoveryCode();
     const newRecoveryHash = await sha256(newRecoveryCode);
@@ -4474,6 +4553,9 @@ function renderRecoveryFlow(){
     state.settings.totpSecret = newTotpSecret;
     if(!state.auditLog) state.auditLog = [];
     state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Administrator-Code über ' + (method === 'totp' ? 'Authenticator-App' : 'Wiederherstellungscode') + ' zurückgesetzt' });
+    // Alle Parteien im Posteingang informieren — ein Zurücksetzen soll nie unbemerkt bleiben.
+    if(!state.notifications) state.notifications = [];
+    state.notifications.unshift({ id: uid(), ts: Date.now(), message: '🔐 Der Administrator-Code wurde über ' + (method === 'totp' ? 'die Authenticator-App' : 'den Wiederherstellungscode') + ' zurückgesetzt. Falls das niemand von euch war, sofort den Administrator informieren!', targetPartyId: null, fromPartyId: null });
     await saveShared();
     session = { adminCode: newAdmin, partyCode: null, partyId: null };
     await saveSession();
@@ -4484,16 +4566,50 @@ function renderRecoveryFlow(){
 
 function renderGate(){
   const card = document.getElementById('gateCard');
+  if(sharedLoadFailed && !state.settings){
+    // Das Laden ist fehlgeschlagen — es ist also UNBEKANNT, ob Daten existieren.
+    // Auf keinen Fall die Ersteinrichtung zeigen (sie würde wie ein Zurücksetzen
+    // der Codes wirken und könnte bestehende Daten überschreiben).
+    card.innerHTML =
+      '<h2>⚠️ Verbindung fehlgeschlagen</h2>' +
+      '<p>Die Daten konnten nicht geladen werden (kein Netz oder Server nicht erreichbar). Bitte Internetverbindung prüfen und nochmals versuchen.</p>' +
+      '<button class="btn" id="retryLoadBtn" style="width:100%;">🔄 Nochmals versuchen</button>';
+    document.getElementById('retryLoadBtn').addEventListener('click', () => location.reload());
+    return;
+  }
   if(!state.settings){
+    const hasStoredKey = !!getStoredBootKey();
     card.innerHTML =
       '<h2>WakeLog einrichten</h2>' +
       '<p>Diese App wird zum ersten Mal geöffnet. Lege deinen Administrator-Code fest — jede Partei bekommt automatisch ihren eigenen persönlichen Code, den du unter "Verwaltung" findest und einzeln weitergeben kannst.</p>' +
+      (hasStoredKey ? '<div class="notice">Du erwartest bestehende Daten deiner Bootsgemeinschaft? Dann ist auf diesem Gerät vermutlich ein falscher Bootsschlüssel gespeichert — richte hier <b>nichts</b> neu ein, sondern gib den Schlüssel neu ein.</div>' : '') +
       '<div class="field"><label for="setup-admin">Dein Administrator-Code</label><input id="setup-admin" type="text" placeholder="z. B. AB3F7K2P"></div>' +
       '<button class="btn" id="setupBtn">Einrichten</button>' +
+      (hasStoredKey ? '<div style="text-align:center; margin-top:1rem;"><a href="#" id="reenterBootKeyLink" style="font-size:0.78rem; color:var(--ink-faint);">🔑 Bootsschlüssel neu eingeben</a></div>' : '') +
       '<div class="gate-error" id="gateError">Bitte das Feld ausfüllen.</div>';
+    const reenterLink = document.getElementById('reenterBootKeyLink');
+    if(reenterLink) reenterLink.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      try{ localStorage.removeItem(BOOTKEY_STORAGE); } catch(e){}
+      location.reload();
+    });
     document.getElementById('setupBtn').addEventListener('click', async () => {
       const admin = document.getElementById('setup-admin').value.trim();
       if(!admin){ document.getElementById('gateError').classList.add('show'); return; }
+      // Direkt vor dem Anlegen nochmals frisch prüfen: Existieren doch schon
+      // Einstellungen (z. B. weil das erste Laden nur fehlgeschlagen war),
+      // wird NICHTS überschrieben.
+      try{
+        const freshSnap = await get(dataRef);
+        if(freshSnap.exists() && freshSnap.val() && freshSnap.val().settings){
+          alert('Es existieren bereits Daten und Einstellungen für diese Bootsgemeinschaft — die Einrichtung wurde abgebrochen. Die App lädt jetzt neu.');
+          location.reload();
+          return;
+        }
+      } catch(e){
+        alert('Verbindung fehlgeschlagen — Einrichtung abgebrochen. Bitte nochmals versuchen.');
+        return;
+      }
       const recoveryCode = randomRecoveryCode();
       const recoveryHash = await sha256(recoveryCode);
       const totpSecret = generateTotpSecretHex();
@@ -4717,6 +4833,7 @@ function renderAdminGeneralSection(){
           '<span id="bootKeyDisplay" style="font-family:\'JetBrains Mono\', monospace; font-weight:700; letter-spacing:0.06em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.45rem 0.6rem;">••••-••••-••••</span>' +
           '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">👁 Anzeigen</button>' +
           '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">💬 Teilen</button>' +
+          '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">🔁 Neu eingeben</button>' +
         '</div>'
       : '<div class="hint">Auf diesem Gerät ist kein Bootsschlüssel gespeichert.</div>') +
     '</div>' +
@@ -4938,6 +5055,11 @@ function renderAdminGeneralSection(){
       const key = getStoredBootKey();
       if(!key) return;
       window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel (einmalig in der App eingeben): ' + key), '_blank');
+    });
+    document.getElementById('bootKeyReenterBtn').addEventListener('click', () => {
+      if(!confirm('Der auf diesem Gerät gespeicherte Bootsschlüssel wird entfernt und beim nächsten Start neu abgefragt. Fortfahren?')) return;
+      try{ localStorage.removeItem(BOOTKEY_STORAGE); } catch(e){}
+      location.reload();
     });
   }
   document.getElementById('changeAdminCodeBtn').addEventListener('click', async () => {
