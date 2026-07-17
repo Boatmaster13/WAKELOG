@@ -925,7 +925,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, get, set, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -940,7 +940,136 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const auth = getAuth(fbApp);
-const dataRef = ref(db, 'bootslogbuch/data');
+
+// Sicherheit: Die Daten liegen NICHT mehr auf einem festen, für jeden lesbaren
+// Pfad, sondern unter bootslogbuch/v2/<SHA-256(Bootsschlüssel)>. Der Schlüssel
+// steht weder im Code noch in der Datenbank — nur wer ihn kennt, kann den Pfad
+// berechnen. Zusammen mit Regeln, die das Auflisten der Datenbank verbieten,
+// sind die Daten damit für Fremde unauffindbar.
+const BOOTKEY_STORAGE = 'boot-logbuch-bootkey';
+const LEGACY_DATA_PATH = 'bootslogbuch/data';
+let dataRef = null;
+
+function normalizeBootKey(raw){
+  return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+async function bootKeyToPath(rawKey){
+  return 'bootslogbuch/v2/' + await sha256('wakelog:' + normalizeBootKey(rawKey));
+}
+function getStoredBootKey(){
+  try{ return localStorage.getItem(BOOTKEY_STORAGE) || null; } catch(e){ return null; }
+}
+function storeBootKey(rawKey){
+  try{ localStorage.setItem(BOOTKEY_STORAGE, rawKey); } catch(e){}
+}
+
+// Löst den Bootsschlüssel auf (gespeichert, eingegeben oder per einmaliger
+// Migration erstellt) und setzt dataRef. Erst danach läuft die App weiter.
+async function resolveDataRef(){
+  const storedKey = getStoredBootKey();
+  if(storedKey){
+    dataRef = ref(db, await bootKeyToPath(storedKey));
+    return;
+  }
+  const legacyRef = ref(db, LEGACY_DATA_PATH);
+  let legacySnap = null;
+  try{ legacySnap = await get(legacyRef); } catch(e){}
+  const hasLegacy = !!(legacySnap && legacySnap.exists());
+  await new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay';
+    overlay.style.display = 'flex';
+    overlay.style.zIndex = '9998';
+    overlay.innerHTML =
+      '<div class="gate-card" style="max-width:420px;">' +
+        '<h2>🔑 Bootsschlüssel</h2>' +
+        '<p style="font-size:0.88rem;">Die Daten sind mit einem gemeinsamen Bootsschlüssel geschützt. Gib den Schlüssel ein, den du von deiner Bootsgemeinschaft erhalten hast — er wird auf diesem Gerät gespeichert und muss nur einmal eingegeben werden.</p>' +
+        '<div class="field" style="margin-bottom:0.6rem;">' +
+          '<input type="text" id="bootKeyInput" placeholder="z. B. AB2C-DE3F-GH4J" autocomplete="off" autocapitalize="characters" style="width:100%; text-transform:uppercase;">' +
+        '</div>' +
+        '<div class="err" id="bootKeyErr" style="display:none; margin-bottom:0.6rem;"></div>' +
+        '<button type="button" class="btn" id="bootKeySubmitBtn" style="width:100%;">Weiter</button>' +
+        (hasLegacy ?
+          '<div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid var(--line);">' +
+            '<p class="hint" style="margin:0 0 0.5rem;">Erstmalige Absicherung: Genau <b>eine</b> Person der Bootsgemeinschaft erstellt einmalig den Schlüssel — die bestehenden Daten werden dabei automatisch auf den geschützten Bereich verschoben. Danach den Schlüssel den anderen Parteien mitteilen.</p>' +
+            '<button type="button" class="btn secondary" id="bootKeyMigrateBtn" style="width:100%;">🔒 Daten absichern & Schlüssel erstellen</button>' +
+          '</div>'
+        : '') +
+      '</div>';
+    document.body.appendChild(overlay);
+    const errEl = overlay.querySelector('#bootKeyErr');
+    const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
+
+    overlay.querySelector('#bootKeySubmitBtn').addEventListener('click', async () => {
+      const raw = overlay.querySelector('#bootKeyInput').value;
+      if(normalizeBootKey(raw).length < 6){ showErr('Bitte gib einen gültigen Bootsschlüssel ein.'); return; }
+      const path = await bootKeyToPath(raw);
+      let snap = null;
+      try{ snap = await get(ref(db, path)); } catch(e){ showErr('Verbindung fehlgeschlagen — bitte nochmals versuchen.'); return; }
+      if(!snap.exists()){
+        if(hasLegacy){
+          showErr('Unter diesem Schlüssel wurden keine Daten gefunden. Prüfe die Eingabe — oder nutze unten die einmalige Absicherung, falls sie noch niemand durchgeführt hat.');
+          return;
+        }
+        if(!confirm('Unter diesem Schlüssel existieren noch keine Daten. Neuen Datenbestand mit diesem Schlüssel anlegen?')) return;
+      }
+      storeBootKey(raw);
+      dataRef = ref(db, path);
+      overlay.remove();
+      resolve();
+    });
+
+    const migrateBtn = overlay.querySelector('#bootKeyMigrateBtn');
+    if(migrateBtn) migrateBtn.addEventListener('click', async () => {
+      migrateBtn.disabled = true;
+      const newKey = randomRecoveryCode();
+      try{
+        const freshSnap = await get(legacyRef);
+        const legacyVal = freshSnap.exists() ? freshSnap.val() : null;
+        if(!legacyVal){ showErr('Keine bestehenden Daten mehr gefunden — vermutlich wurde die Absicherung bereits durchgeführt. Bitte den Schlüssel bei der anderen Partei erfragen und oben eingeben.'); migrateBtn.disabled = false; return; }
+        const newPath = await bootKeyToPath(newKey);
+        await set(ref(db, newPath), legacyVal);
+        await remove(legacyRef);
+        storeBootKey(newKey);
+        dataRef = ref(db, newPath);
+      } catch(e){
+        console.error('Migration fehlgeschlagen', e);
+        showErr('Absicherung fehlgeschlagen — bitte nochmals versuchen.');
+        migrateBtn.disabled = false;
+        return;
+      }
+      overlay.remove();
+      // Schlüssel gross anzeigen + teilen
+      await new Promise((done) => {
+        const keyOverlay = document.createElement('div');
+        keyOverlay.className = 'gate-overlay';
+        keyOverlay.style.display = 'flex';
+        keyOverlay.style.zIndex = '9998';
+        keyOverlay.innerHTML =
+          '<div class="gate-card" style="max-width:420px; text-align:center;">' +
+            '<h2>✅ Daten abgesichert</h2>' +
+            '<p style="font-size:0.88rem;">Das ist euer gemeinsamer Bootsschlüssel. Teile ihn den anderen Parteien mit — jedes Gerät fragt ihn einmalig ab. <b>Ohne diesen Schlüssel gibt es keinen Zugriff auf die Daten</b>, also gut aufbewahren!</p>' +
+            '<div style="font-family:\'JetBrains Mono\', monospace; font-size:1.35rem; font-weight:700; letter-spacing:0.08em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.8rem 0.5rem; margin:0.8rem 0;">' + newKey + '</div>' +
+            '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
+              '<button type="button" class="btn secondary" id="bootKeyShareBtn">💬 Per WhatsApp teilen</button>' +
+              '<button type="button" class="btn secondary" id="bootKeyCopyBtn">📋 Kopieren</button>' +
+              '<button type="button" class="btn" id="bootKeyDoneBtn">Weiter zur App</button>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(keyOverlay);
+        keyOverlay.querySelector('#bootKeyShareBtn').addEventListener('click', () => {
+          const text = 'WakeLog Bootsschlüssel (einmalig in der App eingeben): ' + newKey;
+          window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+        });
+        keyOverlay.querySelector('#bootKeyCopyBtn').addEventListener('click', () => {
+          try{ navigator.clipboard.writeText(newKey); } catch(e){}
+        });
+        keyOverlay.querySelector('#bootKeyDoneBtn').addEventListener('click', () => { keyOverlay.remove(); done(); });
+      });
+      resolve();
+    });
+  });
+}
 
 function waitForAuth(){
   return new Promise((resolve, reject) => {
@@ -4571,7 +4700,19 @@ function renderAdminCostsSection(){
 
 function renderAdminGeneralSection(){
   const content = document.getElementById('adminSubContent');
+  const storedBootKey = getStoredBootKey();
   content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Bootsschlüssel</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
+      (storedBootKey ?
+        '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">' +
+          '<span id="bootKeyDisplay" style="font-family:\'JetBrains Mono\', monospace; font-weight:700; letter-spacing:0.06em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.45rem 0.6rem;">••••-••••-••••</span>' +
+          '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">👁 Anzeigen</button>' +
+          '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">💬 Teilen</button>' +
+        '</div>'
+      : '<div class="hint">Auf diesem Gerät ist kein Bootsschlüssel gespeichert.</div>') +
+    '</div>' +
     '<div class="admin-box">' +
       '<label>Administrator-Code ändern</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Aus Sicherheitsgründen wird dein aktueller Code hier nirgends angezeigt. Beim Ändern wird ausserdem ein neuer Wiederherstellungscode erzeugt (der alte wird ungültig) — notiere ihn dir danach wieder sicher.</div>' +
@@ -4778,6 +4919,20 @@ function renderAdminGeneralSection(){
     renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
   });
 
+  const bootKeyRevealBtn = document.getElementById('bootKeyRevealBtn');
+  if(bootKeyRevealBtn){
+    bootKeyRevealBtn.addEventListener('click', () => {
+      const disp = document.getElementById('bootKeyDisplay');
+      const hidden = disp.textContent.indexOf('•') !== -1;
+      disp.textContent = hidden ? (getStoredBootKey() || '—') : '••••-••••-••••';
+      bootKeyRevealBtn.textContent = hidden ? '🙈 Verbergen' : '👁 Anzeigen';
+    });
+    document.getElementById('bootKeyShareAdminBtn').addEventListener('click', () => {
+      const key = getStoredBootKey();
+      if(!key) return;
+      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel (einmalig in der App eingeben): ' + key), '_blank');
+    });
+  }
   document.getElementById('changeAdminCodeBtn').addEventListener('click', async () => {
     const field = document.getElementById('newAdminCodeField');
     const fb = document.getElementById('adminCodeFeedback');
@@ -5325,6 +5480,7 @@ function startPolling(){
 async function init(){
   setupTabs();
   try{ await waitForAuth(); } catch(e){ console.error('Anmeldung fehlgeschlagen', e); }
+  await resolveDataRef();
   await loadShared();
   await loadSession();
   evaluateAccess();
