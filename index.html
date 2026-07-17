@@ -2712,12 +2712,19 @@ function showBeerConfirmation(){
       '<h2>Ankerdöschen ausgerufen!</h2>' +
       '<p>Die anderen Parteien wurden benachrichtigt und können anstossen oder sich anschliessen. Drück auf Prost! 🍻</p>' +
       '<button class="btn" id="beerConfirmCloseBtn" style="width:100%;">🍻 Prost!</button>' +
+      '<button class="btn secondary" id="beerConfirmWhatsappBtn" style="width:100%; margin-top:0.5rem;">💬 Per WhatsApp rufen</button>' +
+      '<div class="hint" style="margin:0.3rem 0 0; text-align:center;">Tipp: In eurer Ankerdöschen-Gruppe mit eigenem Jingle-Ton ertönt der Ruf beim Empfänger sofort richtig.</div>' +
       '<button class="btn secondary" id="beerConfirmSilentBtn" style="width:100%; margin-top:0.5rem;">Schliessen (ohne Prost)</button>' +
     '</div>';
   document.body.appendChild(overlay);
   document.getElementById('beerConfirmCloseBtn').addEventListener('click', () => {
     playCheersSound();
     overlay.remove();
+  });
+  document.getElementById('beerConfirmWhatsappBtn').addEventListener('click', () => {
+    const senderName = session.partyId ? partyName(session.partyId) : 'WakeLog';
+    const text = '⚓🍺 Ankerdöschen! ' + senderName + ' ruft zum Anstossen — Prost mitmachen? 🍻';
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
   });
   document.getElementById('beerConfirmSilentBtn').addEventListener('click', () => overlay.remove());
 }
