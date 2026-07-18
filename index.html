@@ -3204,10 +3204,10 @@ function renderChatMessageListInto(list){
           const readers = chatMessageReaders(m);
           if(!readers.length) return '';
           const allRead = readers.every(id => chatReadTime(m, id));
-          let out = ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; font-size:0.72rem;">✓✓</span>';
+          let out = ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; font-size:0.72rem; letter-spacing:-0.12em; display:inline-block; padding-right:0.12em;">✓✓</span>';
           out += ' <span data-msg-info="' + m.id + '" style="cursor:pointer;" title="Gelesen-Info">ℹ️</span>';
           if((Date.now() - (m.ts || 0)) <= CHAT_EDIT_WINDOW_MS){
-            out += ' <span data-msg-edit="' + m.id + '" style="cursor:pointer;" title="Bearbeiten (30 Min.)">✏️</span>';
+            out += ' <span data-msg-edit="' + m.id + '" style="cursor:pointer; display:inline-block; transform:scaleX(-1);" title="Bearbeiten (30 Min.)">✏️</span>';
           }
           return out;
         })() + '</div>' +
@@ -3229,13 +3229,13 @@ function showChatModal(){
   const otherParties = state.parties.filter(p => p.id !== session.partyId);
   const pushOn = getPushEnabled();
   overlay.innerHTML =
-    '<div class="gate-card" style="max-width:480px; max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
+    '<div class="gate-card" style="max-width:480px; max-height:86vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
       '<h2>Posteingang</h2>' +
       '<div class="toggle-row" style="margin-bottom:0.9rem; padding-bottom:0.8rem; border-bottom:1px solid var(--line);">' +
         '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
         '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
       '</div>' +
-      '<div id="chatMessageList" style="max-height:34vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
+      '<div id="chatMessageList" style="max-height:27vh; overflow-y:auto; margin-bottom:0.8rem; padding-right:0.45rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
         '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
         '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
@@ -3245,7 +3245,7 @@ function showChatModal(){
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
-      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="4" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
         '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.3rem; font-size:0.76rem;">📷 Kamera</button>' +
         '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.3rem; font-size:0.76rem;">🖼️ Galerie</button>' +
