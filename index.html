@@ -950,6 +950,44 @@ const BOOTKEY_STORAGE = 'boot-logbuch-bootkey';
 const LEGACY_DATA_PATH = 'bootslogbuch/data';
 let dataRef = null;
 
+// Codes können als Link geteilt werden (?bootkey=… / ?code=…): Der Empfänger
+// tippt den Link in WhatsApp an und die App übernimmt den Code automatisch —
+// kein Kopieren aus der Nachricht nötig. Die Parameter werden nach dem Einlesen
+// sofort aus der Adresszeile entfernt.
+const _startParams = new URLSearchParams(location.search);
+const urlBootKey = _startParams.get('bootkey');
+const urlLoginCode = _startParams.get('code');
+if(urlBootKey || urlLoginCode){
+  try{ history.replaceState(null, '', location.pathname); } catch(e){}
+}
+function appBaseUrl(){
+  return location.origin + location.pathname;
+}
+function appShareUrl(param, value){
+  let base = appBaseUrl();
+  try{
+    const configured = (state.settings && state.settings.shareLink || '').trim();
+    if(configured) base = configured;
+  } catch(e){}
+  return base + (base.indexOf('?') === -1 ? '?' : '&') + param + '=' + encodeURIComponent(value);
+}
+// Holt einen Code aus der Zwischenablage und extrahiert ihn notfalls aus einer
+// ganzen Nachricht (Muster BOOT-XXXX-XXXX, XXXX-XXXX-XXXX oder 6-10 Zeichen).
+async function pasteCodeInto(inputEl, kind){
+  let text = '';
+  try{ text = await navigator.clipboard.readText(); } catch(e){ return false; }
+  text = (text || '').trim();
+  if(!text) return false;
+  let match = null;
+  if(kind === 'bootkey'){
+    match = text.match(/BOOT-[A-Z0-9]{4}-[A-Z0-9]{4}/i) || text.match(/[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/i);
+  } else {
+    match = text.match(/\b[A-Z0-9]{6,10}\b/i);
+  }
+  inputEl.value = match ? match[0] : text;
+  return true;
+}
+
 function randomBootKey(){
   // Bewusst anderes Format als der Wiederherstellungscode (XXXX-XXXX-XXXX),
   // damit die beiden Codes nie verwechselt werden können.
@@ -971,10 +1009,35 @@ function storeBootKey(rawKey){
 // Löst den Bootsschlüssel auf (gespeichert, eingegeben oder per einmaliger
 // Migration erstellt) und setzt dataRef. Erst danach läuft die App weiter.
 async function resolveDataRef(){
+  // Per Link geteilter Schlüssel (?bootkey=…) hat Vorrang: prüfen, speichern, fertig.
+  if(urlBootKey && normalizeBootKey(urlBootKey).length >= 6){
+    try{
+      const linkPath = await bootKeyToPath(urlBootKey);
+      const linkSnap = await get(ref(db, linkPath));
+      if(linkSnap.exists()){
+        storeBootKey(urlBootKey);
+        dataRef = ref(db, linkPath);
+        return;
+      }
+    } catch(e){}
+  }
   const storedKey = getStoredBootKey();
+  let keyInvalidated = false;
   if(storedKey){
-    dataRef = ref(db, await bootKeyToPath(storedKey));
-    return;
+    const storedPath = await bootKeyToPath(storedKey);
+    let snap = null; let loadFailed = false;
+    try{ snap = await get(ref(db, storedPath)); } catch(e){ loadFailed = true; }
+    if(loadFailed || (snap && snap.exists())){
+      // Bei Netzfehler normal weiterfahren — loadShared zeigt dann den
+      // "Verbindung fehlgeschlagen"-Bildschirm mit Wiederholen.
+      dataRef = ref(db, storedPath);
+      return;
+    }
+    // Unter dem gespeicherten Schlüssel liegen keine Daten mehr — der
+    // Bootsschlüssel wurde vermutlich geändert. Schlüssel verwerfen und
+    // die Eingabe neu anfordern (NIE eine Ersteinrichtung anbieten).
+    try{ localStorage.removeItem(BOOTKEY_STORAGE); } catch(e){}
+    keyInvalidated = true;
   }
   const legacyRef = ref(db, LEGACY_DATA_PATH);
   let legacySnap = null;
@@ -988,9 +1051,11 @@ async function resolveDataRef(){
     overlay.innerHTML =
       '<div class="gate-card" style="max-width:420px;">' +
         '<h2>🔑 Bootsschlüssel</h2>' +
+        (keyInvalidated ? '<div class="notice">Der auf diesem Gerät gespeicherte Bootsschlüssel ist nicht mehr gültig — vermutlich wurde er vom Administrator geändert. Bitte den aktuellen Schlüssel eingeben.</div>' : '') +
         '<p style="font-size:0.88rem;">Die Daten sind mit einem gemeinsamen Bootsschlüssel geschützt. Gib den Schlüssel ein, den du von deiner Bootsgemeinschaft erhalten hast — er wird auf diesem Gerät gespeichert und muss nur einmal eingegeben werden.</p>' +
-        '<div class="field" style="margin-bottom:0.6rem;">' +
-          '<input type="text" id="bootKeyInput" placeholder="z. B. AB2C-DE3F-GH4J" autocomplete="off" autocapitalize="characters" style="width:100%; text-transform:uppercase;">' +
+        '<div class="field" style="margin-bottom:0.6rem; display:flex; gap:0.4rem;">' +
+          '<input type="text" id="bootKeyInput" placeholder="z. B. BOOT-AB2C-DE3F" autocomplete="off" autocapitalize="characters" style="flex:1; min-width:0; text-transform:uppercase;">' +
+          '<button type="button" class="btn secondary" id="bootKeyPasteBtn" title="Aus Zwischenablage einfügen" style="flex-shrink:0; padding:0.5rem 0.7rem;">📋</button>' +
         '</div>' +
         '<div class="err" id="bootKeyErr" style="display:none; margin-bottom:0.6rem;"></div>' +
         '<button type="button" class="btn" id="bootKeySubmitBtn" style="width:100%;">Weiter</button>' +
@@ -1016,6 +1081,10 @@ async function resolveDataRef(){
     const errEl = overlay.querySelector('#bootKeyErr');
     const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
 
+    overlay.querySelector('#bootKeyPasteBtn').addEventListener('click', async () => {
+      const ok = await pasteCodeInto(overlay.querySelector('#bootKeyInput'), 'bootkey');
+      if(!ok) showErr('Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.');
+    });
     overlay.querySelector('#bootKeyLostLink').addEventListener('click', (ev) => {
       ev.preventDefault();
       const box = overlay.querySelector('#bootKeyLostBox');
@@ -1089,7 +1158,7 @@ async function resolveDataRef(){
           '</div>';
         document.body.appendChild(keyOverlay);
         keyOverlay.querySelector('#bootKeyShareBtn').addEventListener('click', () => {
-          const text = 'WakeLog Bootsschlüssel (einmalig in der App eingeben): ' + newKey;
+          const text = 'WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', newKey) + '\n\nFalls du ihn manuell brauchst: ' + newKey;
           window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
         });
         keyOverlay.querySelector('#bootKeyCopyBtn').addEventListener('click', () => {
@@ -1373,7 +1442,7 @@ function handleAdminStripClick(ev){
 }
 
 function showBeerCallConfirm(){
-  const name = session.partyId ? partyName(session.partyId) : 'Administrator';
+  const name = session.partyId ? partyName(session.partyId) : 'Der Administrator';
   const overlay = document.createElement('div');
   overlay.className = 'gate-overlay';
   overlay.style.display = 'flex';
@@ -1407,7 +1476,7 @@ function showBeerCallConfirm(){
 async function finalizeBeerCall(photoDataUrl){
   if(!state.chatMessages) state.chatMessages = [];
   const msgId = uid();
-  state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
+  state.chatMessages.push({ id: msgId, ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text: '', photo: photoDataUrl || null, type: 'beer', toPartyIds: null });
   if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
   // Ankerdöschen-Rufe erscheinen nur noch im Chat — keine zusätzliche Kopie im Posteingang.
   await saveShared();
@@ -2032,6 +2101,13 @@ function fmtCHF(n){ return n.toLocaleString('de-CH', { style:'currency', currenc
 function fmtNum(n, dec){ return n.toLocaleString('de-CH', { minimumFractionDigits:dec, maximumFractionDigits:dec }); }
 function yearOf(dateStr){ if(!dateStr) return null; return parseInt(dateStr.split('-')[0], 10); }
 function partyName(id){ const p = state.parties.find(p => p.id === id); return p ? p.name : '(unbekannt)'; }
+// Absender einer Chat-Nachricht / eines Ankerdöschen-Rufs: Nachrichten des
+// Administrators (fromAdmin bzw. ohne Partei) heissen "Der Administrator".
+function chatSenderName(m){
+  if(m && m.fromAdmin) return 'Der Administrator';
+  if(m && m.fromPartyId) return partyName(m.fromPartyId);
+  return 'Der Administrator';
+}
 
 function logAudit(action){
   if(!state.auditLog) state.auditLog = [];
@@ -2757,7 +2833,7 @@ function showBeerConfirmation(){
     overlay.remove();
   });
   document.getElementById('beerConfirmWhatsappBtn').addEventListener('click', () => {
-    const senderName = session.partyId ? partyName(session.partyId) : 'WakeLog';
+    const senderName = session.partyId ? partyName(session.partyId) : 'Der Administrator';
     const text = '⚓🍺 Ankerdöschen! ' + senderName + ' ruft zum Anstossen — Prost mitmachen? 🍻';
     window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
   });
@@ -2774,7 +2850,7 @@ function checkNewBeerCalls(oldMessages, newMessages){
       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && getPushEnabled()){
         try{
           new Notification('⚓ Ankerdöschen!', {
-            body: partyName(m.fromPartyId) + ' ruft zum Ankerdöschen — Prost mitmachen?',
+            body: chatSenderName(m) + ' ruft zum Ankerdöschen — Prost mitmachen?',
             icon: 'icon-192.png'
           });
         } catch(e){}
@@ -2883,7 +2959,7 @@ function renderChatMessageListInto(list){
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
         '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.55rem 0.75rem; font-size:0.88rem;">' +
-          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(partyName(m.fromPartyId)) + ' ruft zum Ankerdöschen!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(partyName(m.fromPartyId)) + toLabel + '</div>') +
+          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(chatSenderName(m)) + ' ruft zum Ankerdöschen!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>') +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
         '</div>' +
@@ -2974,7 +3050,7 @@ function showChatModal(){
     const text = textInput.value.trim();
     if(!text && !chatPendingPhoto) return;
     if(!state.chatMessages) state.chatMessages = [];
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, text, photo: chatPendingPhoto, type: 'normal', toPartyIds: chatRecipientIds });
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text, photo: chatPendingPhoto, type: 'normal', toPartyIds: chatRecipientIds });
     if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
     textInput.value = '';
     chatPendingPhoto = null;
@@ -4630,7 +4706,7 @@ function renderGate(){
         '<button type="button" class="active" data-role="party">Partei</button>' +
         '<button type="button" data-role="admin">Administrator</button>' +
       '</div>' +
-      '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><input id="gate-code" type="text" placeholder="z. B. AB3F7K"></div>' +
+      '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><div style="display:flex; gap:0.4rem;"><input id="gate-code" type="text" placeholder="z. B. AB3F7K" value="' + (urlLoginCode ? escapeHtml(urlLoginCode) : '') + '" style="flex:1; min-width:0;"><button type="button" class="btn secondary" id="gateCodePasteBtn" title="Aus Zwischenablage einfügen" style="flex-shrink:0; padding:0.5rem 0.7rem;">📋</button></div></div>' +
       '<button class="btn" id="gateBtn">Bestätigen</button>' +
       '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>' +
       '<div style="text-align:center; margin-top:1rem;"><a href="#" id="forgotAdminLink" style="font-size:0.78rem; color:var(--ink-faint);">Administrator-Code vergessen?</a></div>';
@@ -4638,6 +4714,14 @@ function renderGate(){
     document.getElementById('forgotAdminLink').addEventListener('click', (ev) => {
       ev.preventDefault();
       renderRecoveryFlow();
+    });
+    document.getElementById('gateCodePasteBtn').addEventListener('click', async () => {
+      const ok = await pasteCodeInto(document.getElementById('gate-code'), 'partycode');
+      if(!ok){
+        const err = document.getElementById('gateError');
+        err.textContent = 'Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.';
+        err.classList.add('show');
+      }
     });
 
     let role = 'party';
@@ -4834,6 +4918,7 @@ function renderAdminGeneralSection(){
           '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">👁 Anzeigen</button>' +
           '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">💬 Teilen</button>' +
           '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">🔁 Neu eingeben</button>' +
+          (isAdminUser ? '<button type="button" class="btn secondary" id="bootKeyRotateBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">♻️ Schlüssel ändern</button>' : '') +
         '</div>'
       : '<div class="hint">Auf diesem Gerät ist kein Bootsschlüssel gespeichert.</div>') +
     '</div>' +
@@ -5054,12 +5139,59 @@ function renderAdminGeneralSection(){
     document.getElementById('bootKeyShareAdminBtn').addEventListener('click', () => {
       const key = getStoredBootKey();
       if(!key) return;
-      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel (einmalig in der App eingeben): ' + key), '_blank');
+      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', key) + '\n\nFalls du ihn manuell brauchst: ' + key), '_blank');
     });
     document.getElementById('bootKeyReenterBtn').addEventListener('click', () => {
       if(!confirm('Der auf diesem Gerät gespeicherte Bootsschlüssel wird entfernt und beim nächsten Start neu abgefragt. Fortfahren?')) return;
       try{ localStorage.removeItem(BOOTKEY_STORAGE); } catch(e){}
       location.reload();
+    });
+    const rotateBtn = document.getElementById('bootKeyRotateBtn');
+    if(rotateBtn) rotateBtn.addEventListener('click', async () => {
+      if(!isAdminUser) return;
+      if(!confirm('Neuen Bootsschlüssel erzeugen? Alle Daten werden auf einen neuen geheimen Pfad verschoben. Der alte Schlüssel wird ungültig — ALLE anderen Geräte müssen danach den neuen Schlüssel einmalig eingeben.')) return;
+      rotateBtn.disabled = true;
+      try{
+        const snap = await get(dataRef);
+        if(!snap.exists()){ alert('Daten konnten nicht gelesen werden — Abbruch.'); rotateBtn.disabled = false; return; }
+        const val = snap.val();
+        if(!val.auditLog) val.auditLog = [];
+        val.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Bootsschlüssel geändert — alle Geräte müssen den neuen Schlüssel eingeben' });
+        if(!val.notifications) val.notifications = [];
+        val.notifications.unshift({ id: uid(), ts: Date.now(), message: '🔑 Der Bootsschlüssel wurde geändert. Beim nächsten Öffnen fragt die App den neuen Schlüssel ab — der Administrator teilt ihn dir mit.', targetPartyId: null, fromPartyId: null });
+        const newKey = randomBootKey();
+        const newPath = await bootKeyToPath(newKey);
+        await set(ref(db, newPath), val);
+        await remove(dataRef);
+        storeBootKey(newKey);
+        const keyOverlay = document.createElement('div');
+        keyOverlay.className = 'gate-overlay';
+        keyOverlay.style.display = 'flex';
+        keyOverlay.style.zIndex = '9998';
+        keyOverlay.innerHTML =
+          '<div class="gate-card" style="max-width:420px; text-align:center;">' +
+            '<h2>✅ Neuer Bootsschlüssel</h2>' +
+            '<p style="font-size:0.88rem;">Der alte Schlüssel ist ab sofort ungültig. Teile den neuen Schlüssel den anderen Parteien mit — jedes Gerät fragt ihn beim nächsten Öffnen automatisch ab.</p>' +
+            '<div style="font-family:\'JetBrains Mono\', monospace; font-size:1.35rem; font-weight:700; letter-spacing:0.08em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.8rem 0.5rem; margin:0.8rem 0;">' + newKey + '</div>' +
+            '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
+              '<button type="button" class="btn secondary" id="rotateShareBtn">💬 Per WhatsApp teilen</button>' +
+              '<button type="button" class="btn secondary" id="rotateCopyBtn">📋 Kopieren</button>' +
+              '<button type="button" class="btn" id="rotateDoneBtn">Weiter (App lädt neu)</button>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(keyOverlay);
+        keyOverlay.querySelector('#rotateShareBtn').addEventListener('click', () => {
+          window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog: Neuer Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', newKey) + '\n\nFalls du ihn manuell brauchst: ' + newKey), '_blank');
+        });
+        keyOverlay.querySelector('#rotateCopyBtn').addEventListener('click', () => {
+          try{ navigator.clipboard.writeText(newKey); } catch(e){}
+        });
+        keyOverlay.querySelector('#rotateDoneBtn').addEventListener('click', () => location.reload());
+      } catch(e){
+        console.error('Schlüsselwechsel fehlgeschlagen', e);
+        alert('Schlüsselwechsel fehlgeschlagen — es wurde nichts geändert. Bitte nochmals versuchen.');
+        rotateBtn.disabled = false;
+      }
     });
   }
   document.getElementById('changeAdminCodeBtn').addEventListener('click', async () => {
@@ -5244,7 +5376,7 @@ function renderPartyCodeList(){
           setTimeout(() => fb.classList.remove('show'), 3000);
           return;
         }
-        const msg = 'Hier ist der Link zu unserem WakeLog: ' + link + '\nDein persönlicher Code: ' + p.code;
+        const msg = 'Dein Zugang zu WakeLog — einfach diesen Link antippen, der Code wird automatisch übernommen:\n' + appShareUrl('code', p.code) + '\n\nFalls du den Code manuell brauchst: ' + p.code;
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
         if(!confirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.')) return;
