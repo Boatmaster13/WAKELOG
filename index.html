@@ -1114,6 +1114,7 @@ async function resolveDataRef(){
             '</div>' +
           '</div>' +
           '<div id="bootKeyLostPathOut" style="display:none; font-family:\'JetBrains Mono\', monospace; font-size:0.68rem; word-break:break-all; background:var(--foam); border:1px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem;"></div>' +
+          '<button type="button" class="btn secondary" id="bootKeyLostCopyBtn" style="display:none; width:100%; margin-top:0.4rem; font-size:0.78rem; padding:0.5rem 0.6rem;">📋 Pfad kopieren</button>' +
           '<p class="hint" style="margin:0.5rem 0 0;"><b>3.</b> In der Konsole unter genau diesem Pfad das exportierte JSON importieren, danach oben den neuen Schlüssel eingeben — fertig. Den alten Knoten anschliessend löschen.</p>' +
           '</div>' +
         '</div>' +
@@ -1148,12 +1149,30 @@ async function resolveDataRef(){
     overlay.querySelector('#bootKeyLostCalcBtn').addEventListener('click', async () => {
       const raw = overlay.querySelector('#bootKeyLostNewKey').value;
       const out = overlay.querySelector('#bootKeyLostPathOut');
+      const copyBtn = overlay.querySelector('#bootKeyLostCopyBtn');
       out.style.display = 'block';
       if(normalizeBootKey(raw).length < 6){
         out.textContent = 'Bitte zuerst einen Schlüssel eingeben (Format BOOT-XXXX-XXXX, mind. 6 Zeichen) — oder mit 🎲 einen Vorschlag erzeugen.';
+        copyBtn.style.display = 'none';
         return;
       }
       out.textContent = await bootKeyToPath(raw);
+      copyBtn.style.display = 'block';
+      copyBtn.textContent = '📋 Pfad kopieren';
+    });
+    overlay.querySelector('#bootKeyLostCopyBtn').addEventListener('click', async () => {
+      const copyBtn = overlay.querySelector('#bootKeyLostCopyBtn');
+      const path = overlay.querySelector('#bootKeyLostPathOut').textContent;
+      let ok = false;
+      try{ await navigator.clipboard.writeText(path); ok = true; } catch(e){
+        try{
+          const ta = document.createElement('textarea');
+          ta.value = path; document.body.appendChild(ta); ta.select();
+          ok = document.execCommand('copy'); ta.remove();
+        } catch(e2){}
+      }
+      copyBtn.textContent = ok ? '✅ Kopiert!' : '📋 Kopieren fehlgeschlagen — bitte Text markieren';
+      setTimeout(() => { copyBtn.textContent = '📋 Pfad kopieren'; }, 2500);
     });
 
     overlay.querySelector('#bootKeySubmitBtn').addEventListener('click', async () => {
@@ -4975,9 +4994,11 @@ function renderAdminGeneralSection(){
         '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
           '<span id="bootKeyDisplay" style="grid-column:1 / -1; text-align:center; font-family:\'JetBrains Mono\', monospace; font-weight:700; letter-spacing:0.06em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem 0.6rem;">••••-••••-••••</span>' +
           '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">👁 Anzeigen</button>' +
+          '<button type="button" class="btn secondary" id="bootKeyCopyAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Kopieren</button>' +
           '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💬 Teilen</button>' +
-          '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' + (isAdminUser ? '' : ' grid-column:1 / -1;') + '">🔁 Neu eingeben</button>' +
-          (isAdminUser ? '<button type="button" class="btn secondary" id="bootKeyRotateBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">♻️ Schlüssel ändern</button>' : '') +
+          '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🔁 Neu eingeben</button>' +
+          (isAdminUser ? '<button type="button" class="btn secondary" id="bootKeyRotateBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; grid-column:1 / -1;">♻️ Schlüssel ändern</button>' : '') +
+          (isAdminUser ? '<div style="grid-column:1 / -1;"><div class="hint" style="margin:0.3rem 0 0.15rem;">Datenbank-Pfad zu diesem Schlüssel (zum Abgleich in der Firebase-Konsole — antippen zum Kopieren):</div><div id="bootKeyPathInfo" style="font-family:\'JetBrains Mono\', monospace; font-size:0.66rem; word-break:break-all; background:var(--foam); border:1px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.45rem 0.5rem; cursor:pointer;">wird berechnet …</div></div>' : '') +
         '</div>'
       : '<div class="hint">Auf diesem Gerät ist kein Bootsschlüssel gespeichert.</div>') +
     '</div>' +
@@ -5194,6 +5215,25 @@ function renderAdminGeneralSection(){
       const hidden = disp.textContent.indexOf('•') !== -1;
       disp.textContent = hidden ? (getStoredBootKey() || '—') : '••••-••••-••••';
       bootKeyRevealBtn.textContent = hidden ? '🙈 Verbergen' : '👁 Anzeigen';
+    });
+    const pathInfo = document.getElementById('bootKeyPathInfo');
+    if(pathInfo){
+      bootKeyToPath(storedBootKey).then(p => { pathInfo.textContent = p; });
+      pathInfo.addEventListener('click', () => {
+        if(pathInfo.textContent.indexOf('bootslogbuch/') !== 0) return;
+        copyToClipboard(pathInfo.textContent);
+        const orig = pathInfo.textContent;
+        pathInfo.textContent = '✅ Pfad kopiert!';
+        setTimeout(() => { pathInfo.textContent = orig; }, 1500);
+      });
+    }
+    document.getElementById('bootKeyCopyAdminBtn').addEventListener('click', () => {
+      const key = getStoredBootKey();
+      if(!key) return;
+      copyToClipboard(key);
+      const b = document.getElementById('bootKeyCopyAdminBtn');
+      b.textContent = '✅ Kopiert!';
+      setTimeout(() => { b.textContent = '📋 Kopieren'; }, 2000);
     });
     document.getElementById('bootKeyShareAdminBtn').addEventListener('click', () => {
       const key = getStoredBootKey();
