@@ -1102,10 +1102,12 @@ async function resolveDataRef(){
           '<div id="bootKeyLostAdminBox" style="display:none;">' +
           '<p class="hint" style="margin:0 0 0.5rem;"><b>1.</b> Zuerst bei den anderen Parteien nachfragen: Jedes Gerät, das den Schlüssel je eingegeben hat, kann ihn unter Verwaltung → Allg. Einstellungen → Bootsschlüssel → "👁 Anzeigen" wieder zeigen.</p>' +
           '<p class="hint" style="margin:0 0 0.5rem;"><b>2.</b> Hat ihn wirklich niemand mehr: Als Inhaber des Firebase-Projekts kannst du die Daten retten. In der Firebase-Konsole (Realtime Database → Daten) den Knoten unter <code>bootslogbuch/v2</code> öffnen, über das ⋮-Menü <b>JSON exportieren</b>. Dann hier einen neuen Wunsch-Schlüssel eingeben und den Pfad berechnen lassen:</p>' +
-          '<div style="display:flex; gap:0.4rem; margin-bottom:0.4rem;">' +
-            '<input type="text" id="bootKeyLostNewKey" placeholder="BOOT-XXXX-XXXX" autocomplete="off" autocapitalize="characters" style="flex:1; min-width:0; text-transform:uppercase;">' +
-            '<button type="button" class="btn secondary" id="bootKeyLostSuggestBtn" title="Neuen Schlüssel im richtigen Format vorschlagen" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.6rem;">🎲</button>' +
-            '<button type="button" class="btn secondary" id="bootKeyLostCalcBtn" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.6rem;">Pfad berechnen</button>' +
+          '<div style="margin-bottom:0.4rem;">' +
+            '<input type="text" id="bootKeyLostNewKey" placeholder="BOOT-XXXX-XXXX" autocomplete="off" autocapitalize="characters" style="width:100%; box-sizing:border-box; text-transform:uppercase; margin-bottom:0.4rem;">' +
+            '<div style="display:flex; gap:0.4rem;">' +
+              '<button type="button" class="btn secondary" id="bootKeyLostSuggestBtn" title="Neuen Schlüssel im richtigen Format vorschlagen" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.7rem;">🎲 Vorschlag</button>' +
+              '<button type="button" class="btn secondary" id="bootKeyLostCalcBtn" style="flex:1; min-width:0; font-size:0.78rem; padding:0.5rem 0.6rem; white-space:nowrap;">Pfad berechnen</button>' +
+            '</div>' +
           '</div>' +
           '<div id="bootKeyLostPathOut" style="display:none; font-family:\'JetBrains Mono\', monospace; font-size:0.68rem; word-break:break-all; background:var(--foam); border:1px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem;"></div>' +
           '<p class="hint" style="margin:0.5rem 0 0;"><b>3.</b> In der Konsole unter genau diesem Pfad das exportierte JSON importieren, danach oben den neuen Schlüssel eingeben — fertig. Den alten Knoten anschliessend löschen.</p>' +
