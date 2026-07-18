@@ -1351,6 +1351,7 @@ async function loadShared(){
       state.partyQrCodes = loaded.partyQrCodes || {};
       state.notifications = loaded.notifications || [];
       state.chatMessages = loaded.chatMessages || [];
+      state.chatSeen = loaded.chatSeen || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
     } else {
@@ -1394,12 +1395,20 @@ function subscribeRealtime(){
       const newChatMessages = loaded.chatMessages || [];
       checkNewBeerCalls(state.chatMessages || [], newChatMessages);
       state.chatMessages = newChatMessages;
+      state.chatSeen = loaded.chatSeen || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
       state.priorityRequests = newRequests;
     evaluateAccess();
     if(!state.settings || !accessGranted){ showGate(); return; }
+    // Ist der Posteingang/Chat gerade offen, Verlauf sofort aktualisieren und
+    // eingehende Nachrichten als gelesen markieren (für die Häkchen beim Absender).
+    const openChatList = document.getElementById('chatMessageList');
+    if(openChatList){
+      renderChatMessageListInto(openChatList);
+      markChatSeenShared();
+    }
     const active = document.activeElement;
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
     if(isTyping) return;
@@ -3028,6 +3037,26 @@ function getUnreadChatCount(){
 
 let chatRecipientIds = null; // null = alle
 
+// Gelesen-Häkchen: Jeder Leser hinterlegt beim Betrachten des Chats einen
+// geteilten Zeitstempel. Nachrichten, deren Empfänger alle einen neueren
+// Zeitstempel haben, gelten als gelesen (blaue Häkchen).
+let chatSeenSaving = false;
+function markChatSeenShared(){
+  const key = session.partyId || (isAdminUser ? 'admin' : null);
+  if(!key || !accessGranted) return;
+  if(!state.chatSeen) state.chatSeen = {};
+  const msgs = getRelevantChatMessages();
+  const newestIncoming = msgs.reduce((mx, m) => {
+    const isMine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
+    return isMine ? mx : Math.max(mx, m.ts || 0);
+  }, 0);
+  if(newestIncoming <= (state.chatSeen[key] || 0)) return;
+  if(chatSeenSaving) return;
+  chatSeenSaving = true;
+  state.chatSeen[key] = Date.now();
+  Promise.resolve(saveShared()).then(() => { chatSeenSaving = false; }).catch(() => { chatSeenSaving = false; });
+}
+
 function renderChatMessageListInto(list){
   // Chat = Posteingang: Chat-Nachrichten und automatische Mitteilungen
   // erscheinen zeitlich sortiert in EINEM Verlauf.
@@ -3046,7 +3075,7 @@ function renderChatMessageListInto(list){
         '</div>';
       }
       const m = item.m;
-      const mine = m.fromPartyId === session.partyId;
+      const mine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
       const isBeer = m.type === 'beer';
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       const senderLine = isBeer
@@ -3063,7 +3092,16 @@ function renderChatMessageListInto(list){
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
           (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
         '</div>' +
-        '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + ';">' + new Date(m.ts).toLocaleDateString('de-CH') + ', ' + new Date(m.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+        '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + ';">' + new Date(m.ts).toLocaleDateString('de-CH') + ', ' + new Date(m.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr' + (function(){
+          if(!mine || isBeer) return '';
+          const readers = (m.toPartyIds && m.toPartyIds.length)
+            ? m.toPartyIds
+            : state.parties.map(p => p.id).filter(id => id !== m.fromPartyId);
+          if(!readers.length) return '';
+          const seen = state.chatSeen || {};
+          const allRead = readers.every(id => (seen[id] || 0) >= (m.ts || 0));
+          return ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; letter-spacing:-0.12em;">✓✓</span>';
+        })() + '</div>' +
       '</div>';
     }).join('');
     list.scrollTop = list.scrollHeight;
@@ -3107,6 +3145,7 @@ function showChatModal(){
     '</div>';
   document.body.appendChild(overlay);
   renderChatMessageListInto(document.getElementById('chatMessageList'));
+  markChatSeenShared();
 
   chatRecipientIds = null;
   overlay.querySelectorAll('.chat-recipient-chip').forEach(chip => {
