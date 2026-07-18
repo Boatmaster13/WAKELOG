@@ -1295,7 +1295,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-8';
+const APP_VERSION = '2026-07-18-9';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3273,15 +3273,15 @@ function showChatModal(){
       '</div>' +
       '<div id="chatMessageList" style="flex:1 1 auto; min-height:100px; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-bottom:0.7rem; padding-right:0.4rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
-        '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
-        '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
+        '<div class="hint" style="margin:0 0 0.15rem;">An:</div>' +
+        '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.3rem;" id="chatRecipientChips">' +
           '<button type="button" class="icon-btn chat-recipient-chip active" data-id="">Alle</button>' +
           otherParties.map(p => '<button type="button" class="icon-btn chat-recipient-chip" data-id="' + p.id + '">' + escapeHtml(p.name) + '</button>').join('') +
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
-      '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+      '<div class="field" style="margin:0 0 0.35rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.1rem;">' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatPhotoCameraBtn" title="Foto aufnehmen">📷</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatPhotoGalleryBtn" title="Aus Galerie wählen">🖼️</button>' +
@@ -3405,9 +3405,10 @@ function showChatModal(){
   const chatClearBtn = document.getElementById('chatClearBtn');
   if(chatClearBtn) chatClearBtn.addEventListener('click', async () => {
     if(!isAdminUser) return;
-    if(!confirm('Wirklich den GESAMTEN Chat-Verlauf für alle Parteien unwiderruflich löschen? (Automatische Mitteilungen bleiben erhalten.)')) return;
+    if(!confirm('Wirklich den GESAMTEN Verlauf (Nachrichten UND automatische Mitteilungen) für alle Parteien unwiderruflich löschen?')) return;
     state.chatMessages = [];
-    logAudit('Chat-Verlauf vollständig geleert');
+    state.notifications = [];
+    logAudit('Posteingang vollständig geleert (Nachrichten und Mitteilungen)');
     await saveShared();
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
