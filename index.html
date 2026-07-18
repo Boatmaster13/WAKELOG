@@ -1297,7 +1297,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-2';
+const APP_VERSION = '2026-07-18-5';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -2967,7 +2967,7 @@ function checkNewBeerCalls(oldMessages, newMessages){
       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && getPushEnabled()){
         try{
           new Notification('⚓ Ankerdöschen!', {
-            body: '🍻 ' + chatSenderName(m) + ' ruft zum Ankerdöschen — Prost mitmachen?',
+            body: (chatSenderName(m) === 'Der Administrator' ? 'Admin' : chatSenderName(m)) + ' ruft zum Ankerdöschen — Prost mitmachen? ⚓🍻',
             icon: 'icon-192.png'
           });
         } catch(e){}
@@ -3197,7 +3197,7 @@ function renderChatMessageListInto(list){
       const isBeer = m.type === 'beer';
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
       const senderLine = isBeer
-        ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓🍻 ' + escapeHtml(chatSenderName(m)) + ' ruft zum Ankerdöschen!</div>'
+        ? '<div style="font-weight:700; margin-bottom:0.2rem; font-size:0.84rem;">' + escapeHtml(chatSenderName(m) === 'Der Administrator' ? 'Admin' : chatSenderName(m)) + ' ruft zum Ankerdöschen! ⚓🍻</div>'
         : (mine
             ? (toLabel ? '<div class="hint" style="margin:0 0 0.2rem;">Du' + toLabel + '</div>' : '')
             : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>');
@@ -3240,14 +3240,14 @@ function showChatModal(){
   const otherParties = state.parties.filter(p => p.id !== session.partyId);
   const pushOn = getPushEnabled();
   overlay.innerHTML =
-    '<div class="gate-card" style="max-width:540px; max-height:94vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:1.1rem 0.9rem 1rem;">' +
+    '<div class="gate-card" style="max-width:540px; height:96vh; display:flex; flex-direction:column; overflow:hidden; padding:1.1rem 0.9rem 1rem;">' +
       '<button type="button" class="modal-x" id="chatCloseBtn" title="Schliessen">✕</button>' +
       '<h2 style="margin:0 0 0.4rem;">Posteingang</h2>' +
       '<div class="toggle-row" style="margin:0 0 0.6rem; padding-bottom:0.6rem; border-bottom:1px solid var(--line);">' +
         '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
         '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
       '</div>' +
-      '<div id="chatMessageList" style="max-height:42vh; overflow-y:auto; margin-bottom:0.7rem; padding-right:0.4rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
+      '<div id="chatMessageList" style="flex:1 1 auto; min-height:100px; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-bottom:0.7rem; padding-right:0.4rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
         '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
         '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
