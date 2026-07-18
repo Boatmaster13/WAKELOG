@@ -1073,7 +1073,7 @@ async function resolveDataRef(){
     overlay.style.display = 'flex';
     overlay.style.zIndex = '9998';
     overlay.innerHTML =
-      '<div class="gate-card" style="max-width:420px;">' +
+      '<div class="gate-card" style="max-width:420px; max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
         '<h2>🔑 Bootsschlüssel</h2>' +
         (keyInvalidated ? '<div class="notice">Der auf diesem Gerät gespeicherte Bootsschlüssel ist nicht mehr gültig — vermutlich wurde er vom Administrator geändert. Bitte den aktuellen Schlüssel eingeben.</div>' : '') +
         '<p style="font-size:0.88rem;">Die Daten sind mit einem gemeinsamen Bootsschlüssel geschützt. Gib den Schlüssel ein, den du von deiner Bootsgemeinschaft erhalten hast — er wird auf diesem Gerät gespeichert und muss nur einmal eingegeben werden.</p>' +
@@ -1091,14 +1091,24 @@ async function resolveDataRef(){
         : '') +
         '<div style="text-align:center; margin-top:1rem;"><a href="#" id="bootKeyLostLink" style="font-size:0.78rem; color:var(--ink-faint);">Bootsschlüssel verloren?</a></div>' +
         '<div id="bootKeyLostBox" style="display:none; margin-top:0.8rem; padding-top:0.8rem; border-top:1px solid var(--line); text-align:left;">' +
-          '<p class="hint" style="margin:0 0 0.5rem;"><b>1.</b> Zuerst bei allen Parteien nachfragen: Jedes Gerät, das den Schlüssel je eingegeben hat, kann ihn unter Verwaltung → Allg. Einstellungen → Bootsschlüssel → "👁 Anzeigen" wieder zeigen.</p>' +
-          '<p class="hint" style="margin:0 0 0.5rem;"><b>2.</b> Hat ihn wirklich niemand mehr: Der Inhaber des Firebase-Projekts kann die Daten retten. In der Firebase-Konsole (Realtime Database → Daten) den Knoten unter <code>bootslogbuch/v2</code> öffnen, über das ⋮-Menü <b>JSON exportieren</b>. Dann hier einen neuen Wunsch-Schlüssel eingeben und den Pfad berechnen lassen:</p>' +
+          '<p class="hint" style="margin:0 0 0.5rem;">Wer bist du?</p>' +
+          '<div style="display:flex; gap:0.5rem; margin-bottom:0.7rem;">' +
+            '<button type="button" class="btn secondary" id="bootKeyLostPartyBtn" style="flex:1; min-width:0; font-size:0.8rem; padding:0.5rem 0.4rem;">Partei</button>' +
+            '<button type="button" class="btn secondary" id="bootKeyLostAdminBtn" style="flex:1; min-width:0; font-size:0.8rem; padding:0.5rem 0.4rem;">Administrator</button>' +
+          '</div>' +
+          '<div id="bootKeyLostPartyBox" style="display:none;">' +
+            '<p class="hint" style="margin:0;">Frag den <b>Administrator</b> nach dem aktuellen Bootsschlüssel — insbesondere wenn er kürzlich geändert wurde, hat nur er den neuen. Er kann ihn dir direkt per WhatsApp schicken; der Link darin übernimmt den Schlüssel automatisch.</p>' +
+          '</div>' +
+          '<div id="bootKeyLostAdminBox" style="display:none;">' +
+          '<p class="hint" style="margin:0 0 0.5rem;"><b>1.</b> Zuerst bei den anderen Parteien nachfragen: Jedes Gerät, das den Schlüssel je eingegeben hat, kann ihn unter Verwaltung → Allg. Einstellungen → Bootsschlüssel → "👁 Anzeigen" wieder zeigen.</p>' +
+          '<p class="hint" style="margin:0 0 0.5rem;"><b>2.</b> Hat ihn wirklich niemand mehr: Als Inhaber des Firebase-Projekts kannst du die Daten retten. In der Firebase-Konsole (Realtime Database → Daten) den Knoten unter <code>bootslogbuch/v2</code> öffnen, über das ⋮-Menü <b>JSON exportieren</b>. Dann hier einen neuen Wunsch-Schlüssel eingeben und den Pfad berechnen lassen:</p>' +
           '<div style="display:flex; gap:0.4rem; margin-bottom:0.4rem;">' +
             '<input type="text" id="bootKeyLostNewKey" placeholder="Neuer Wunsch-Schlüssel" autocomplete="off" style="flex:1; min-width:0;">' +
             '<button type="button" class="btn secondary" id="bootKeyLostCalcBtn" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.6rem;">Pfad berechnen</button>' +
           '</div>' +
           '<div id="bootKeyLostPathOut" style="display:none; font-family:\'JetBrains Mono\', monospace; font-size:0.68rem; word-break:break-all; background:var(--foam); border:1px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem;"></div>' +
           '<p class="hint" style="margin:0.5rem 0 0;"><b>3.</b> In der Konsole unter genau diesem Pfad das exportierte JSON importieren, danach oben den neuen Schlüssel eingeben — fertig. Den alten Knoten anschliessend löschen.</p>' +
+          '</div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -1116,6 +1126,14 @@ async function resolveDataRef(){
       ev.preventDefault();
       const box = overlay.querySelector('#bootKeyLostBox');
       box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+    overlay.querySelector('#bootKeyLostPartyBtn').addEventListener('click', () => {
+      overlay.querySelector('#bootKeyLostPartyBox').style.display = 'block';
+      overlay.querySelector('#bootKeyLostAdminBox').style.display = 'none';
+    });
+    overlay.querySelector('#bootKeyLostAdminBtn').addEventListener('click', () => {
+      overlay.querySelector('#bootKeyLostAdminBox').style.display = 'block';
+      overlay.querySelector('#bootKeyLostPartyBox').style.display = 'none';
     });
     overlay.querySelector('#bootKeyLostCalcBtn').addEventListener('click', async () => {
       const raw = overlay.querySelector('#bootKeyLostNewKey').value;
