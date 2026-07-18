@@ -544,9 +544,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   content:""; position:absolute; inset:7px; border:1.5px dashed var(--volt-dark); border-radius:50%;
 }
 .stamp .lbl{ font-family:'Inter', sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:0.2rem; }
-.stamp .amt{ font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:1.6rem; color:var(--hull); line-height:1.1; max-width:100%; }
-.stamp .amt.amt-md{ font-size:1.3rem; }
-.stamp .amt.amt-sm{ font-size:1.05rem; }
+.stamp .amt{ font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:1.6rem; color:var(--hull); line-height:1.1; max-width:100%; white-space:nowrap; }
 .stamp.stamp-solo{ width:min(215px, 75%); }
 .stamp .parties{ font-family:'JetBrains Mono', monospace; font-size:0.66rem; color:var(--ink-soft); margin-top:0.25rem; }
 .settled-note{ font-weight:600; color:#1C9A64; font-size:0.9rem; background:#E4F7EE; padding:0.7rem 0.9rem; border-radius:var(--radius-sm); }
@@ -1297,7 +1295,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-6';
+const APP_VERSION = '2026-07-18-8';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3134,6 +3132,22 @@ function showChatMessageInfo(msgId){
   infoOverlay.querySelector('#msgInfoCloseBtn').addEventListener('click', () => infoOverlay.remove());
 }
 
+// 🗑️: eigene Nachrichten löschen (Admin darf alle löschen)
+async function deleteChatMessage(msgId){
+  const m = (state.chatMessages || []).find(x => x.id === msgId);
+  if(!m) return;
+  const mine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
+  if(!mine && !isAdminUser) return;
+  const what = m.voice ? 'Diese Sprachnachricht' : (m.type === 'beer' ? 'Diesen Ankerdöschen-Ruf' : 'Diese Nachricht');
+  if(!confirm(what + ' für alle löschen?')) return;
+  state.chatMessages = (state.chatMessages || []).filter(x => x.id !== msgId);
+  logAudit('Chat-Nachricht gelöscht');
+  await saveShared();
+  const openList = document.getElementById('chatMessageList');
+  if(openList) renderChatMessageListInto(openList);
+  updateHeaderMeta();
+}
+
 // ✏️: eigene Nachrichten sind 30 Minuten lang bearbeitbar
 const CHAT_EDIT_WINDOW_MS = 30 * 60 * 1000;
 function editChatMessage(msgId){
@@ -3211,14 +3225,20 @@ function renderChatMessageListInto(list){
           (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
         '</div>' +
         '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + '; overflow-wrap:anywhere;">' + fmtChatTs(m.ts) + (m.editedTs ? ' <span style="opacity:0.7;">(bearbeitet)</span>' : '') + (function(){
-          if(!mine || isBeer) return '';
-          const readers = chatMessageReaders(m);
-          if(!readers.length) return '';
-          const allRead = readers.every(id => chatReadTime(m, id));
-          let out = ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; font-size:0.72rem; letter-spacing:-0.12em; display:inline-block; padding-right:0.12em;">✓✓</span>';
-          out += ' <span data-msg-info="' + m.id + '" style="cursor:pointer;" title="Gelesen-Info">ℹ️</span>';
-          if((Date.now() - (m.ts || 0)) <= CHAT_EDIT_WINDOW_MS){
-            out += ' <span data-msg-edit="' + m.id + '" style="cursor:pointer; display:inline-block; transform:scaleX(-1);" title="Bearbeiten (30 Min.)">✏️</span>';
+          let out = '';
+          if(mine && !isBeer){
+            const readers = chatMessageReaders(m);
+            if(readers.length){
+              const allRead = readers.every(id => chatReadTime(m, id));
+              out += ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; font-size:0.72rem; letter-spacing:-0.12em; display:inline-block; padding-right:0.12em;">✓✓</span>';
+            }
+            out += ' <span data-msg-info="' + m.id + '" style="cursor:pointer;" title="Gelesen-Info">ℹ️</span>';
+            if((Date.now() - (m.ts || 0)) <= CHAT_EDIT_WINDOW_MS){
+              out += ' <span data-msg-edit="' + m.id + '" style="cursor:pointer; display:inline-block; transform:scaleX(-1);" title="Bearbeiten (30 Min.)">✏️</span>';
+            }
+          }
+          if(mine || isAdminUser){
+            out += ' <span data-msg-del="' + m.id + '" style="cursor:pointer;" title="Löschen">🗑️</span>';
           }
           return out;
         })() + '</div>' +
@@ -3226,6 +3246,7 @@ function renderChatMessageListInto(list){
     }).join('');
     list.querySelectorAll('[data-msg-info]').forEach(el => el.addEventListener('click', () => showChatMessageInfo(el.dataset.msgInfo)));
     list.querySelectorAll('[data-msg-edit]').forEach(el => el.addEventListener('click', () => editChatMessage(el.dataset.msgEdit)));
+    list.querySelectorAll('[data-msg-del]').forEach(el => el.addEventListener('click', () => deleteChatMessage(el.dataset.msgDel)));
     list.scrollTop = list.scrollHeight;
   }
 }
@@ -3243,9 +3264,12 @@ function showChatModal(){
     '<div class="gate-card" style="max-width:540px; height:96vh; display:flex; flex-direction:column; overflow:hidden; padding:1.1rem 0.9rem 1rem;">' +
       '<button type="button" class="modal-x" id="chatCloseBtn" title="Schliessen">✕</button>' +
       '<h2 style="margin:0 0 0.4rem;">Posteingang</h2>' +
-      '<div class="toggle-row" style="margin:0 0 0.6rem; padding-bottom:0.6rem; border-bottom:1px solid var(--line);">' +
-        '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
-        '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
+      '<div class="toggle-row" style="margin:0 0 0.6rem; padding-bottom:0.6rem; border-bottom:1px solid var(--line); justify-content:space-between;">' +
+        '<div style="display:flex; align-items:center; gap:0.7rem; min-width:0;">' +
+          '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
+          '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
+        '</div>' +
+        (isAdminUser ? '<button type="button" class="btn secondary" id="chatClearBtn" title="Gesamten Chat-Verlauf löschen" style="flex-shrink:0; font-size:0.72rem; padding:0.4rem 0.55rem; white-space:nowrap;">🗑️ Leeren</button>' : '') +
       '</div>' +
       '<div id="chatMessageList" style="flex:1 1 auto; min-height:100px; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-bottom:0.7rem; padding-right:0.4rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
@@ -3377,6 +3401,16 @@ function showChatModal(){
   document.getElementById('pushToggle').addEventListener('change', (ev) => {
     setPushEnabled(ev.target.checked);
     if(ev.target.checked) requestNotificationPermission();
+  });
+  const chatClearBtn = document.getElementById('chatClearBtn');
+  if(chatClearBtn) chatClearBtn.addEventListener('click', async () => {
+    if(!isAdminUser) return;
+    if(!confirm('Wirklich den GESAMTEN Chat-Verlauf für alle Parteien unwiderruflich löschen? (Automatische Mitteilungen bleiben erhalten.)')) return;
+    state.chatMessages = [];
+    logAudit('Chat-Verlauf vollständig geleert');
+    await saveShared();
+    renderChatMessageListInto(document.getElementById('chatMessageList'));
+    updateHeaderMeta();
   });
 
   document.getElementById('chatSendBtn').addEventListener('click', async () => {
@@ -4071,6 +4105,23 @@ function exportYearOverviewPdf(year){
   setTimeout(() => { window.print(); }, 100);
 }
 
+// Passt die Betragsschrift im Ausgleich-Stempel exakt ein: so gross wie
+// möglich, aber nie über den Kreis hinaus (Messung statt fixer Stufen).
+function fitStampAmounts(scope){
+  (scope || document).querySelectorAll('.stamp').forEach(stamp => {
+    const amt = stamp.querySelector('.amt');
+    if(!amt || !stamp.clientWidth) return;
+    // 0.8 = nutzbare Breite in der Kreismitte (Rundung, Rand, Innenabstand)
+    const avail = stamp.clientWidth * 0.8;
+    let size = Math.round(stamp.clientWidth * 0.2); // Startgrösse relativ zum Kreis
+    amt.style.fontSize = size + 'px';
+    while(size > 13 && amt.scrollWidth > avail){
+      size -= 1;
+      amt.style.fontSize = size + 'px';
+    }
+  });
+}
+
 function renderSettlement(){
   const yearSel = document.getElementById('settlementYear');
   if(!yearSel.value) return;
@@ -4141,17 +4192,14 @@ function renderSettlement(){
   } else {
     html += '<div class="stamps">';
     tx.forEach(t => {
-      const amtStr = fmtCHF(t.amount);
-      // Lange Beträge automatisch kleiner darstellen, damit sie im Kreis bleiben;
-      // ein einzelner Stempel darf zusätzlich grösser sein.
-      const amtClass = amtStr.length >= 14 ? ' amt-sm' : (amtStr.length >= 11 ? ' amt-md' : '');
       const soloClass = tx.length === 1 ? ' stamp-solo' : '';
-      html += '<div class="stamp' + soloClass + '"><div class="lbl">Ausgleich ' + year + '</div><div class="amt' + amtClass + '">' + amtStr + '</div><div class="parties">' + escapeHtml(t.from) + ' → ' + escapeHtml(t.to) + '</div></div>';
+      html += '<div class="stamp' + soloClass + '"><div class="lbl">Ausgleich ' + year + '</div><div class="amt">' + fmtCHF(t.amount) + '</div><div class="parties">' + escapeHtml(t.from) + ' → ' + escapeHtml(t.to) + '</div></div>';
     });
     html += '</div>';
   }
 
   container.innerHTML = html;
+  requestAnimationFrame(() => fitStampAmounts(container));
 }
 
 function renderAdjustmentTab(){
