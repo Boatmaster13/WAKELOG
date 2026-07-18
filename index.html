@@ -3049,11 +3049,19 @@ function renderChatMessageListInto(list){
       const mine = m.fromPartyId === session.partyId;
       const isBeer = m.type === 'beer';
       const toLabel = (m.toPartyIds && m.toPartyIds.length) ? ' → ' + m.toPartyIds.map(id => escapeHtml(partyName(id))).join(', ') : '';
+      const senderLine = isBeer
+        ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(chatSenderName(m)) + ' ruft zum Ankerdöschen!</div>'
+        : (mine
+            ? (toLabel ? '<div class="hint" style="margin:0 0 0.2rem;">Du' + toLabel + '</div>' : '')
+            : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>');
+      const bubbleBg = isBeer ? '#F5E7B8' : (mine ? '#DCF3C8' : '#fff');
+      const bubbleBorder = isBeer ? '#C9A227' : (mine ? '#A9D18E' : 'var(--bronze-line)');
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:80%;">' +
-        '<div style="background:' + (isBeer ? '#F5E7B8' : (mine ? 'var(--foam)' : '#fff')) + '; border:1.5px solid ' + (isBeer ? '#C9A227' : 'var(--bronze-line)') + '; border-radius:14px; padding:0.55rem 0.75rem; font-size:0.88rem;">' +
-          (isBeer ? '<div style="font-weight:700; margin-bottom:0.2rem;">⚓ ' + escapeHtml(chatSenderName(m)) + ' ruft zum Ankerdöschen!</div>' : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>') +
+        '<div style="background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;">' +
+          senderLine +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
+          (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
         '</div>' +
         '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + ';">' + new Date(m.ts).toLocaleDateString('de-CH') + ', ' + new Date(m.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
       '</div>';
@@ -3087,10 +3095,12 @@ function showChatModal(){
         '</div>'
       ) : '') +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
+      '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
       '<div class="field" style="margin:0 0 0.5rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div style="display:flex; gap:0.5rem;">' +
-        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.4rem; font-size:0.78rem;">📷 Aufnehmen</button>' +
-        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.4rem; font-size:0.78rem;">🖼️ Galerie</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoCameraBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.3rem; font-size:0.76rem;">📷 Kamera</button>' +
+        '<button type="button" class="btn secondary" id="chatPhotoGalleryBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.3rem; font-size:0.76rem;">🖼️ Galerie</button>' +
+        '<button type="button" class="btn secondary" id="chatVoiceBtn" style="flex:1; min-width:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0.5rem 0.3rem; font-size:0.76rem;">🎤 Memo</button>' +
       '</div>' +
       '<button type="button" class="btn" id="chatSendBtn" style="width:100%; margin-top:0.6rem;">Senden</button>' +
       '<button class="btn secondary" id="chatCloseBtn" style="margin-top:1rem; width:100%;">Schliessen</button>' +
@@ -3131,6 +3141,64 @@ function showChatModal(){
   document.getElementById('chatPhotoCameraBtn').addEventListener('click', () => openInAppCamera(applyChatPhoto, null, 700, 0.6));
   document.getElementById('chatPhotoGalleryBtn').addEventListener('click', () => openImagePicker(false, handleChatPhotoSelect));
 
+  // --- Sprachnachricht aufnehmen (max. 60 Sek.) ---
+  const voiceArea = document.getElementById('chatVoiceArea');
+  let recorder = null, recChunks = [], recTimer = null, recStart = 0, recStream = null, recCancelled = false;
+  function stopRecStream(){ try{ if(recStream) recStream.getTracks().forEach(t => t.stop()); } catch(e){} recStream = null; }
+  function renderVoicePreview(){
+    if(chatPendingVoice){
+      voiceArea.innerHTML = '<div style="display:flex; align-items:center; gap:0.4rem;">' +
+        '<audio controls src="' + chatPendingVoice + '" style="flex:1; min-width:0; height:36px;"></audio>' +
+        '<button type="button" class="del-btn" id="chatVoiceRemoveBtn">entfernen</button></div>';
+      document.getElementById('chatVoiceRemoveBtn').addEventListener('click', () => { chatPendingVoice = null; voiceArea.innerHTML = ''; });
+    } else {
+      voiceArea.innerHTML = '';
+    }
+  }
+  renderVoicePreview();
+  document.getElementById('chatVoiceBtn').addEventListener('click', async () => {
+    if(recorder) return; // Aufnahme läuft bereits
+    if(!window.MediaRecorder){ voiceArea.innerHTML = '<div class="hint">Sprachaufnahme wird von diesem Browser nicht unterstützt.</div>'; return; }
+    try{ recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e){ voiceArea.innerHTML = '<div class="hint">Mikrofon nicht verfügbar — bitte die Mikrofon-Berechtigung für diese Website erlauben.</div>'; return; }
+    let mime = '';
+    if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
+    else if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4';
+    recChunks = []; recCancelled = false;
+    try{ recorder = mime ? new MediaRecorder(recStream, { mimeType: mime, audioBitsPerSecond: 32000 }) : new MediaRecorder(recStream); }
+    catch(e){ recorder = new MediaRecorder(recStream); }
+    recorder.ondataavailable = (ev) => { if(ev.data && ev.data.size) recChunks.push(ev.data); };
+    recorder.onstop = () => {
+      stopRecStream();
+      clearInterval(recTimer);
+      const type = (recorder && recorder.mimeType) || mime || 'audio/webm';
+      recorder = null;
+      if(recCancelled){ recChunks = []; renderVoicePreview(); return; }
+      const blob = new Blob(recChunks, { type });
+      recChunks = [];
+      if(!blob.size){ renderVoicePreview(); return; }
+      if(blob.size > 1600000){ voiceArea.innerHTML = '<div class="hint">Aufnahme zu gross — bitte kürzer aufnehmen.</div>'; return; }
+      const r = new FileReader();
+      r.onload = () => { chatPendingVoice = r.result; renderVoicePreview(); };
+      r.readAsDataURL(blob);
+    };
+    recorder.start(1000);
+    recStart = Date.now();
+    voiceArea.innerHTML = '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+      '<span style="color:#C0392B; font-weight:700; font-family:\'JetBrains Mono\', monospace; flex-shrink:0;">● <span id="chatRecTime">0:00</span></span>' +
+      '<button type="button" class="btn secondary" id="chatRecStopBtn" style="flex:1; min-width:0; font-size:0.78rem; padding:0.45rem 0.4rem; white-space:nowrap;">⏹ Fertig</button>' +
+      '<button type="button" class="btn secondary" id="chatRecCancelBtn" style="flex:1; min-width:0; font-size:0.78rem; padding:0.45rem 0.4rem; white-space:nowrap;">✖ Verwerfen</button>' +
+    '</div>';
+    document.getElementById('chatRecStopBtn').addEventListener('click', () => { try{ if(recorder) recorder.stop(); } catch(e){} });
+    document.getElementById('chatRecCancelBtn').addEventListener('click', () => { recCancelled = true; try{ if(recorder) recorder.stop(); } catch(e){} });
+    recTimer = setInterval(() => {
+      const sec = Math.floor((Date.now() - recStart) / 1000);
+      const el = document.getElementById('chatRecTime');
+      if(el) el.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+      if(sec >= 60){ try{ if(recorder) recorder.stop(); } catch(e){} }
+    }, 500);
+  });
+
   document.getElementById('pushToggle').addEventListener('change', (ev) => {
     setPushEnabled(ev.target.checked);
     if(ev.target.checked) requestNotificationPermission();
@@ -3140,13 +3208,15 @@ function showChatModal(){
     if(!session.partyId && !isAdminUser) return;
     const textInput = document.getElementById('chatTextInput');
     const text = textInput.value.trim();
-    if(!text && !chatPendingPhoto) return;
+    if(!text && !chatPendingPhoto && !chatPendingVoice) return;
     if(!state.chatMessages) state.chatMessages = [];
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text, photo: chatPendingPhoto, type: 'normal', toPartyIds: chatRecipientIds });
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text, photo: chatPendingPhoto, voice: chatPendingVoice, type: 'normal', toPartyIds: chatRecipientIds });
     if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
     textInput.value = '';
     chatPendingPhoto = null;
+    chatPendingVoice = null;
     chatPreviewArea.innerHTML = '';
+    voiceArea.innerHTML = '';
     await saveShared();
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
@@ -3161,6 +3231,7 @@ function showChatModal(){
 }
 
 let chatPendingPhoto = null;
+let chatPendingVoice = null;
 let beerPendingPhoto = null;
 
 // In-App-Kamera über getUserMedia: zeigt eine Live-Vorschau mit Auslöser direkt
