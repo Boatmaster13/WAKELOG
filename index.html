@@ -1078,7 +1078,7 @@ async function resolveDataRef(){
         (keyInvalidated ? '<div class="notice">Der auf diesem Gerät gespeicherte Bootsschlüssel ist nicht mehr gültig — vermutlich wurde er vom Administrator geändert. Bitte den aktuellen Schlüssel eingeben.</div>' : '') +
         '<p style="font-size:0.88rem;">Die Daten sind mit einem gemeinsamen Bootsschlüssel geschützt. Gib den Schlüssel ein, den du von deiner Bootsgemeinschaft erhalten hast — er wird auf diesem Gerät gespeichert und muss nur einmal eingegeben werden.</p>' +
         '<div class="field" style="margin-bottom:0.6rem; display:flex; gap:0.4rem;">' +
-          '<input type="text" id="bootKeyInput" placeholder="z. B. BOOT-AB2C-DE3F" autocomplete="off" autocapitalize="characters" style="flex:1; min-width:0; text-transform:uppercase;">' +
+          '<input type="text" id="bootKeyInput" placeholder="z. B. BOOT-AB2C-DE3F" autocomplete="off" autocapitalize="characters" style="flex:1; min-width:0; text-transform:uppercase; font-size:0.85rem;">' +
           '<button type="button" class="btn secondary" id="bootKeyPasteBtn" title="Aus Zwischenablage einfügen" style="flex-shrink:0; padding:0.5rem 0.7rem;">📋</button>' +
         '</div>' +
         '<div class="err" id="bootKeyErr" style="display:none; margin-bottom:0.6rem;"></div>' +
@@ -1103,7 +1103,7 @@ async function resolveDataRef(){
           '<p class="hint" style="margin:0 0 0.5rem;"><b>1.</b> Zuerst bei den anderen Parteien nachfragen: Jedes Gerät, das den Schlüssel je eingegeben hat, kann ihn unter Verwaltung → Allg. Einstellungen → Bootsschlüssel → "👁 Anzeigen" wieder zeigen.</p>' +
           '<p class="hint" style="margin:0 0 0.5rem;"><b>2.</b> Hat ihn wirklich niemand mehr: Als Inhaber des Firebase-Projekts kannst du die Daten retten. In der Firebase-Konsole (Realtime Database → Daten) den Knoten unter <code>bootslogbuch/v2</code> öffnen, über das ⋮-Menü <b>JSON exportieren</b>. Dann hier einen neuen Wunsch-Schlüssel eingeben und den Pfad berechnen lassen:</p>' +
           '<div style="margin-bottom:0.4rem;">' +
-            '<input type="text" id="bootKeyLostNewKey" placeholder="BOOT-XXXX-XXXX" autocomplete="off" autocapitalize="characters" style="width:100%; box-sizing:border-box; text-transform:uppercase; margin-bottom:0.4rem;">' +
+            '<input type="text" id="bootKeyLostNewKey" placeholder="BOOT-XXXX-XXXX" autocomplete="off" autocapitalize="characters" style="width:100%; box-sizing:border-box; text-transform:uppercase; margin-bottom:0.4rem; font-size:0.85rem; padding:0.5rem 0.6rem;">' +
             '<div style="display:flex; gap:0.4rem;">' +
               '<button type="button" class="btn secondary" id="bootKeyLostSuggestBtn" title="Neuen Schlüssel im richtigen Format vorschlagen" style="flex-shrink:0; font-size:0.78rem; padding:0.5rem 0.7rem;">🎲 Vorschlag</button>' +
               '<button type="button" class="btn secondary" id="bootKeyLostCalcBtn" style="flex:1; min-width:0; font-size:0.78rem; padding:0.5rem 0.6rem; white-space:nowrap;">Pfad berechnen</button>' +
