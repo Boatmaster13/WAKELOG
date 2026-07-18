@@ -544,7 +544,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   content:""; position:absolute; inset:7px; border:1.5px dashed var(--volt-dark); border-radius:50%;
 }
 .stamp .lbl{ font-family:'Inter', sans-serif; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:0.2rem; }
-.stamp .amt{ font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:1.6rem; color:var(--hull); line-height:1.1; }
+.stamp .amt{ font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:1.6rem; color:var(--hull); line-height:1.1; max-width:100%; }
+.stamp .amt.amt-md{ font-size:1.3rem; }
+.stamp .amt.amt-sm{ font-size:1.05rem; }
+.stamp.stamp-solo{ width:min(215px, 75%); }
 .stamp .parties{ font-family:'JetBrains Mono', monospace; font-size:0.66rem; color:var(--ink-soft); margin-top:0.25rem; }
 .settled-note{ font-weight:600; color:#1C9A64; font-size:0.9rem; background:#E4F7EE; padding:0.7rem 0.9rem; border-radius:var(--radius-sm); }
 
@@ -2937,6 +2940,16 @@ function checkNewBeerCalls(oldMessages, newMessages){
   });
 }
 
+let cheersRetryArmed = false;
+function armCheersRetry(){
+  if(cheersRetryArmed) return;
+  cheersRetryArmed = true;
+  window.addEventListener('pointerdown', () => {
+    cheersRetryArmed = false;
+    playCheersSound();
+  }, { once: true });
+}
+
 let cheersAudioCtx = null;
 function playSynthCheers(){
   try{
@@ -2991,7 +3004,9 @@ function playCheersSound(){
     canOpen.addEventListener('error', playSip, { once: true });
     const p = canOpen.play();
     if(p && typeof p.then === 'function'){
-      p.catch(() => playSip());
+      // Abspielen vom Browser blockiert (Autoplay-Schutz im Hintergrund-Tab):
+      // beim nächsten Tipp auf die Seite nachholen.
+      p.catch(() => armCheersRetry());
     }
   } catch(e){ playSynthCheers(); }
 }
@@ -3880,7 +3895,12 @@ function renderSettlement(){
   } else {
     html += '<div class="stamps">';
     tx.forEach(t => {
-      html += '<div class="stamp"><div class="lbl">Ausgleich ' + year + '</div><div class="amt">' + fmtCHF(t.amount) + '</div><div class="parties">' + escapeHtml(t.from) + ' → ' + escapeHtml(t.to) + '</div></div>';
+      const amtStr = fmtCHF(t.amount);
+      // Lange Beträge automatisch kleiner darstellen, damit sie im Kreis bleiben;
+      // ein einzelner Stempel darf zusätzlich grösser sein.
+      const amtClass = amtStr.length >= 14 ? ' amt-sm' : (amtStr.length >= 11 ? ' amt-md' : '');
+      const soloClass = tx.length === 1 ? ' stamp-solo' : '';
+      html += '<div class="stamp' + soloClass + '"><div class="lbl">Ausgleich ' + year + '</div><div class="amt' + amtClass + '">' + amtStr + '</div><div class="parties">' + escapeHtml(t.from) + ' → ' + escapeHtml(t.to) + '</div></div>';
     });
     html += '</div>';
   }
