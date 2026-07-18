@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="only light">
 <title>WakeLog</title>
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  color-scheme: light;
+  color-scheme: only light;
   --hull:#161513;
   --hull2:#211F1C;
   --hull-glow:#332E26;
@@ -635,6 +635,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   .hero-container{ max-width:1180px; }
 }
 #printArea{ display:none; }
+@media (prefers-color-scheme: dark){
+  :root{ color-scheme: only light; }
+  html, body{ background:var(--sand); color:var(--ink); }
+}
 @media print{
   body > *:not(#printArea){ display:none !important; }
   #printArea{ display:block; position:static; width:100%; padding:1.5rem; background:#fff; }
@@ -971,21 +975,41 @@ function appShareUrl(param, value){
   } catch(e){}
   return base + (base.indexOf('?') === -1 ? '?' : '&') + param + '=' + encodeURIComponent(value);
 }
-// Holt einen Code aus der Zwischenablage und extrahiert ihn notfalls aus einer
-// ganzen Nachricht (Muster BOOT-XXXX-XXXX, XXXX-XXXX-XXXX oder 6-10 Zeichen).
+// Holt einen Code aus der Zwischenablage und erkennt dabei, um WELCHEN Code es
+// sich handelt: Bootsschlüssel (?bootkey=…, BOOT-XXXX-XXXX, XXXX-XXXX-XXXX)
+// oder Zugangscode (?code=…, GROSS geschriebener 6-10-Zeichen-Block). Landet
+// der falsche Code-Typ im Feld, gibt es 'wrongkind' zurück statt Unsinn
+// einzutragen. Rückgabe: 'ok' | 'wrongkind' | 'nocode' | 'noclip'.
 async function pasteCodeInto(inputEl, kind){
   let text = '';
-  try{ text = await navigator.clipboard.readText(); } catch(e){ return false; }
+  try{ text = await navigator.clipboard.readText(); } catch(e){ return 'noclip'; }
   text = (text || '').trim();
-  if(!text) return false;
-  let match = null;
+  if(!text) return 'noclip';
+  const bootParam = text.match(/[?&]bootkey=([A-Za-z0-9%-]+)/i);
+  const codeParam = text.match(/[?&]code=([A-Za-z0-9%]+)/i);
+  const bootPattern = text.match(/BOOT-[A-Z0-9]{4}-[A-Z0-9]{4}/i) || text.match(/\b[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}\b/);
+  const isSingleToken = !/\s/.test(text);
   if(kind === 'bootkey'){
-    match = text.match(/BOOT-[A-Z0-9]{4}-[A-Z0-9]{4}/i) || text.match(/[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/i);
-  } else {
-    match = text.match(/\b[A-Z0-9]{6,10}\b/i);
+    if(bootParam){ inputEl.value = decodeURIComponent(bootParam[1]); return 'ok'; }
+    if(bootPattern){ inputEl.value = bootPattern[0].toUpperCase(); return 'ok'; }
+    if(codeParam || (isSingleToken && /^[A-Z0-9]{6}$/.test(text))) return 'wrongkind';
+    if(isSingleToken && text.length <= 20){ inputEl.value = text; return 'ok'; }
+    return 'nocode';
   }
-  inputEl.value = match ? match[0] : text;
-  return true;
+  // Zugangscode
+  if(codeParam){ inputEl.value = decodeURIComponent(codeParam[1]); return 'ok'; }
+  // Bootsschlüssel-Anteile entfernen, damit sie nicht fälschlich als Code gelten
+  const cleaned = text
+    .replace(/[?&]bootkey=[A-Za-z0-9%-]+/ig, ' ')
+    .replace(/BOOT-[A-Z0-9]{4}-[A-Z0-9]{4}/ig, ' ')
+    .replace(/\b[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}\b/g, ' ');
+  // Codes sind GROSS geschrieben — bewusst ohne /i, damit normale Wörter
+  // ("einfach", "WakeLog" …) nicht als Code durchgehen. Letzter Treffer zählt
+  // (in den Teilen-Nachrichten steht der Code am Schluss).
+  const tokens = cleaned.match(/\b[A-Z0-9]{6,10}\b/g);
+  if(tokens && tokens.length){ inputEl.value = tokens[tokens.length - 1]; return 'ok'; }
+  if(isSingleToken && !bootPattern && !bootParam && text.length >= 4 && text.length <= 12){ inputEl.value = text; return 'ok'; }
+  return (bootPattern || bootParam) ? 'wrongkind' : 'nocode';
 }
 
 function randomBootKey(){
@@ -1082,8 +1106,11 @@ async function resolveDataRef(){
     const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
 
     overlay.querySelector('#bootKeyPasteBtn').addEventListener('click', async () => {
-      const ok = await pasteCodeInto(overlay.querySelector('#bootKeyInput'), 'bootkey');
-      if(!ok) showErr('Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.');
+      const res = await pasteCodeInto(overlay.querySelector('#bootKeyInput'), 'bootkey');
+      if(res === 'wrongkind') showErr('In der Zwischenablage steckt ein Zugangscode — hier wird aber der Bootsschlüssel benötigt (BOOT-XXXX-XXXX).');
+      else if(res === 'nocode') showErr('In der Zwischenablage wurde kein Bootsschlüssel gefunden.');
+      else if(res === 'noclip') showErr('Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.');
+      else errEl.style.display = 'none';
     });
     overlay.querySelector('#bootKeyLostLink').addEventListener('click', (ev) => {
       ev.preventDefault();
@@ -4716,12 +4743,13 @@ function renderGate(){
       renderRecoveryFlow();
     });
     document.getElementById('gateCodePasteBtn').addEventListener('click', async () => {
-      const ok = await pasteCodeInto(document.getElementById('gate-code'), 'partycode');
-      if(!ok){
-        const err = document.getElementById('gateError');
-        err.textContent = 'Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.';
-        err.classList.add('show');
-      }
+      const res = await pasteCodeInto(document.getElementById('gate-code'), 'partycode');
+      const err = document.getElementById('gateError');
+      if(res === 'ok'){ err.classList.remove('show'); return; }
+      if(res === 'wrongkind') err.textContent = 'In der Zwischenablage steckt der Bootsschlüssel — hier wird aber dein persönlicher Zugangscode benötigt.';
+      else if(res === 'nocode') err.textContent = 'In der Zwischenablage wurde kein Zugangscode gefunden.';
+      else err.textContent = 'Zwischenablage nicht verfügbar — bitte das Feld lange drücken und "Einfügen" wählen.';
+      err.classList.add('show');
     });
 
     let role = 'party';
