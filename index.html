@@ -1079,6 +1079,20 @@ async function resolveDataRef(){
     overlay.className = 'gate-overlay';
     overlay.style.display = 'flex';
     overlay.style.zIndex = '9998';
+    document.body.appendChild(overlay);
+    // Der Dialog lässt sich schliessen (z. B. wenn man die App nur zumachen
+    // will) — dahinter liegt eine ruhige Sperr-Ansicht, von der aus die
+    // Eingabe jederzeit wieder geöffnet werden kann.
+    const renderLocked = () => {
+      overlay.innerHTML =
+        '<div class="gate-card" style="max-width:420px; text-align:center;">' +
+          '<h2>🔒 WakeLog gesperrt</h2>' +
+          '<p style="font-size:0.88rem;">Ohne Bootsschlüssel können keine Daten geladen werden. Du kannst die App jetzt einfach verlassen — oder den Schlüssel eingeben, sobald du ihn hast.</p>' +
+          '<button type="button" class="btn" id="lockedEnterKeyBtn" style="width:100%;">🔑 Bootsschlüssel eingeben</button>' +
+        '</div>';
+      overlay.querySelector('#lockedEnterKeyBtn').addEventListener('click', () => renderKeyGate());
+    };
+    const renderKeyGate = () => {
     overlay.innerHTML =
       '<div class="gate-card" style="max-width:420px; max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
         '<h2>🔑 Bootsschlüssel</h2>' +
@@ -1121,8 +1135,9 @@ async function resolveDataRef(){
           '<p class="hint" style="margin:0.5rem 0 0;"><b>3.</b> In der Konsole unter genau diesem Pfad das exportierte JSON importieren, danach oben den neuen Schlüssel eingeben — fertig. Den alten Knoten anschliessend löschen.</p>' +
           '</div>' +
         '</div>' +
+        '<button type="button" class="btn secondary" id="bootKeyGateCloseBtn" style="width:100%; margin-top:1.1rem;">Schliessen</button>' +
       '</div>';
-    document.body.appendChild(overlay);
+    overlay.querySelector('#bootKeyGateCloseBtn').addEventListener('click', renderLocked);
     const errEl = overlay.querySelector('#bootKeyErr');
     const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
 
@@ -1248,6 +1263,8 @@ async function resolveDataRef(){
       });
       resolve();
     });
+    };
+    renderKeyGate();
   });
 }
 
@@ -3046,15 +3063,105 @@ function markChatSeenShared(){
   if(!key || !accessGranted) return;
   if(!state.chatSeen) state.chatSeen = {};
   const msgs = getRelevantChatMessages();
+  const nowTs = Date.now();
+  let changed = false;
+  // Exakte Lesezeit je Nachricht festhalten (für die ℹ️-Info des Absenders)
+  msgs.forEach(m => {
+    const isMine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
+    if(isMine) return;
+    if(!m.readBy) m.readBy = {};
+    if(!m.readBy[key]){ m.readBy[key] = nowTs; changed = true; }
+  });
   const newestIncoming = msgs.reduce((mx, m) => {
     const isMine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
     return isMine ? mx : Math.max(mx, m.ts || 0);
   }, 0);
-  if(newestIncoming <= (state.chatSeen[key] || 0)) return;
-  if(chatSeenSaving) return;
+  if(newestIncoming > (state.chatSeen[key] || 0)){ state.chatSeen[key] = nowTs; changed = true; }
+  if(!changed || chatSeenSaving) return;
   chatSeenSaving = true;
-  state.chatSeen[key] = Date.now();
   Promise.resolve(saveShared()).then(() => { chatSeenSaving = false; }).catch(() => { chatSeenSaving = false; });
+}
+
+// Empfänger einer Nachricht (gezielte Nachricht → gewählte Parteien, sonst alle anderen)
+function chatMessageReaders(m){
+  return (m.toPartyIds && m.toPartyIds.length)
+    ? m.toPartyIds
+    : state.parties.map(p => p.id).filter(id => id !== m.fromPartyId);
+}
+function chatReadTime(m, readerId){
+  if(m.readBy && m.readBy[readerId]) return m.readBy[readerId];
+  const seen = (state.chatSeen || {})[readerId] || 0;
+  return seen >= (m.ts || 0) ? seen : 0;
+}
+function fmtChatTs(ts){
+  return new Date(ts).toLocaleDateString('de-CH') + ', ' + new Date(ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
+}
+
+// ℹ️: zeigt, wann die Nachricht von wem gelesen wurde
+function showChatMessageInfo(msgId){
+  const m = (state.chatMessages || []).find(x => x.id === msgId);
+  if(!m) return;
+  const readers = chatMessageReaders(m);
+  const infoOverlay = document.createElement('div');
+  infoOverlay.className = 'gate-overlay';
+  infoOverlay.style.display = 'flex';
+  infoOverlay.style.zIndex = '9999';
+  infoOverlay.innerHTML =
+    '<div class="gate-card" style="max-width:380px;">' +
+      '<h2>Nachrichten-Info</h2>' +
+      '<div class="hint" style="margin:0 0 0.6rem;">Gesendet: ' + fmtChatTs(m.ts) + (m.editedTs ? '<br>Zuletzt bearbeitet: ' + fmtChatTs(m.editedTs) : '') + '</div>' +
+      readers.map(id => {
+        const rts = chatReadTime(m, id);
+        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; padding:0.35rem 0; border-bottom:1px solid var(--line); font-size:0.85rem;">' +
+          '<span>' + escapeHtml(partyName(id)) + '</span>' +
+          '<span style="white-space:nowrap;">' + (rts ? '<span style="color:#34B7F1; font-weight:700;">✓✓</span> ' + fmtChatTs(rts) : '<span style="color:#95A5A6; font-weight:700;">✓✓</span> noch nicht gelesen') + '</span>' +
+        '</div>';
+      }).join('') +
+      '<button type="button" class="btn" id="msgInfoCloseBtn" style="width:100%; margin-top:1rem;">Schliessen</button>' +
+    '</div>';
+  document.body.appendChild(infoOverlay);
+  infoOverlay.querySelector('#msgInfoCloseBtn').addEventListener('click', () => infoOverlay.remove());
+}
+
+// ✏️: eigene Nachrichten sind 30 Minuten lang bearbeitbar
+const CHAT_EDIT_WINDOW_MS = 30 * 60 * 1000;
+function editChatMessage(msgId){
+  const m = (state.chatMessages || []).find(x => x.id === msgId);
+  if(!m) return;
+  const mine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
+  if(!mine) return;
+  if(Date.now() - (m.ts || 0) > CHAT_EDIT_WINDOW_MS){
+    alert('Nachrichten können nur innerhalb von 30 Minuten nach dem Senden bearbeitet werden.');
+    return;
+  }
+  const editOverlay = document.createElement('div');
+  editOverlay.className = 'gate-overlay';
+  editOverlay.style.display = 'flex';
+  editOverlay.style.zIndex = '9999';
+  editOverlay.innerHTML =
+    '<div class="gate-card" style="max-width:420px;">' +
+      '<h2>Nachricht bearbeiten</h2>' +
+      '<textarea id="msgEditText" rows="4" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none; box-sizing:border-box;"></textarea>' +
+      '<div style="display:flex; gap:0.5rem; margin-top:0.8rem;">' +
+        '<button type="button" class="btn" id="msgEditSaveBtn" style="flex:1;">Speichern</button>' +
+        '<button type="button" class="btn secondary" id="msgEditCancelBtn" style="flex:1;">Abbrechen</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(editOverlay);
+  const ta = editOverlay.querySelector('#msgEditText');
+  ta.value = m.text || '';
+  ta.focus();
+  editOverlay.querySelector('#msgEditCancelBtn').addEventListener('click', () => editOverlay.remove());
+  editOverlay.querySelector('#msgEditSaveBtn').addEventListener('click', async () => {
+    const val = ta.value.trim();
+    if(!val && !m.photo && !m.voice){ editOverlay.remove(); return; }
+    m.text = val;
+    m.editedTs = Date.now();
+    editOverlay.remove();
+    await saveShared();
+    const openList = document.getElementById('chatMessageList');
+    if(openList) renderChatMessageListInto(openList);
+  });
 }
 
 function renderChatMessageListInto(list){
@@ -3092,18 +3199,22 @@ function renderChatMessageListInto(list){
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
           (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
         '</div>' +
-        '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + ';">' + new Date(m.ts).toLocaleDateString('de-CH') + ', ' + new Date(m.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr' + (function(){
+        '<div class="hint" style="margin-top:0.15rem; text-align:' + (mine ? 'right' : 'left') + '; overflow-wrap:anywhere;">' + fmtChatTs(m.ts) + (m.editedTs ? ' <span style="opacity:0.7;">(bearbeitet)</span>' : '') + (function(){
           if(!mine || isBeer) return '';
-          const readers = (m.toPartyIds && m.toPartyIds.length)
-            ? m.toPartyIds
-            : state.parties.map(p => p.id).filter(id => id !== m.fromPartyId);
+          const readers = chatMessageReaders(m);
           if(!readers.length) return '';
-          const seen = state.chatSeen || {};
-          const allRead = readers.every(id => (seen[id] || 0) >= (m.ts || 0));
-          return ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; letter-spacing:-0.12em;">✓✓</span>';
+          const allRead = readers.every(id => chatReadTime(m, id));
+          let out = ' <span style="color:' + (allRead ? '#34B7F1' : '#95A5A6') + '; font-weight:700; font-size:0.72rem;">✓✓</span>';
+          out += ' <span data-msg-info="' + m.id + '" style="cursor:pointer;" title="Gelesen-Info">ℹ️</span>';
+          if((Date.now() - (m.ts || 0)) <= CHAT_EDIT_WINDOW_MS){
+            out += ' <span data-msg-edit="' + m.id + '" style="cursor:pointer;" title="Bearbeiten (30 Min.)">✏️</span>';
+          }
+          return out;
         })() + '</div>' +
       '</div>';
     }).join('');
+    list.querySelectorAll('[data-msg-info]').forEach(el => el.addEventListener('click', () => showChatMessageInfo(el.dataset.msgInfo)));
+    list.querySelectorAll('[data-msg-edit]').forEach(el => el.addEventListener('click', () => editChatMessage(el.dataset.msgEdit)));
     list.scrollTop = list.scrollHeight;
   }
 }
@@ -3118,13 +3229,13 @@ function showChatModal(){
   const otherParties = state.parties.filter(p => p.id !== session.partyId);
   const pushOn = getPushEnabled();
   overlay.innerHTML =
-    '<div class="gate-card" style="max-width:480px;">' +
+    '<div class="gate-card" style="max-width:480px; max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
       '<h2>Posteingang</h2>' +
       '<div class="toggle-row" style="margin-bottom:0.9rem; padding-bottom:0.8rem; border-bottom:1px solid var(--line);">' +
         '<label class="switch"><input type="checkbox" id="pushToggle" ' + (pushOn ? 'checked' : '') + '><span class="slider"></span></label>' +
         '<label style="margin:0;">🔔 Push-Benachrichtigungen</label>' +
       '</div>' +
-      '<div id="chatMessageList" style="max-height:45vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
+      '<div id="chatMessageList" style="max-height:34vh; overflow-y:auto; margin-bottom:1rem; display:flex; flex-direction:column; gap:0.7rem;"></div>' +
       (otherParties.length > 1 ? (
         '<div class="hint" style="margin-bottom:0.3rem;">An:</div>' +
         '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.7rem;" id="chatRecipientChips">' +
@@ -3199,7 +3310,21 @@ function showChatModal(){
     if(recorder) return; // Aufnahme läuft bereits
     if(!window.MediaRecorder){ voiceArea.innerHTML = '<div class="hint">Sprachaufnahme wird von diesem Browser nicht unterstützt.</div>'; return; }
     try{ recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch(e){ voiceArea.innerHTML = '<div class="hint">Mikrofon nicht verfügbar — bitte die Mikrofon-Berechtigung für diese Website erlauben.</div>'; return; }
+    catch(e){
+      const errName = (e && e.name) ? e.name : 'Unbekannt';
+      let hint;
+      if(errName === 'NotAllowedError' || errName === 'SecurityError'){
+        hint = 'Der Browser blockiert das Mikrofon für diese Website. Tippe auf das Schloss- bzw. Einstellungs-Symbol in der Adressleiste → Berechtigungen → Mikrofon → Zulassen (in Samsung Internet: Menü → Einstellungen → Websites und Downloads → Website-Berechtigungen → Mikrofon) — danach die Seite neu laden und 🎤 Memo erneut antippen.';
+      } else if(errName === 'NotFoundError'){
+        hint = 'Es wurde kein Mikrofon gefunden.';
+      } else if(errName === 'NotReadableError'){
+        hint = 'Das Mikrofon ist gerade von einer anderen App belegt — andere Apps schliessen und nochmals versuchen.';
+      } else {
+        hint = 'Das Mikrofon konnte nicht gestartet werden.';
+      }
+      voiceArea.innerHTML = '<div class="hint">🎤 ' + hint + ' <span style="opacity:0.7;">(Fehlercode: ' + escapeHtml(errName) + ')</span></div>';
+      return;
+    }
     let mime = '';
     if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
     else if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4';
