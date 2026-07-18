@@ -4972,12 +4972,12 @@ function renderAdminGeneralSection(){
       '<label>Bootsschlüssel</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
       (storedBootKey ?
-        '<div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">' +
-          '<span id="bootKeyDisplay" style="font-family:\'JetBrains Mono\', monospace; font-weight:700; letter-spacing:0.06em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.45rem 0.6rem;">••••-••••-••••</span>' +
-          '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">👁 Anzeigen</button>' +
-          '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">💬 Teilen</button>' +
-          '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">🔁 Neu eingeben</button>' +
-          (isAdminUser ? '<button type="button" class="btn secondary" id="bootKeyRotateBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">♻️ Schlüssel ändern</button>' : '') +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+          '<span id="bootKeyDisplay" style="grid-column:1 / -1; text-align:center; font-family:\'JetBrains Mono\', monospace; font-weight:700; letter-spacing:0.06em; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); padding:0.5rem 0.6rem;">••••-••••-••••</span>' +
+          '<button type="button" class="btn secondary" id="bootKeyRevealBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">👁 Anzeigen</button>' +
+          '<button type="button" class="btn secondary" id="bootKeyShareAdminBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💬 Teilen</button>' +
+          '<button type="button" class="btn secondary" id="bootKeyReenterBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' + (isAdminUser ? '' : ' grid-column:1 / -1;') + '">🔁 Neu eingeben</button>' +
+          (isAdminUser ? '<button type="button" class="btn secondary" id="bootKeyRotateBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">♻️ Schlüssel ändern</button>' : '') +
         '</div>'
       : '<div class="hint">Auf diesem Gerät ist kein Bootsschlüssel gespeichert.</div>') +
     '</div>' +
