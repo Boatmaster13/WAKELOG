@@ -1028,6 +1028,10 @@ function getStoredBootKey(){
 }
 function storeBootKey(rawKey){
   try{ localStorage.setItem(BOOTKEY_STORAGE, rawKey); } catch(e){}
+  // Schlüssel-Eingabe ist ein "neue Tür"-Moment: gespeicherte Anmeldung
+  // verwerfen, damit anschliessend IMMER der Zugangscode verlangt wird.
+  try{ localStorage.removeItem('boot-logbuch-session'); } catch(e){}
+  session = { partyCode: null, partyId: null, adminCode: null };
 }
 
 // Löst den Bootsschlüssel auf (gespeichert, eingegeben oder per einmaliger
