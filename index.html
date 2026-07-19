@@ -745,6 +745,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <button class="tab active" data-tab="log">Logbuch</button>
         <button class="tab" data-tab="adjustment">Ausgleich</button>
         <button class="tab" data-tab="settlement">Abrechnung</button>
+        <button class="tab" data-tab="docs">Dok</button>
         <button class="tab" data-tab="admin">Verwaltung</button>
       </div>
     </div>
@@ -926,6 +927,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
         <div id="yearComparisonChart"></div>
       </div>
+    </div>
+
+    <div class="panel" id="panel-docs">
+      <div class="card" id="docsCard"></div>
     </div>
 
     <div class="panel" id="panel-admin">
@@ -1295,7 +1300,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-12';
+const APP_VERSION = '2026-07-19-4';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1502,7 +1507,19 @@ function subscribeRealtime(){
       state.chatMessages = newChatMessages;
       state.chatSeen = loaded.chatSeen || {};
       state.documents = loaded.documents || [];
-      state.reservations = loaded.reservations || {};
+      const newReservations = loaded.reservations || {};
+      // Bootshorn beim Empfänger, wenn eine fremde Fahrt-Ankündigung neu eintrifft
+      try{
+        const myKey = session.partyId;
+        Object.keys(newReservations).forEach(dstr => {
+          const r = newReservations[dstr];
+          const existed = state.reservations && state.reservations[dstr];
+          if(!existed && r && r.partyId !== myKey && (Date.now() - (r.ts || 0)) < 2 * 60 * 1000){
+            playBoatHorn();
+          }
+        });
+      } catch(e){}
+      state.reservations = newReservations;
       state.checklists = loaded.checklists || null;
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
@@ -1653,7 +1670,7 @@ function updateHeaderMeta(){
     const badgeHtml = isAdminUser
       ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Admin</span>'
       : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;" title="Rang nach gefahrenen Motorstunden">' + escapeHtml(partyName(session.partyId)) + (captainRank(session.partyId) ? ' · ' + captainRank(session.partyId) : '') + '</span>' : '');
-    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start; width:100%; gap:0.3rem;">' +
+    strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start; width:100%; gap:0.3rem; margin-top:0.7rem;">' +
       '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
         '<div id="liveWeatherWidget"></div>' +
         '<div id="liveWeatherLocationLine" class="sub" style="font-size:0.62rem; text-align:center;"></div>' +
@@ -1664,7 +1681,7 @@ function updateHeaderMeta(){
       badgeHtml +
       '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Abmelden</button>' +
     '</div>' +
-    '<div style="width:100%; text-align:center; font-family:\'JetBrains Mono\', monospace; font-size:0.62rem; font-style:italic; color:rgba(255,255,255,0.5); margin-top:0.55rem;">„' + sailorQuoteOfTheDay() + '"</div>';
+    '<div style="width:100%; text-align:center; font-family:\'JetBrains Mono\', monospace; font-size:0.62rem; font-style:italic; color:rgba(255,255,255,0.5); margin-top:1.5rem; margin-bottom:-0.6rem;">„' + sailorQuoteOfTheDay() + '"</div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -2286,6 +2303,7 @@ function renderCalendarDayPanel(){
     const resvValid = resv && resv.partyId === eff.partyId;
     if(resvValid){
       statusLine += ' <span style="display:block; margin-top:0.3rem;">🚤 <b>' + escapeHtml(partyName(resv.partyId)) + '</b> hat für diesen Tag eine Fahrt angekündigt.</span>';
+      actions += '<button class="btn secondary" id="calIcsBtn">📅 In meinen Kalender übernehmen</button>';
     }
     if(isAdminUser || myId === eff.partyId){
       if(!resvValid){
@@ -2319,9 +2337,41 @@ function renderCalendarDayPanel(){
       '<div class="gate-error" id="calFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
 
+  const icsBtn = document.getElementById('calIcsBtn');
+  if(icsBtn) icsBtn.addEventListener('click', () => {
+    const resv2 = (state.reservations || {})[dateStr];
+    if(!resv2) return;
+    const d = dateStr.replace(/-/g, '');
+    const next = new Date(dateStr + 'T00:00:00');
+    next.setDate(next.getDate() + 1);
+    const dEnd = next.getFullYear() + String(next.getMonth() + 1).padStart(2, '0') + String(next.getDate()).padStart(2, '0');
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//WakeLog//DE',
+      'BEGIN:VEVENT',
+      'UID:wakelog-' + dateStr + '-' + resv2.partyId + '@wakelog',
+      'DTSTAMP:' + stamp,
+      'DTSTART;VALUE=DATE:' + d,
+      'DTEND;VALUE=DATE:' + dEnd,
+      'SUMMARY:🚤 Bootsfahrt (' + partyName(resv2.partyId) + ')',
+      'DESCRIPTION:Über WakeLog angekündigte Fahrt',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'wakelog-fahrt-' + dateStr + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  });
   const reserveBtn = document.getElementById('calReserveBtn');
   if(reserveBtn) reserveBtn.addEventListener('click', async () => {
     if(!state.reservations) state.reservations = {};
+    playBoatHorn();
     state.reservations[dateStr] = { partyId: eff.partyId, ts: Date.now() };
     pushNotification('🚤 ' + partyName(eff.partyId) + ' hat für den ' + fmtDateCH(dateStr) + ' eine Fahrt angekündigt.', null);
     logAudit('Fahrt angekündigt für ' + fmtDateCH(dateStr));
@@ -3130,6 +3180,15 @@ function checkNewBeerCalls(oldMessages, newMessages){
       updateHeaderMeta();
     }
   });
+}
+
+function playBoatHorn(){
+  try{
+    const horn = new Audio('boat-horn.mp3');
+    horn.volume = 0.9;
+    const p = horn.play();
+    if(p && typeof p.then === 'function') p.catch(() => {});
+  } catch(e){}
 }
 
 let cheersRetryArmed = false;
@@ -5364,7 +5423,6 @@ function renderAdminPanel(){
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
-      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='docs'?' active':'') + '" data-subtab="docs">Dokumente</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
@@ -5376,7 +5434,6 @@ function renderAdminPanel(){
 
   if(adminSubTab === 'parties') renderAdminPartiesSection();
   else if(adminSubTab === 'costs') renderAdminCostsSection();
-  else if(adminSubTab === 'docs') renderAdminDocsSection();
   else if(adminSubTab === 'log') renderAdminAuditSection();
   else renderAdminGeneralSection();
 }
@@ -5389,10 +5446,51 @@ function backupBoxHtml(){
       '<button type="button" class="btn secondary" id="backupDownloadBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💾 Backup laden</button>' +
       '<button type="button" class="btn secondary" id="backupRestoreBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📤 Wiederherstellen</button>' +
     '</div>' +
+  '</div>' +
+  '<div class="admin-box">' +
+    '<label>App-Code-Export</label>' +
+    '<div class="hint" style="margin-bottom:0.7rem;">Sichert den Programmcode der App selbst (die HTML-Datei) — z. B. bevor eine neue Version hochgeladen wird.</div>' +
+    '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+      '<button class="btn secondary" id="exportCodeBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💾 Exportieren</button>' +
+      '<button class="btn secondary" id="copyCodeBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Kopieren</button>' +
+    '</div>' +
+    '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
   '</div>';
 }
 
 function wireBackupButtons(){
+  const exportCodeBtn = document.getElementById('exportCodeBtn');
+  if(exportCodeBtn) exportCodeBtn.addEventListener('click', async () => {
+    const fb = document.getElementById('exportFeedback');
+    try{
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      fb.style.color = '#1C9A64'; fb.textContent = 'Code-Download gestartet.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    } catch(e){
+      fb.style.color = '#C0392B'; fb.textContent = 'Download fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
+    }
+  });
+  const copyCodeBtn = document.getElementById('copyCodeBtn');
+  if(copyCodeBtn) copyCodeBtn.addEventListener('click', async () => {
+    const fb = document.getElementById('exportFeedback');
+    try{
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const text = await res.text();
+      await copyToClipboard(text);
+      fb.style.color = '#1C9A64'; fb.textContent = 'Code in die Zwischenablage kopiert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+    } catch(e){
+      fb.style.color = '#C0392B'; fb.textContent = 'Kopieren fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
+    }
+  });
   const dl = document.getElementById('backupDownloadBtn');
   if(dl) dl.addEventListener('click', () => {
     const json = JSON.stringify(buildSharedPayload(), null, 2);
@@ -5548,7 +5646,7 @@ async function compressImageToLimit(file, maxBytes){
 function defaultChecklists(){
   const mk = (texts) => texts.map(t => ({ id: uid(), text: t, done: false }));
   return {
-    slip: { title: '⛴️ Slip — Ein- & Auswassern', items: mk([
+    slip: { title: '⛴️ Ein- & Auswassern', items: mk([
       'Lenzstopfen eingesetzt (WICHTIG — vor dem Wasser prüfen!)',
       'Zurrgurte erst an der Rampe lösen',
       'Trailer-Lichtbalken abnehmen (Elektrik nicht ins Wasser)',
@@ -5557,7 +5655,7 @@ function defaultChecklists(){
       'Auto: Handbremse fest, ggf. Keile unterlegen',
       'Nach dem Auswassern: Lenzstopfen ziehen, Boot abtropfen lassen'
     ]) },
-    start: { title: '✅ Startklar-Check vor der Fahrt', items: mk([
+    start: { title: '✅ Startklar-Check', items: mk([
       'Benzinstand geprüft',
       'Bilge kontrolliert / Lenzpumpe testen',
       'Totmannschalter (Quickstopp) verbunden',
@@ -5582,14 +5680,17 @@ function defaultChecklists(){
 function renderChecklistsBox(){
   if(!state.checklists) state.checklists = defaultChecklists();
   const lists = state.checklists;
+  // Alte, längere Titel auf die kompakten einzeiligen Varianten migrieren
+  if(lists.slip && lists.slip.title === '⛴️ Slip — Ein- & Auswassern') lists.slip.title = '⛴️ Ein- & Auswassern';
+  if(lists.start && lists.start.title === '✅ Startklar-Check vor der Fahrt') lists.start.title = '✅ Startklar-Check';
   return '<div class="admin-box">' +
     '<label>📋 Checklisten</label>' +
     '<div class="hint" style="margin-bottom:0.7rem;">Zum Abhaken vor Ort — Punkte lassen sich hinzufügen und löschen, damit ihr die Listen an eure Abläufe anpassen könnt. Haken werden geteilt gespeichert.</div>' +
     Object.keys(lists).map(key => {
       const l = lists[key];
-      return '<div style="margin-bottom:1.1rem;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">' +
-          '<b>' + escapeHtml(l.title) + '</b>' +
+      return '<div style="margin-bottom:1.9rem;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">' +
+          '<b style="min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(l.title) + '</b>' +
           '<button type="button" class="del-btn" data-cl-reset="' + key + '">Haken zurücksetzen</button>' +
         '</div>' +
         (l.items || []).map(it =>
@@ -5655,7 +5756,7 @@ const KNOT_GUIDE = [
   { name: 'Palstek', use: 'Feste Schlaufe, die sich nicht zuzieht — z. B. Festmacher am Poller oder Rettungsschlaufe.', memo: '„Der Frosch kommt aus dem Teich, um den Baum, zurück in den Teich."', link: 'https://www.animatedknots.com/bowline-knot' },
   { name: 'Kreuzknoten', use: 'Zwei gleich dicke Enden verbinden (z. B. Persenning-Bändsel).', memo: 'Rechts über links — links über rechts.', link: 'https://www.animatedknots.com/square-knot' },
   { name: 'Webeleinstek (Mastwurf)', use: 'Fender an der Reling befestigen, Leine an Stange/Poller — der Alltagsknoten schlechthin.', memo: 'Zwei gegenläufige Schläge übereinander.', link: 'https://www.animatedknots.com/clove-hitch-knot-rope-end' },
-  { name: 'Rundtörn mit zwei halben Schlägen', use: 'Boot sicher an Ring, Poller oder Baum festmachen — hält auch unter Last und lässt sich wieder lösen.', memo: 'Einmal ganz herum, dann zweimal halb drum.', link: 'https://www.animatedknots.com/round-turn-two-half-hitches-knot' },
+  { name: 'Rundtörn + 2 halbe Schläge', use: 'Boot sicher an Ring, Poller oder Baum festmachen — hält auch unter Last und lässt sich wieder lösen.', memo: 'Einmal ganz herum, dann zweimal halb drum.', link: 'https://www.animatedknots.com/round-turn-two-half-hitches-knot' },
   { name: 'Schotstek', use: 'Zwei ungleich dicke Leinen verbinden (z. B. Schleppleine verlängern).', memo: 'Die dünne Leine arbeitet, die dicke bildet die Bucht.', link: 'https://www.animatedknots.com/sheet-bend-knot' },
   { name: 'Slipstek', use: 'Schnell lösbarer Knoten auf Zug — z. B. Wakeboard-/Schleppleine kurzzeitig belegen.', memo: 'Wie eine Schlaufe, die man mit einem Ruck öffnet.', link: 'https://www.animatedknots.com/slip-knot' },
   { name: 'Klampe belegen', use: 'Festmacher korrekt an der Klampe sichern.', memo: 'Runder Törn, Kreuzschläge, Kopfschlag.', link: 'https://www.animatedknots.com/cleat-hitch-knot-dock-line' },
@@ -5663,12 +5764,168 @@ const KNOT_GUIDE = [
   { name: 'Stopperstek', use: 'Leine an einer anderen, belasteten Leine abstoppen (z. B. Ankerleine entlasten).', memo: 'Zwei Schläge in Zugrichtung, einer dagegen.', link: 'https://www.animatedknots.com/rolling-hitch-knot' }
 ];
 
-function renderAdminDocsSection(){
-  const content = document.getElementById('adminSubContent');
+let docsSubTab = 'files';
+const MANEUVER_GUIDE = [
+  { title: '🧷 Ablegen', steps: [
+    'Vorgehen gemäss Checkliste; wenn alles i. O., Befestigungen bei eingeschaltetem Motor zuerst im Lee lösen.',
+    'Voll in Richtung Steg einschlagen und Vorwärtsgang einlegen.',
+    'Voll in die Gegenrichtung einschlagen und Rückwärtsgang einlegen.',
+    'Boot vom Steg wegtreiben lassen und gewünschte Fahrtrichtung einschlagen.',
+    'Im Hafen nicht mehr als 5 km/h fahren.',
+    'Ausserhalb des Hafens innerhalb der 300 m max. 10 km/h (Tourenzahl bei rund 17k).',
+    'Vor der Beschleunigung: Rundumblick (kein Hindernis im Weg?) — «Achtung, ich beschleunige.» — Beschleunigen auf Vollgas.'
+  ]},
+  { title: '🔄 Wenden über Bug (am Steg)', steps: [
+    'Gegen den Steg voll einschlagen und Vorwärtsgang einlegen.',
+    'Gang herausnehmen.',
+    'Voll in die Gegenrichtung einschlagen.',
+    'Rückwärtsgang einlegen.',
+    'Gang herausnehmen.',
+    'Wieder zum Steg hin voll einschlagen usw. — Vorgänge wiederholen, bis das Boot gewendet ist.',
+    'WICHTIG: Nie einschlagen, wenn der Gang eingelegt ist!'
+  ]},
+  { title: '🧭 Eselsbrücken für Landabstand 300 m', steps: [
+    'Vom Zuger Hafen Richtung Arth: St.-Michaels-Kirche exakt hinter Casino.',
+    'Von Oberwil Richtung Risch: St.-Andreas-Schloss verschwindet hinter Landzunge.',
+    'Von Cham Richtung Oberwil: Kirchenspitze berührt Waldrand (flacher Teil).',
+    'Von Oberwil Richtung Cham: Cheminée der Siemens exakt hinter Schützenmatt-TH.'
+  ]},
+  { title: '⬅️ Seitliches Landen, vorwärts (backbord oder steuerbord)', steps: [
+    'Mit dem Bug die Stelle anpeilen, wo das Heck zu liegen kommen soll.',
+    'Zwei Bootslängen vor dem Steg den Gang herausnehmen.',
+    'Eine Bootslänge vor dem Steg das Steuer voll vom Steg weg einschlagen und Vorwärtsgang einlegen, bis das Boot ca. in einem 10°-Winkel zum Steg steht.',
+    'Steuer um zwei Umdrehungen lösen (= gegen den Steg einschlagen) und Rückwärtsgang einlegen.',
+    'Rückwärtsgang so lange eingelegt lassen, bis das Boot still steht.',
+    'Boot in Richtung Steg driften lassen.',
+    'Ggf. leicht korrigieren: Schauen, in welche Richtung sich der Bug wendet, und in die gleiche Richtung steuern (wendet sich der Bug z. B. leicht vom Steg ab, auch in diese Richtung korrigieren).',
+    'Boot belegen und sichern (zuerst im Luv belegen).',
+    'Motor abstellen.'
+  ]},
+  { title: '➡️ Seitliches Landen, rückwärts (backbord oder steuerbord)', steps: [
+    'Mit dem Heck die Stelle anpeilen, wo der Bug zu liegen kommen soll.',
+    'Eine Bootslänge vor dem Steg das Steuer vom Steg weg voll einschlagen und Rückwärtsgang eingelegt lassen.',
+    'Steuer voll eingeschlagen lassen, bis das Boot leicht überdreht (Rückwärtsgang bleibt eingelegt).',
+    'Vorwärtsgang einlegen und so lange eingelegt lassen, bis das Boot parallel zum Steg steht.',
+    'Steuer um zwei Umdrehungen lösen (= gegen den Steg einschlagen).',
+    'Ggf. leicht korrigieren: Schauen, in welche Richtung sich der Bug wendet, und in die gleiche Richtung steuern.',
+    'Boot in Richtung Steg driften lassen.',
+    'Boot belegen und sichern (zuerst im Luv belegen).',
+    'Motor abstellen.'
+  ]},
+  { title: '🛠️ Korrigieren bei Landungen (zu weit weg oder schräg am Steg)', steps: [
+    'Heck näher an den Steg bringen: zuerst voll weg vom Steg einschlagen, dann Vorwärtsgang einlegen.',
+    'Heck vom Steg abwenden: zuerst voll gegen den Steg einschlagen, dann Vorwärtsgang einlegen.'
+  ]},
+  { title: '🅿️ Boxenmanöver', steps: [
+    'In der Mitte der Fahrgasse fahren (im Hafen).',
+    'Wenn der Bug (Vorwärtsmanöver) bzw. das Heck (Rückwärtsmanöver) ca. auf Höhe der ersten seitlichen Boxenbegrenzung ist (eher etwas vorher), das Schiff in Richtung Box abdrehen.',
+    'Bei ca. 45° voll in die Gegenrichtung einschlagen und den Rückwärtsgang einlegen.',
+    'Rückwärtsgang eingelegt lassen, bis das Boot gerade ausgerichtet ist.',
+    'Aufläsen und nochmals einige Meter zurückfahren (Drift wegnehmen).',
+    'Vorwärtsgang einlegen und gerade in die Box hineinfahren.',
+    'Gang rechtzeitig herausnehmen und mit Rückwärtsgang bremsen.',
+    'Merke: Das Manöver ist vorwärts und rückwärts identisch!'
+  ]},
+  { title: '🛟 Mensch über Bord', steps: [
+    '«Mensch über Bord!» rufen.',
+    'Gang sofort herausnehmen.',
+    'Schauen, wo sich Boje/Mensch befindet.',
+    'Boot wenden und mit dem Wind zur Boje/zum Menschen hinfahren — Bug leicht steuerbord an Boje/Mensch vorbeirichten (nicht allzu schnell fahren).',
+    'Zwei Bootslängen vor der Boje/dem Menschen den Gang herausnehmen.',
+    'Eine Bootslänge davor voll nach backbord einschlagen und Vorwärtsgang einlegen, bis das Boot ca. in einem 10°-Winkel zur Boje/zum Menschen steht.',
+    'Steuer um drei Umdrehungen nach steuerbord lösen und Rückwärtsgang einlegen.',
+    'Rückwärtsgang so lange eingelegt lassen, bis das Boot still steht.',
+    'Boot in Richtung Boje/Mensch driften lassen.',
+    'Motor abstellen.',
+    'Boje aus dem Wasser nehmen.'
+  ], extra: { label: 'Im Ernstfall', items: [
+    'Mensch sichern und am Boot befestigen: Schot zweimal möglichst weit oben um den Oberkörper wickeln und mit Palstek am Rücken fixieren; Mensch an Klampe mittels Kopfschlag sichern.',
+    'Notruf absetzen (Polizei, nicht Rettungsdienst).',
+    'Position mittels Kreuzpeilung angeben.',
+    'Nächstgelegenen Hafen ansteuern.'
+  ]}},
+  { title: '💡 Sonstiges', steps: [
+    'Wind kann auch am Atomkraftwerk abgelesen werden (Blickrichtung Hünenberg).',
+    'Sich immer gut umschauen.',
+    'Stets ruhig bleiben, keine Hektik!',
+    'Nie direkt von der Tankstelle (beim Pedalosteg in Zug) zum Zuger Hafen fahren — Uferzone von 150 m beachten, keine Parallelfahrten!'
+  ]}
+
+];
+
+function maneuversBoxHtml(){
+  return '<div class="admin-box">' +
+    '<label>🚤 Manöver-Guide</label>' +
+    '<div class="hint" style="margin-bottom:0.7rem;">Deine Notizen aus den Fahrstunden — pro Manöver antippen zum Aufklappen.</div>' +
+    MANEUVER_GUIDE.map(m =>
+      '<details style="margin-bottom:1.1rem; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.55rem 0.7rem; background:var(--foam);">' +
+        '<summary style="font-weight:700; cursor:pointer; font-size:0.9rem;">' + m.title + '</summary>' +
+        '<ol style="margin:0.6rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' +
+          m.steps.map(st => '<li>' + st + '</li>').join('') +
+        '</ol>' +
+        (m.extra ? '<div style="margin-top:0.5rem;"><b style="font-size:0.85rem;">' + m.extra.label + ':</b><ul style="margin:0.3rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' + m.extra.items.map(it => '<li>' + it + '</li>').join('') + '</ul></div>' : '') +
+      '</details>'
+    ).join('') +
+  '</div>';
+}
+
+function knotsBoxHtml(){
+  return '<div class="admin-box">' +
+    '<label>🪢 Knoten-Guide</label>' +
+    '<div class="hint" style="margin-bottom:0.7rem;">Die wichtigsten Knoten fürs Boot — mit Link zur Schritt-für-Schritt-Animation.</div>' +
+    KNOT_GUIDE.map(k =>
+      '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.25rem; margin-bottom:0.9rem;">' +
+        '<b style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + k.name + '</b>' +
+        '<div class="hint" style="margin:0;">' + k.use + '</div>' +
+        '<div class="hint" style="margin:0; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
+        '<a href="' + k.link + '" target="_blank" rel="noopener" style="font-size:0.78rem;">▶ Animation ansehen</a>' +
+      '</div>'
+    ).join('') +
+  '</div>';
+}
+
+function renderDocsTab(){
+  const card = document.getElementById('docsCard');
+  if(!card) return;
+  card.innerHTML =
+    '<h2>Dokumente</h2>' +
+    '<div class="admin-subtabs">' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Bootsdok.</button>' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='checklists'?' active':'') + '" data-docstab="checklists">Checklisten</button>' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='knots'?' active':'') + '" data-docstab="knots">Knoten</button>' +
+    '</div>' +
+    '<div id="docsSubContent"></div>';
+  card.querySelectorAll('[data-docstab]').forEach(btn => btn.addEventListener('click', () => {
+    docsSubTab = btn.dataset.docstab;
+    renderDocsTab();
+  }));
+  const content = document.getElementById('docsSubContent');
+  if(docsSubTab === 'checklists'){
+    content.innerHTML = '<div id="checklistsWrap"></div>';
+    refreshDocsChecklists();
+    return;
+  }
+  if(docsSubTab === 'knots'){
+    content.innerHTML = knotsBoxHtml();
+    return;
+  }
+  if(docsSubTab === 'manoever'){
+    content.innerHTML = maneuversBoxHtml() + '<div id="manoeverFilesWrap"></div>';
+    renderDocFilesSection(document.getElementById('manoeverFilesWrap'), 'manoever');
+    return;
+  }
+  renderDocFilesSection(content, 'boot');
+}
+
+function renderDocFilesSection(content, category){
+  const isMan = category === 'manoever';
   content.innerHTML =
     '<div class="admin-box">' +
-      '<label>Dokumentenablage</label>' +
-      '<div class="hint" style="margin-bottom:0.7rem;">Bootsausweis, Versicherung, Manöver-Anleitungen usw. — als Foto oder PDF (max. ca. 1.5 MB) für alle Parteien abrufbar. Hinweis: Behörden verlangen in der Regel die Originaldokumente; die Ablage dient als Nachschlagewerk und Zweitkopie.</div>' +
+      '<label>' + (isMan ? 'Manöver-Anleitungen' : 'Bootsdokumente') + '</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">' + (isMan
+        ? 'Deine Notizen und Anleitungen für Manöver — Anlegen, Ablegen, Parken, Mann über Bord, Boot startklar machen … Als Foto oder PDF (max. ca. 1.5 MB), für alle Parteien abrufbar.'
+        : 'Bootsausweis, Versicherung, Führerausweise usw. — als Foto oder PDF (max. ca. 1.5 MB) für alle Parteien abrufbar. Hinweis: Behörden verlangen in der Regel die Originaldokumente; die Ablage dient als Nachschlagewerk und Zweitkopie.') + '</div>' +
       '<div class="field"><label for="docName">Bezeichnung</label><input id="docName" type="text" placeholder="z. B. Manöver-Anleitung, Bootsausweis"></div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:0.8rem;">' +
         '<button type="button" class="btn secondary" id="docPhotoBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📷 Foto hinzufügen</button>' +
@@ -5676,26 +5933,12 @@ function renderAdminDocsSection(){
       '</div>' +
       '<div class="hint" id="docFeedback" style="margin:0 0 0.5rem;"></div>' +
       '<div id="docList"></div>' +
-    '</div>' +
-    '<div id="checklistsWrap"></div>' +
-    '<div class="admin-box">' +
-      '<label>🪢 Knoten-Guide</label>' +
-      '<div class="hint" style="margin-bottom:0.7rem;">Die wichtigsten Knoten fürs Boot — mit Link zur Schritt-für-Schritt-Animation.</div>' +
-      KNOT_GUIDE.map(k =>
-        '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
-          '<b>' + k.name + '</b>' +
-          '<div class="hint" style="margin:0;">' + k.use + '</div>' +
-          '<div class="hint" style="margin:0; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
-          '<a href="' + k.link + '" target="_blank" rel="noopener" style="font-size:0.78rem;">▶ Animation ansehen</a>' +
-        '</div>'
-      ).join('') +
     '</div>';
 
-  refreshDocsChecklists();
   const feedback = document.getElementById('docFeedback');
   function renderDocList(){
     const listEl = document.getElementById('docList');
-    const docs = (state.documents || []).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+    const docs = (state.documents || []).filter(d => (d.category || 'boot') === category).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
     if(!docs.length){ listEl.innerHTML = '<div class="empty">Noch keine Dokumente abgelegt.</div>'; return; }
     listEl.innerHTML = docs.map(d => {
       const canDelete = isAdminUser || d.uploadedBy === (session.partyId || 'admin');
@@ -5738,7 +5981,7 @@ function renderAdminDocsSection(){
     const nameInput = document.getElementById('docName');
     const name = nameInput.value.trim() || fallbackName;
     if(!state.documents) state.documents = [];
-    state.documents.push({ id: uid(), name, kind, data: dataUrl, size: size || dataUrl.length, ts: Date.now(), uploadedBy: session.partyId || 'admin' });
+    state.documents.push({ id: uid(), name, kind, category, data: dataUrl, size: size || dataUrl.length, ts: Date.now(), uploadedBy: session.partyId || 'admin' });
     logAudit('Dokument abgelegt: ' + name);
     await saveShared();
     nameInput.value = '';
@@ -5912,15 +6155,6 @@ function renderAdminGeneralSection(){
       '<div class="gate-error" id="weatherLocationFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '<div class="admin-box">' +
-      '<label>Export</label>' +
-      '<div class="hint" style="margin-bottom:0.9rem;">Sichere den App-Code als Backup. Der PDF-Export der Jahresübersicht steht allen Parteien direkt im Abrechnung-Tab zur Verfügung.</div>' +
-      '<div style="display:flex; gap:0.5rem; flex-wrap:nowrap;">' +
-        '<button class="btn secondary" id="exportCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">💾 Exportieren</button>' +
-        '<button class="btn secondary" id="copyCodeBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:0.5rem; padding-right:0.5rem;">📋 Kopieren</button>' +
-      '</div>' +
-      '<div class="gate-error" id="exportFeedback" style="color:#1C9A64;"></div>' +
-    '</div>' +
-    '<div class="admin-box">' +
       '<label>Jahr zurücksetzen</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Löscht sämtliche Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben eines gewählten Jahres unwiderruflich aus der laufenden Ansicht. Vor dem Löschen wird automatisch eine Sicherung angelegt, die du danach jederzeit wiederherstellen kannst — bis zum nächsten Zurücksetzen desselben Jahres.</div>' +
       '<div class="field"><label for="resetYearSelect">Jahr</label><select id="resetYearSelect"></select></div>' +
@@ -5928,38 +6162,6 @@ function renderAdminGeneralSection(){
       '<div id="resetYearRestoreArea" style="margin-top:0.9rem;"></div>' +
       '<div class="gate-error" id="resetYearFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
-
-  document.getElementById('exportCodeBtn').addEventListener('click', async () => {
-    const fb = document.getElementById('exportFeedback');
-    try{
-      const res = await fetch(location.href, { cache: 'no-store' });
-      const text = await res.text();
-      const blob = new Blob([text], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.html';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      fb.style.color = '#1C9A64'; fb.textContent = 'Code-Download gestartet.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
-    } catch(e){
-      fb.style.color = '#C0392B'; fb.textContent = 'Download fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
-    }
-  });
-
-  document.getElementById('copyCodeBtn').addEventListener('click', async () => {
-    const fb = document.getElementById('exportFeedback');
-    try{
-      const res = await fetch(location.href, { cache: 'no-store' });
-      const text = await res.text();
-      await copyToClipboard(text);
-      fb.style.color = '#1C9A64'; fb.textContent = 'Code in die Zwischenablage kopiert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
-    } catch(e){
-      fb.style.color = '#C0392B'; fb.textContent = 'Kopieren fehlgeschlagen. Bitte erneut versuchen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
-    }
-  });
 
   const resetYearSelect = document.getElementById('resetYearSelect');
   const resetYears = priorityYears();
@@ -6666,6 +6868,7 @@ function renderAll(){
   renderYearComparison();
   renderAdjustmentTab();
   renderAdminPanel();
+  renderDocsTab();
   renderCalendarTab();
   renderSeasonEventsList();
   updateHeaderMeta();
