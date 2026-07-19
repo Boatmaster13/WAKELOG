@@ -725,7 +725,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <img src="header-logo.png" alt="WakeLog Logo" id="heroLogo" style="width:56px; height:56px; flex-shrink:0; cursor:pointer;">
           <div>
             <h1>WakeLog</h1>
-            <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
+            <div class="sub">Fahrten, Tanken &amp; Kostenausgleich</div>
           </div>
         </div>
       </div>
@@ -1295,7 +1295,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-11';
+const APP_VERSION = '2026-07-18-12';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1644,8 +1644,7 @@ function updateHeaderMeta(){
   const prioBlock = prio
     ? '<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>'
     : '';
-  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>' +
-    '<div style="width:100%; text-align:center; font-style:italic; opacity:0.75; margin-top:0.15rem;">„' + sailorQuoteOfTheDay() + '"</div>';
+  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>';
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
@@ -1664,7 +1663,8 @@ function updateHeaderMeta(){
       '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       badgeHtml +
       '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Abmelden</button>' +
-    '</div>';
+    '</div>' +
+    '<div style="width:100%; text-align:center; font-family:\'JetBrains Mono\', monospace; font-size:0.62rem; font-style:italic; color:rgba(255,255,255,0.5); margin-top:0.55rem;">„' + sailorQuoteOfTheDay() + '"</div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -4317,7 +4317,6 @@ function renderSettlement(){
     '<div class="stat stat-highlight"><div class="num">' + fmtCHF(totalFuelExpense + totalAnnual) + '</div><div class="lbl">Gesamtaufwand</div></div>' +
   '</div>';
 
-  html += buildConsumptionTrendSection(year);
   html += '<h3 style="margin:2.6rem 0 0.4rem;">Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
 
   const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
@@ -4469,8 +4468,9 @@ function getYearComparisonData(){
 // Verbrauchstrend: Ø-Rate (l/h) aller Nutzungseinträge des Jahres als Linie —
 // macht z. B. schleichend steigenden Verbrauch (Motorproblem, Bewuchs) sichtbar.
 function buildConsumptionTrendSection(year){
+  // year = null → Trend über alle Jahre (für den Jahresvergleich)
   const pts = (state.entries || [])
-    .filter(e => String(new Date(e.date).getFullYear()) === String(year) && getEntryFlags(e).hasUsage && typeof e.consumption === 'number' && e.consumption > 0)
+    .filter(e => (year === null || String(new Date(e.date).getFullYear()) === String(year)) && getEntryFlags(e).hasUsage && typeof e.consumption === 'number' && e.consumption > 0)
     .sort((a,b) => (a.date || '').localeCompare(b.date || ''))
     .map(e => ({ date: e.date, v: e.consumption }));
   let inner;
@@ -4496,8 +4496,8 @@ function buildConsumptionTrendSection(year){
         dots +
       '</svg>';
   }
-  return '<h3 style="margin:2.2rem 0 0.3rem;">Verbrauchstrend (l/h)</h3>' +
-    '<div class="hint" style="margin:0 0 0.5rem;">Tagesverbrauch je Fahrt über die Saison — steigt die Linie dauerhaft, lohnt ein Blick auf Motor und Rumpf.</div>' +
+  return '<h3 style="margin:2.6rem 0 0.5rem;">Verbrauchstrend (l/h)</h3>' +
+    '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Tagesverbrauch je Fahrt über die Zeit — steigt die Linie dauerhaft, lohnt ein Blick auf Motor und Rumpf.</div>' +
     inner;
 }
 
@@ -4575,7 +4575,8 @@ function renderYearComparison(){
     '<h3 style="margin:2.6rem 0 0.5rem;">Motorstunden — nach Nutzung</h3>' +
     '<div class="hint" style="margin:-0.2rem 0 0.6rem;">Wie sich die gefahrenen Stunden verteilen. Weicht die Verteilung vom Balken oben ab, hat eine Partei im Verhältnis zur Nutzung mehr oder weniger bezahlt.</div>' +
     hoursHtml +
-    buildComparisonBreakdown(perYear, 'hours', (v) => fmtNum(v, 1) + ' Std.');
+    buildComparisonBreakdown(perYear, 'hours', (v) => fmtNum(v, 1) + ' Std.') +
+    buildConsumptionTrendSection(null);
 }
 
 function exportYearComparisonCsv(){
@@ -5380,10 +5381,70 @@ function renderAdminPanel(){
   else renderAdminGeneralSection();
 }
 
+function backupBoxHtml(){
+  return '<div class="admin-box">' +
+    '<label>Datensicherung</label>' +
+    '<div class="hint" style="margin-bottom:0.7rem;">Lädt den kompletten Datenbestand (Einträge, Parteien, Einstellungen, Chat, Dokumente …) als JSON-Datei herunter — als Sicherheitskopie oder um versehentliche Löschungen rückgängig zu machen.</div>' +
+    '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+      '<button type="button" class="btn secondary" id="backupDownloadBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💾 Backup laden</button>' +
+      '<button type="button" class="btn secondary" id="backupRestoreBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📤 Wiederherstellen</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function wireBackupButtons(){
+  const dl = document.getElementById('backupDownloadBtn');
+  if(dl) dl.addEventListener('click', () => {
+    const json = JSON.stringify(buildSharedPayload(), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    logAudit('Backup heruntergeladen');
+    saveShared();
+  });
+  const rs = document.getElementById('backupRestoreBtn');
+  if(rs) rs.addEventListener('click', () => {
+    if(!isAdminUser) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      setTimeout(() => input.remove(), 500);
+      if(!file) return;
+      const r = new FileReader();
+      r.onload = async () => {
+        let data = null;
+        try{ data = JSON.parse(r.result); } catch(e){}
+        if(!data || !data.parties || !data.settings){
+          alert('Diese Datei ist kein gültiges WakeLog-Backup.');
+          return;
+        }
+        if(!confirm('ACHTUNG: Der aktuelle Datenbestand wird für ALLE Parteien vollständig durch das Backup ersetzt. Fortfahren?')) return;
+        state = data;
+        if(!state.auditLog) state.auditLog = [];
+        state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Backup wiederhergestellt (' + file.name + ')' });
+        await saveShared();
+        alert('Backup wiederhergestellt — die App lädt jetzt neu.');
+        location.reload();
+      };
+      r.readAsText(file);
+    }, { once: true });
+    input.click();
+  });
+}
+
 function renderAdminAuditSection(){
   const content = document.getElementById('adminSubContent');
   const logEntries = state.auditLog || [];
   content.innerHTML =
+    backupBoxHtml() +
     '<div class="admin-box">' +
       '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:nowrap;">' +
         '<label style="margin:0; flex:1; min-width:0; overflow-wrap:anywhere;">Änderungsprotokoll</label>' +
@@ -5402,6 +5463,7 @@ function renderAdminAuditSection(){
         '</div>';
       }).join('') : '<div class="empty">Noch keine Änderungen protokolliert.</div>') +
     '</div>';
+  wireBackupButtons();
   const exportBtn = document.getElementById('exportAuditPdfBtn');
   if(exportBtn) exportBtn.addEventListener('click', exportAuditLogPdf);
   const exportCsvBtn = document.getElementById('exportAuditCsvBtn');
@@ -5750,14 +5812,6 @@ function renderAdminGeneralSection(){
   const storedBootKey = getStoredBootKey();
   content.innerHTML =
     '<div class="admin-box">' +
-      '<label>Datensicherung</label>' +
-      '<div class="hint" style="margin-bottom:0.7rem;">Lädt den kompletten Datenbestand (Einträge, Parteien, Einstellungen, Chat, Dokumente …) als JSON-Datei herunter — als Sicherheitskopie oder um versehentliche Löschungen rückgängig zu machen.</div>' +
-      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
-        '<button type="button" class="btn secondary" id="backupDownloadBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💾 Backup laden</button>' +
-        '<button type="button" class="btn secondary" id="backupRestoreBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📤 Wiederherstellen</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="admin-box">' +
       '<label>Bootsschlüssel</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
       (storedBootKey ?
@@ -5976,50 +6030,6 @@ function renderAdminGeneralSection(){
     await saveShared();
     fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wurde zurückgesetzt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
     renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
-  });
-
-  document.getElementById('backupDownloadBtn').addEventListener('click', () => {
-    const json = JSON.stringify(buildSharedPayload(), null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-    logAudit('Backup heruntergeladen');
-    saveShared();
-  });
-  document.getElementById('backupRestoreBtn').addEventListener('click', () => {
-    if(!isAdminUser) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-    input.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
-    document.body.appendChild(input);
-    input.addEventListener('change', () => {
-      const file = input.files && input.files[0];
-      setTimeout(() => input.remove(), 500);
-      if(!file) return;
-      const r = new FileReader();
-      r.onload = async () => {
-        let data = null;
-        try{ data = JSON.parse(r.result); } catch(e){}
-        if(!data || !data.parties || !data.settings){
-          alert('Diese Datei ist kein gültiges WakeLog-Backup.');
-          return;
-        }
-        if(!confirm('ACHTUNG: Der aktuelle Datenbestand wird für ALLE Parteien vollständig durch das Backup ersetzt. Fortfahren?')) return;
-        state = data;
-        if(!state.auditLog) state.auditLog = [];
-        state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Backup wiederhergestellt (' + file.name + ')' });
-        await saveShared();
-        alert('Backup wiederhergestellt — die App lädt jetzt neu.');
-        location.reload();
-      };
-      r.readAsText(file);
-    }, { once: true });
-    input.click();
   });
 
   const bootKeyRevealBtn = document.getElementById('bootKeyRevealBtn');
