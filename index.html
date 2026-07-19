@@ -402,6 +402,19 @@ input:disabled, select:disabled{
 }
 .admin-subtab-btn.active{ background:var(--volt); border-color:var(--volt); color:var(--hull); }
 .admin-readonly{ opacity:0.5; pointer-events:none; filter:grayscale(0.4); user-select:none; }
+.settings-group{ border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); background:var(--panel); margin-bottom:0.8rem; overflow:hidden; }
+.settings-group > summary{ list-style:none; cursor:pointer; padding:0.75rem 0.9rem; font-weight:700; font-size:0.9rem; color:var(--ink); display:flex; justify-content:space-between; align-items:center; gap:0.5rem; }
+.settings-group > summary::-webkit-details-marker{ display:none; }
+.settings-group > summary::after{ content:'▾'; font-size:0.8rem; opacity:0.55; transition:transform 0.15s; }
+.settings-group[open] > summary::after{ transform:rotate(180deg); }
+.settings-group > .settings-group-body{ padding:0.2rem 0.7rem 0.6rem; }
+.settings-group .admin-box{ border:none; padding-left:0; padding-right:0; margin-bottom:0.4rem; }
+.rule-toggle{ position:relative; width:42px; height:23px; flex-shrink:0; display:inline-block; }
+.rule-toggle input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; z-index:1; }
+.rule-toggle .track{ position:absolute; inset:0; background:#C6BBA8; border-radius:12px; transition:background 0.15s; }
+.rule-toggle input:checked ~ .track{ background:#1C9A64; }
+.rule-toggle .track::after{ content:''; position:absolute; top:2px; left:2px; width:19px; height:19px; background:#fff; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,0.3); transition:left 0.15s; }
+.rule-toggle input:checked ~ .track::after{ left:21px; }
 .party-code-actions{ display:flex; gap:0.25rem; flex-wrap:nowrap; }
 .icon-btn{
   font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
@@ -872,9 +885,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
     <div class="panel" id="panel-settlement">
       <div class="card" style="padding:0.9rem 1rem;">
         <div class="admin-subnav" style="margin:0;">
-          <button type="button" class="admin-subtab-btn active" data-settletab="abrechnung">Jahresabrechnung</button>
-          <button type="button" class="admin-subtab-btn" data-settletab="vergleich">Jahresvergleich</button>
+          <button type="button" class="admin-subtab-btn active" data-settletab="abrechnung">Abrechnung</button>
+          <button type="button" class="admin-subtab-btn" data-settletab="vergleich">Vergleich</button>
           <button type="button" class="admin-subtab-btn" data-settletab="ausgleich">Ausgleich</button>
+          <button type="button" class="admin-subtab-btn" data-settletab="fixkosten">Fixkosten</button>
         </div>
       </div>
       <div id="settleWrap-abrechnung" style="display:none;">
@@ -901,6 +915,12 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
         <div id="yearComparisonChart"></div>
+      </div>
+      </div>
+      <div id="settleWrap-fixkosten" style="display:none;">
+      <div class="card">
+        <h2>Fixkosten</h2>
+        <div id="fixkostenContent"></div>
       </div>
       </div>
       <div id="settleWrap-ausgleich">
@@ -1309,7 +1329,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-11';
+const APP_VERSION = '2026-07-19-15';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -4100,8 +4120,8 @@ const CALC_RULES = [
     on: 'Benzinkosten werden nach den effektiv verbrauchten Litern verteilt (Motorstunden × Ø-Verbrauch × Nutzungsanteil je Fahrt).',
     off: 'Benzinkosten werden gleichmässig auf alle Parteien verteilt — Motorstunden und Verbrauch spielen keine Rolle.' },
   { key: 'annualByUsage', title: 'Fixkosten nach Nutzungsanteil',
-    on: 'Jährliche Fixkosten werden im Verhältnis der gefahrenen Motorstunden verteilt (ohne Stunden: gleichmässig).',
-    off: 'Jährliche Fixkosten werden immer gleichmässig auf alle Parteien verteilt.' },
+    on: 'Sämtliche jährlichen Fixkosten (Anschaffung, Versicherung, Winterlager, Service …) werden im Verhältnis der gefahrenen Motorstunden verteilt (ohne Stunden: gleichmässig).',
+    off: 'Sämtliche jährlichen Fixkosten werden gleichmässig auf alle Parteien verteilt — 50:50 bei zwei, 33⅓ bei drei Parteien usw., unabhängig von der Nutzung.' },
   { key: 'giftsToPresent', title: 'Tank-Geschenke der Tagescrew gutschreiben',
     on: 'Von Gästen geschenkte Tankbeträge werden den Parteien gutgeschrieben, die an dem Tag auf dem Boot eingetragen waren.',
     off: 'Geschenkte Tankbeträge werden der Partei gutgeschrieben, die die Tankfüllung bezahlt hat.' },
@@ -4113,7 +4133,7 @@ const CALC_RULES = [
 function getCalcRules(){
   const stored = (state.settings && state.settings.calcRules) || {};
   const merged = {};
-  CALC_RULES.forEach(r => { merged[r.key] = (r.key in stored) ? !!stored[r.key] : true; });
+  CALC_RULES.forEach(r => { merged[r.key] = (r.key in stored) ? !!stored[r.key] : (('def' in r) ? !!r.def : true); });
   return merged;
 }
 
@@ -4171,6 +4191,7 @@ function computeSettlement(year){
 
   const annualItems = (state.annualCosts && state.annualCosts[year]) || [];
   const totalAnnual = annualItems.reduce((s,c) => s + (c.amount || 0), 0);
+
   const annualPaid = {}; state.parties.forEach(p => annualPaid[p.id] = 0);
   annualItems.forEach(c => {
     Object.keys(c.paidBy || {}).forEach(id => {
@@ -5464,14 +5485,14 @@ let adminSubTab = 'parties';
 
 function renderAdminPanel(){
   const card = document.getElementById('adminCard');
-  const isReadOnlySubtab = !isAdminUser && adminSubTab !== 'costs' && adminSubTab !== 'docs';
+  if(adminSubTab === 'costs') adminSubTab = 'parties';
+  const isReadOnlySubtab = !isAdminUser;
 
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
     (isReadOnlySubtab ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
-      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
@@ -5482,7 +5503,6 @@ function renderAdminPanel(){
   });
 
   if(adminSubTab === 'parties') renderAdminPartiesSection();
-  else if(adminSubTab === 'costs') renderAdminCostsSection();
   else if(adminSubTab === 'log') renderAdminAuditSection();
   else renderAdminGeneralSection();
 }
@@ -5904,7 +5924,10 @@ function getManeuvers(){
 }
 
 function maneuversBoxHtml(){
-  return '<h3 style="margin:0 0 0.6rem; white-space:nowrap;">🚤 Manöver-Guide</h3>' +
+  return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
+      '<h3 style="margin:0; white-space:nowrap;">🚤 Manöver-Guide</h3>' +
+      '<button type="button" class="btn secondary" id="exportManeuversPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+    '</div>' +
     getManeuvers().map((m, idx) =>
       '<div class="admin-box" style="padding-bottom:0.6rem;">' +
         '<details>' +
@@ -5986,6 +6009,26 @@ function exportManeuversPdf(){
   setTimeout(() => { window.print(); }, 100);
 }
 
+function exportChecklistsPdf(){
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+  if(!state.checklists) state.checklists = defaultChecklists();
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Checklisten</div></div>' +
+    '</div>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  Object.keys(state.checklists).forEach(key => {
+    const l = state.checklists[key];
+    html += '<div style="page-break-inside:avoid; break-inside:avoid;">' +
+      '<h3 style="margin:1.0rem 0 0.3rem;">' + escapeHtml(l.title) + '</h3>' +
+      (l.items || []).map(it => '<div style="margin:0.15rem 0;">☐&nbsp; ' + escapeHtml(it.text) + '</div>').join('') +
+    '</div>';
+  });
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
+}
+
 function exportKnotsPdf(){
   const printArea = document.getElementById('printArea');
   if(!printArea) return;
@@ -5994,20 +6037,25 @@ function exportKnotsPdf(){
       '<div><h1>WakeLog</h1><div class="print-subtitle">Knoten-Guide</div></div>' +
     '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  html += '<div style="font-size:0.95em; line-height:1.32;">';
   KNOT_GUIDE.forEach(k => {
     html += '<div style="page-break-inside:avoid; break-inside:avoid;">' +
-      '<h3 style="margin:0.95rem 0 0.2rem;">' + k.name + '</h3>' +
+      '<h3 style="margin:0.62rem 0 0.12rem; font-size:1.05em;">' + k.name + '</h3>' +
       '<div>' + k.use + '</div>' +
       '<div style="font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
       '<div style="font-size:0.85em; color:#555;">Animation: <a href="' + k.link + '" style="color:#1a56a0;">' + k.link + '</a></div>' +
     '</div>';
   });
+  html += '</div>';
   printArea.innerHTML = html;
   setTimeout(() => { window.print(); }, 100);
 }
 
 function knotsBoxHtml(){
-  return '<h3 style="margin:0 0 0.6rem; white-space:nowrap;">🪢 Knoten-Guide</h3>' +
+  return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
+      '<h3 style="margin:0; white-space:nowrap;">🪢 Knoten-Guide</h3>' +
+      '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+    '</div>' +
     KNOT_GUIDE.map(k => {
       const photo = (state.knotPhotos || {})[k.name];
       return '<div class="admin-box">' +
@@ -6028,11 +6076,7 @@ function renderDocsTab(){
   const card = document.getElementById('docsCard');
   if(!card) return;
   card.innerHTML =
-    '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:1.1rem;">' +
-      '<h2 style="margin:0;">Dokumente</h2>' +
-      (docsSubTab === 'manoever' ? '<button type="button" class="btn secondary" id="exportManeuversPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' : '') +
-      (docsSubTab === 'knots' ? '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' : '') +
-    '</div>' +
+    '<h2>Dokumente</h2>' +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Papiere</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
@@ -6044,18 +6088,21 @@ function renderDocsTab(){
     docsSubTab = btn.dataset.docstab;
     renderDocsTab();
   }));
-  const mPdfBtn = document.getElementById('exportManeuversPdfBtn');
-  if(mPdfBtn) mPdfBtn.addEventListener('click', exportManeuversPdf);
-  const kPdfBtn = document.getElementById('exportKnotsPdfBtn');
-  if(kPdfBtn) kPdfBtn.addEventListener('click', exportKnotsPdf);
   const content = document.getElementById('docsSubContent');
   if(docsSubTab === 'checklists'){
-    content.innerHTML = '<div id="checklistsWrap"></div>';
+    content.innerHTML =
+      '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
+        '<h3 style="margin:0; white-space:nowrap;">📋 Checklisten</h3>' +
+        '<button type="button" class="btn secondary" id="exportChecklistsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+      '</div>' +
+      '<div id="checklistsWrap"></div>';
+    document.getElementById('exportChecklistsPdfBtn').addEventListener('click', exportChecklistsPdf);
     refreshDocsChecklists();
     return;
   }
   if(docsSubTab === 'knots'){
     content.innerHTML = knotsBoxHtml();
+    document.getElementById('exportKnotsPdfBtn').addEventListener('click', exportKnotsPdf);
     content.querySelectorAll('[data-knot-photo]').forEach(el => el.addEventListener('click', () => {
       const name = decodeURIComponent(el.dataset.knotPhoto);
       openImagePicker(false, async (file) => {
@@ -6081,6 +6128,7 @@ function renderDocsTab(){
   }
   if(docsSubTab === 'manoever'){
     content.innerHTML = maneuversBoxHtml() + '<div id="manoeverFilesWrap"></div>';
+    document.getElementById('exportManeuversPdfBtn').addEventListener('click', exportManeuversPdf);
     content.querySelectorAll('[data-man-edit]').forEach(el => el.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -6189,7 +6237,8 @@ function renderDocFilesSection(content, category){
 }
 
 function renderAdminCostsSection(){
-  const content = document.getElementById('adminSubContent');
+  const content = document.getElementById('fixkostenContent');
+  if(!content) return;
   content.innerHTML =
     '<div class="admin-box">' +
       '<label>Neuer Fixkosten-Eintrag</label>' +
@@ -6224,26 +6273,30 @@ function renderAdminCostsSection(){
   setupAnnualCostUI();
 }
 
+const adminGeneralOpenGroups = new Set(['rules']);
 function renderAdminGeneralSection(){
   const content = document.getElementById('adminSubContent');
   const storedBootKey = getStoredBootKey();
   const calcRules = getCalcRules();
+  const og = adminGeneralOpenGroups;
   content.innerHTML =
+    '<details class="settings-group" data-group="rules"' + (og.has('rules') ? ' open' : '') + '><summary>📐 Rechnungsregeln</summary><div class="settings-group-body">' +
     '<div class="admin-box">' +
       '<label>Rechnungsregeln — Saldo je Partei</label>' +
       '<div class="hint" style="margin-bottom:0.8rem;">So berechnet die App den Saldo: Jede Partei trägt ihren fairen Anteil an Benzin und Fixkosten; bezahlt hat sie, was sie effektiv ausgelegt hat (Tankfüllungen, Fixkosten, Ausgleichszahlungen). Saldo = bezahlt − fairer Anteil. Die einzelnen Regeln lassen sich hier abschalten — die Abrechnung rechnet sofort neu und weist angepasste Regeln aus.</div>' +
       CALC_RULES.map(r =>
         '<div style="border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.6rem 0.7rem; margin-bottom:0.6rem; background:var(--foam);">' +
-          '<div style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.3rem;">' +
-            '<input type="checkbox" data-calc-rule="' + r.key + '" ' + (calcRules[r.key] ? 'checked' : '') + ' style="flex-shrink:0;">' +
-            '<div style="font-weight:700; font-size:0.88rem; color:var(--ink); min-width:0;">' + r.title + '</div>' +
-            '<span style="margin-left:auto; flex-shrink:0; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; color:' + (calcRules[r.key] ? '#1C9A64' : '#B3402A') + ';">' + (calcRules[r.key] ? 'AKTIV' : 'INAKTIV') + '</span>' +
-          '</div>' +
+          '<label style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.3rem; cursor:pointer;">' +
+            '<span style="font-weight:700; font-size:0.88rem; color:var(--ink); min-width:0; flex:1;">' + r.title + '</span>' +
+            '<span class="rule-toggle"><input type="checkbox" data-calc-rule="' + r.key + '" ' + (calcRules[r.key] ? 'checked' : '') + '><span class="track"></span></span>' +
+          '</label>' +
           '<div class="hint" style="margin:0;">' + (calcRules[r.key] ? r.on : r.off) + '</div>' +
         '</div>'
       ).join('') +
       '<div class="hint" style="margin:0;">Hinweis: Liegen in einem Jahr keine Motorstunden vor, teilt die App nutzungsabhängige Kosten automatisch gleichmässig auf (wird in der Abrechnung ausgewiesen).</div>' +
     '</div>' +
+    '</div></details>' +
+    '<details class="settings-group" data-group="access"' + (og.has('access') ? ' open' : '') + '><summary>🔐 Zugang &amp; Sicherheit</summary><div class="settings-group-body">' +
     '<div class="admin-box">' +
       '<label>Bootsschlüssel</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
@@ -6281,6 +6334,8 @@ function renderAdminGeneralSection(){
       '</div>' +
       '<div class="gate-error" id="copyFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
+    '</div></details>' +
+    '<details class="settings-group" data-group="boat"' + (og.has('boat') ? ' open' : '') + '><summary>⚙️ Boot, Zähler &amp; Wetter</summary><div class="settings-group-body">' +
     '<div class="admin-box">' +
       '<label>Anfangsstand Motorenstundenzähler</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der Stand des Motorenstundenzählers, bevor mit WakeLog zu rechnen begonnen wurde (0, falls die Zählung bei diesem Logbuch beginnt). Alle künftigen Einträge berechnen die gefahrenen Stunden als Differenz zum jeweils letzten Stand — beim allerersten Eintrag zu diesem Wert.</div>' +
@@ -6344,6 +6399,8 @@ function renderAdminGeneralSection(){
       '</div>' +
       '<div class="gate-error" id="weatherLocationFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
+    '</div></details>' +
+    '<details class="settings-group" data-group="reset"' + (og.has('reset') ? ' open' : '') + '><summary>🗑️ Jahr zurücksetzen</summary><div class="settings-group-body">' +
     '<div class="admin-box">' +
       '<label>Jahr zurücksetzen</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Löscht sämtliche Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben eines gewählten Jahres unwiderruflich aus der laufenden Ansicht. Vor dem Löschen wird automatisch eine Sicherung angelegt, die du danach jederzeit wiederherstellen kannst — bis zum nächsten Zurücksetzen desselben Jahres.</div>' +
@@ -6351,7 +6408,13 @@ function renderAdminGeneralSection(){
       '<button class="btn secondary" id="resetYearBtn" style="border-color:#C0392B; color:#C0392B;">🗑️ Jahr zurücksetzen</button>' +
       '<div id="resetYearRestoreArea" style="margin-top:0.9rem;"></div>' +
       '<div class="gate-error" id="resetYearFeedback" style="color:#1C9A64;"></div>' +
-    '</div>';
+    '</div>' +
+    '</div></details>';
+
+  content.querySelectorAll('details.settings-group').forEach(d => d.addEventListener('toggle', () => {
+    if(d.open) adminGeneralOpenGroups.add(d.dataset.group);
+    else adminGeneralOpenGroups.delete(d.dataset.group);
+  }));
 
   const resetYearSelect = document.getElementById('resetYearSelect');
   const resetYears = priorityYears();
@@ -7088,12 +7151,15 @@ function wireSettlementSubnav(){
   const btns = document.querySelectorAll('[data-settletab]');
   function apply(){
     btns.forEach(b => b.classList.toggle('active', b.dataset.settletab === settlementSubTab));
-    ['ausgleich','abrechnung','vergleich'].forEach(k => {
+    ['ausgleich','abrechnung','vergleich','fixkosten'].forEach(k => {
       const w = document.getElementById('settleWrap-' + k);
       if(w) w.style.display = (k === settlementSubTab) ? '' : 'none';
     });
     if(settlementSubTab === 'abrechnung'){
       requestAnimationFrame(() => fitStampAmounts(document));
+    }
+    if(settlementSubTab === 'fixkosten'){
+      renderAdminCostsSection();
     }
   }
   btns.forEach(b => b.addEventListener('click', () => { settlementSubTab = b.dataset.settletab; apply(); }));
