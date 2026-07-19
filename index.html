@@ -93,10 +93,10 @@ body{
   margin:0;
 }
 .hero .sub{
-  font-size:0.85rem;
+  font-size:clamp(0.62rem, 2.9vw, 0.85rem);
   color:rgba(255,255,255,0.62);
   margin-top:0.5rem;
-  max-width:32ch;
+  white-space:nowrap;
 }
 .hero .meta{
   font-family:'JetBrains Mono', monospace;
@@ -725,7 +725,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <img src="header-logo.png" alt="WakeLog Logo" id="heroLogo" style="width:56px; height:56px; flex-shrink:0; cursor:pointer;">
           <div>
             <h1>WakeLog</h1>
-            <div class="sub">Das Cockpit eurer Bootsgemeinschaft</div>
+            <div class="sub">Wake it easy — das Cockpit für Boot &amp; Crew</div>
           </div>
         </div>
       </div>
@@ -1309,7 +1309,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-7';
+const APP_VERSION = '2026-07-19-11';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1445,6 +1445,7 @@ async function loadShared(){
       state.reservations = loaded.reservations || {};
       state.checklists = loaded.checklists || null;
       state.maneuvers = loaded.maneuvers || null;
+      state.knotPhotos = loaded.knotPhotos || {};
     } else {
       state = defaultData();
     }
@@ -1475,7 +1476,7 @@ async function loadShared(){
 }
 
 function buildSharedPayload(){
-  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
+  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, knotPhotos: state.knotPhotos || {}, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
 }
 
 async function saveShared(){
@@ -1532,6 +1533,7 @@ function subscribeRealtime(){
       state.reservations = newReservations;
       state.checklists = loaded.checklists || null;
       state.maneuvers = loaded.maneuvers || null;
+      state.knotPhotos = loaded.knotPhotos || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
@@ -4091,7 +4093,32 @@ function openPhotoLightbox(src){
   document.body.appendChild(overlay);
 }
 
+// Rechnungsregeln für den Saldo je Partei — einzeln dokumentiert und vom
+// Admin an-/abschaltbar (Verwaltung > Allg. Einstellungen). Defaults = alles an.
+const CALC_RULES = [
+  { key: 'fuelByConsumption', title: 'Benzin nach effektivem Verbrauch',
+    on: 'Benzinkosten werden nach den effektiv verbrauchten Litern verteilt (Motorstunden × Ø-Verbrauch × Nutzungsanteil je Fahrt).',
+    off: 'Benzinkosten werden gleichmässig auf alle Parteien verteilt — Motorstunden und Verbrauch spielen keine Rolle.' },
+  { key: 'annualByUsage', title: 'Fixkosten nach Nutzungsanteil',
+    on: 'Jährliche Fixkosten werden im Verhältnis der gefahrenen Motorstunden verteilt (ohne Stunden: gleichmässig).',
+    off: 'Jährliche Fixkosten werden immer gleichmässig auf alle Parteien verteilt.' },
+  { key: 'giftsToPresent', title: 'Tank-Geschenke der Tagescrew gutschreiben',
+    on: 'Von Gästen geschenkte Tankbeträge werden den Parteien gutgeschrieben, die an dem Tag auf dem Boot eingetragen waren.',
+    off: 'Geschenkte Tankbeträge werden der Partei gutgeschrieben, die die Tankfüllung bezahlt hat.' },
+  { key: 'includeSettlements', title: 'Ausgleichszahlungen einrechnen',
+    on: 'Bereits geleistete Ausgleichszahlungen werden im Saldo berücksichtigt (Rest-Saldo).',
+    off: 'Der Saldo zeigt die reine Jahresrechnung ohne bereits geleistete Ausgleichszahlungen.' }
+];
+
+function getCalcRules(){
+  const stored = (state.settings && state.settings.calcRules) || {};
+  const merged = {};
+  CALC_RULES.forEach(r => { merged[r.key] = (r.key in stored) ? !!stored[r.key] : true; });
+  return merged;
+}
+
 function computeSettlement(year){
+  const rules = getCalcRules();
   const consumed = {}, partyHoursMap = {}, paid = {};
   state.parties.forEach(p => { consumed[p.id] = 0; partyHoursMap[p.id] = 0; paid[p.id] = 0; });
   const entryHours = computeHoursMap();
@@ -4127,8 +4154,9 @@ function computeSettlement(year){
       // Die vollen Ausgaben bleiben im Kostenpool, die Rechnung geht auf (Summe = 0).
       if(giftAmt > 0){
         const usage = getEntryUsageSplit(e);
-        const creditIds = usage.ids.length ? usage.ids : payer.ids;
-        const creditSplit = usage.ids.length ? usage.split : payer.split;
+        const useUsage = rules.giftsToPresent && usage.ids.length > 0;
+        const creditIds = useUsage ? usage.ids : payer.ids;
+        const creditSplit = useUsage ? usage.split : payer.split;
         creditIds.forEach(id => {
           if(!(id in paid)) return;
           paid[id] += giftAmt * ((creditSplit[id] || 0) / 100);
@@ -4161,13 +4189,18 @@ function computeSettlement(year){
     if(s.to in settledIn) settledIn[s.to] += s.amount || 0;
   });
 
+  const equalShare = state.parties.length ? 1 / state.parties.length : 0;
   const rows = state.parties.map(p => {
-    const usageSharePct = totalHours > 0 ? (partyHoursMap[p.id] / totalHours) : (state.parties.length ? 1/state.parties.length : 0);
-    const fuelFairShare = totalConsumed > 0 ? totalFuelExpense * (consumed[p.id] / totalConsumed) : 0;
+    const usageSharePct = rules.annualByUsage
+      ? (totalHours > 0 ? (partyHoursMap[p.id] / totalHours) : equalShare)
+      : equalShare;
+    const fuelFairShare = rules.fuelByConsumption
+      ? (totalConsumed > 0 ? totalFuelExpense * (consumed[p.id] / totalConsumed) : totalFuelExpense * equalShare)
+      : totalFuelExpense * equalShare;
     const annualFairShare = totalAnnual * usageSharePct;
     const totalPaid = paid[p.id] + annualPaid[p.id];
     const totalFairShare = fuelFairShare + annualFairShare;
-    const settledBalance = settledOut[p.id] - settledIn[p.id];
+    const settledBalance = rules.includeSettlements ? (settledOut[p.id] - settledIn[p.id]) : 0;
     return {
       id: p.id, name: p.name, hours: partyHoursMap[p.id], liters: consumed[p.id],
       pct: totalConsumed > 0 ? (consumed[p.id] / totalConsumed) * 100 : 0,
@@ -4370,6 +4403,11 @@ function renderSettlement(){
 
   const missingConsumption = state.entries.some(e => yearOf(e.date) === year && getEntryFlags(e).hasUsage && !(typeof e.consumption === 'number' && e.consumption > 0));
   let html = '';
+  const activeRules = getCalcRules();
+  const offRules = CALC_RULES.filter(r => !activeRules[r.key]);
+  if(offRules.length){
+    html += '<div class="notice warn">⚙️ Angepasste Rechnungsregeln aktiv — deaktiviert: ' + offRules.map(r => r.title).join(', ') + '. Details in Verwaltung → Allg. Einstellungen.</div>';
+  }
   if(missingConsumption){
     html += '<div class="notice warn">Mindestens ein Nutzungseintrag in ' + year + ' hat keinen Durchschnittsverbrauch hinterlegt und geht daher mit 0 Litern in die Abrechnung ein. Im Logbuch bearbeiten, um den fairen Anteil korrekt zu berechnen.</div>';
   }
@@ -5866,10 +5904,7 @@ function getManeuvers(){
 }
 
 function maneuversBoxHtml(){
-  return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
-      '<h3 style="margin:0; white-space:nowrap;">🚤 Manöver-Guide</h3>' +
-      '<button type="button" class="btn secondary" id="exportManeuversPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
-    '</div>' +
+  return '<h3 style="margin:0 0 0.6rem; white-space:nowrap;">🚤 Manöver-Guide</h3>' +
     getManeuvers().map((m, idx) =>
       '<div class="admin-box" style="padding-bottom:0.6rem;">' +
         '<details>' +
@@ -5939,11 +5974,13 @@ function exportManeuversPdf(){
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
   getManeuvers().forEach(m => {
     const pageBreak = m.title.indexOf('Seitliches Landen, rückwärts') !== -1 ? ' page-break-before:always;' : '';
-    html += '<h3 style="margin:1.1rem 0 0.3rem;' + pageBreak + '">' + m.title + '</h3>';
+    html += '<div style="page-break-inside:avoid; break-inside:avoid;' + pageBreak + '">';
+    html += '<h3 style="margin:1.1rem 0 0.3rem;">' + m.title + '</h3>';
     html += '<ol style="margin:0 0 0.4rem; padding-left:1.3rem;">' + (m.steps || []).map(st => '<li>' + st + '</li>').join('') + '</ol>';
     if(m.extra && m.extra.items && m.extra.items.length){
       html += '<b>' + escapeHtml(m.extra.label) + ':</b><ul style="margin:0.2rem 0 0.4rem; padding-left:1.3rem;">' + m.extra.items.map(it => '<li>' + it + '</li>').join('') + '</ul>';
     }
+    html += '</div>';
   });
   printArea.innerHTML = html;
   setTimeout(() => { window.print(); }, 100);
@@ -5957,38 +5994,45 @@ function exportKnotsPdf(){
       '<div><h1>WakeLog</h1><div class="print-subtitle">Knoten-Guide</div></div>' +
     '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
-  html += '<div style="font-size:0.82em; line-height:1.35;">';
   KNOT_GUIDE.forEach(k => {
-    html += '<h3 style="margin:0.7rem 0 0.1rem; font-size:1.05em;">' + k.name + '</h3>' +
+    html += '<div style="page-break-inside:avoid; break-inside:avoid;">' +
+      '<h3 style="margin:0.95rem 0 0.2rem;">' + k.name + '</h3>' +
       '<div>' + k.use + '</div>' +
       '<div style="font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
-      '<div><a href="' + k.link + '" style="color:#1a56a0;">▶ Animation: ' + k.link + '</a></div>';
+      '<div style="font-size:0.85em; color:#555;">Animation: <a href="' + k.link + '" style="color:#1a56a0;">' + k.link + '</a></div>' +
+    '</div>';
   });
-  html += '</div>';
   printArea.innerHTML = html;
   setTimeout(() => { window.print(); }, 100);
 }
 
 function knotsBoxHtml(){
-  return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
-      '<h3 style="margin:0; white-space:nowrap;">🪢 Knoten-Guide</h3>' +
-      '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
-    '</div>' +
-    KNOT_GUIDE.map(k =>
-      '<div class="admin-box">' +
-        '<div style="font-weight:700; font-size:0.88rem; color:var(--ink); margin-bottom:0.35rem; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + k.name + '</div>' +
+  return '<h3 style="margin:0 0 0.6rem; white-space:nowrap;">🪢 Knoten-Guide</h3>' +
+    KNOT_GUIDE.map(k => {
+      const photo = (state.knotPhotos || {})[k.name];
+      return '<div class="admin-box">' +
+        '<div style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.35rem;">' +
+          (photo ? '<img src="' + photo + '" data-lightbox-src="1" style="width:46px; height:46px; object-fit:cover; border-radius:8px; border:1px solid var(--bronze-line); flex-shrink:0; cursor:pointer;" title="Gross ansehen">' : '') +
+          '<div style="font-weight:700; font-size:0.88rem; color:var(--ink); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + k.name + '</div>' +
+          (isAdminUser ? '<span data-knot-photo="' + encodeURIComponent(k.name) + '" style="cursor:pointer; flex-shrink:0;" title="Foto vom fertigen Knoten hinterlegen">📷</span>' : '') +
+          (isAdminUser && photo ? '<span data-knot-photo-del="' + encodeURIComponent(k.name) + '" style="cursor:pointer; flex-shrink:0; opacity:0.6;" title="Foto entfernen">✕</span>' : '') +
+        '</div>' +
         '<div class="hint" style="margin:0 0 0.3rem;">' + k.use + '</div>' +
         '<div class="hint" style="margin:0 0 0.3rem; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
         '<a href="' + k.link + '" target="_blank" rel="noopener" style="font-size:0.78rem;">▶ Animation ansehen</a>' +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
 }
 
 function renderDocsTab(){
   const card = document.getElementById('docsCard');
   if(!card) return;
   card.innerHTML =
-    '<h2>Dokumente</h2>' +
+    '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:1.1rem;">' +
+      '<h2 style="margin:0;">Dokumente</h2>' +
+      (docsSubTab === 'manoever' ? '<button type="button" class="btn secondary" id="exportManeuversPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' : '') +
+      (docsSubTab === 'knots' ? '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' : '') +
+    '</div>' +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Papiere</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
@@ -6000,6 +6044,10 @@ function renderDocsTab(){
     docsSubTab = btn.dataset.docstab;
     renderDocsTab();
   }));
+  const mPdfBtn = document.getElementById('exportManeuversPdfBtn');
+  if(mPdfBtn) mPdfBtn.addEventListener('click', exportManeuversPdf);
+  const kPdfBtn = document.getElementById('exportKnotsPdfBtn');
+  if(kPdfBtn) kPdfBtn.addEventListener('click', exportKnotsPdf);
   const content = document.getElementById('docsSubContent');
   if(docsSubTab === 'checklists'){
     content.innerHTML = '<div id="checklistsWrap"></div>';
@@ -6008,14 +6056,31 @@ function renderDocsTab(){
   }
   if(docsSubTab === 'knots'){
     content.innerHTML = knotsBoxHtml();
-    const kBtn = document.getElementById('exportKnotsPdfBtn');
-    if(kBtn) kBtn.addEventListener('click', exportKnotsPdf);
+    content.querySelectorAll('[data-knot-photo]').forEach(el => el.addEventListener('click', () => {
+      const name = decodeURIComponent(el.dataset.knotPhoto);
+      openImagePicker(false, async (file) => {
+        try{
+          const dataUrl = await compressImageToLimit(file, 220000);
+          if(!state.knotPhotos) state.knotPhotos = {};
+          state.knotPhotos[name] = dataUrl;
+          logAudit('Knoten-Foto hinterlegt: ' + name);
+          await saveShared();
+          renderDocsTab();
+        } catch(e){ alert('Foto konnte nicht gelesen werden.'); }
+      });
+    }));
+    content.querySelectorAll('[data-knot-photo-del]').forEach(el => el.addEventListener('click', async () => {
+      const name = decodeURIComponent(el.dataset.knotPhotoDel);
+      if(!confirm('Foto zu "' + name + '" entfernen?')) return;
+      if(state.knotPhotos) delete state.knotPhotos[name];
+      logAudit('Knoten-Foto entfernt: ' + name);
+      await saveShared();
+      renderDocsTab();
+    }));
     return;
   }
   if(docsSubTab === 'manoever'){
     content.innerHTML = maneuversBoxHtml() + '<div id="manoeverFilesWrap"></div>';
-    const mBtn = document.getElementById('exportManeuversPdfBtn');
-    if(mBtn) mBtn.addEventListener('click', exportManeuversPdf);
     content.querySelectorAll('[data-man-edit]').forEach(el => el.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -6162,7 +6227,23 @@ function renderAdminCostsSection(){
 function renderAdminGeneralSection(){
   const content = document.getElementById('adminSubContent');
   const storedBootKey = getStoredBootKey();
+  const calcRules = getCalcRules();
   content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Rechnungsregeln — Saldo je Partei</label>' +
+      '<div class="hint" style="margin-bottom:0.8rem;">So berechnet die App den Saldo: Jede Partei trägt ihren fairen Anteil an Benzin und Fixkosten; bezahlt hat sie, was sie effektiv ausgelegt hat (Tankfüllungen, Fixkosten, Ausgleichszahlungen). Saldo = bezahlt − fairer Anteil. Die einzelnen Regeln lassen sich hier abschalten — die Abrechnung rechnet sofort neu und weist angepasste Regeln aus.</div>' +
+      CALC_RULES.map(r =>
+        '<div style="border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.6rem 0.7rem; margin-bottom:0.6rem; background:var(--foam);">' +
+          '<div style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.3rem;">' +
+            '<input type="checkbox" data-calc-rule="' + r.key + '" ' + (calcRules[r.key] ? 'checked' : '') + ' style="flex-shrink:0;">' +
+            '<div style="font-weight:700; font-size:0.88rem; color:var(--ink); min-width:0;">' + r.title + '</div>' +
+            '<span style="margin-left:auto; flex-shrink:0; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; color:' + (calcRules[r.key] ? '#1C9A64' : '#B3402A') + ';">' + (calcRules[r.key] ? 'AKTIV' : 'INAKTIV') + '</span>' +
+          '</div>' +
+          '<div class="hint" style="margin:0;">' + (calcRules[r.key] ? r.on : r.off) + '</div>' +
+        '</div>'
+      ).join('') +
+      '<div class="hint" style="margin:0;">Hinweis: Liegen in einem Jahr keine Motorstunden vor, teilt die App nutzungsabhängige Kosten automatisch gleichmässig auf (wird in der Abrechnung ausgewiesen).</div>' +
+    '</div>' +
     '<div class="admin-box">' +
       '<label>Bootsschlüssel</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
@@ -6342,6 +6423,18 @@ function renderAdminGeneralSection(){
     fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wurde zurückgesetzt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
     renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
   });
+
+  content.querySelectorAll('[data-calc-rule]').forEach(cb => cb.addEventListener('change', async () => {
+    if(!isAdminUser) return;
+    if(!state.settings.calcRules) state.settings.calcRules = {};
+    state.settings.calcRules[cb.dataset.calcRule] = cb.checked;
+    const rule = CALC_RULES.find(r => r.key === cb.dataset.calcRule);
+    logAudit('Rechnungsregel ' + (cb.checked ? 'aktiviert' : 'deaktiviert') + ': ' + (rule ? rule.title : cb.dataset.calcRule));
+    await saveShared();
+    renderAdminGeneralSection();
+    renderSettlement();
+    renderYearComparison();
+  }));
 
   const bootKeyRevealBtn = document.getElementById('bootKeyRevealBtn');
   if(bootKeyRevealBtn){
