@@ -722,7 +722,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
     <div class="hero-container">
       <div class="hero-inner">
         <div id="heroHomeLink" style="display:flex; align-items:center; gap:0.9rem; cursor:pointer;">
-          <img src="header-logo.png" alt="WakeLog Logo" style="width:56px; height:56px; flex-shrink:0;">
+          <img src="header-logo.png" alt="WakeLog Logo" id="heroLogo" style="width:56px; height:56px; flex-shrink:0; cursor:pointer;">
           <div>
             <h1>WakeLog</h1>
             <div class="sub">Fahrten, Tanken &amp; fairer Kostenausgleich für die Bootsgemeinschaft</div>
@@ -1295,7 +1295,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-18-9';
+const APP_VERSION = '2026-07-18-11';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1357,6 +1357,54 @@ function defaultData(){
 
 let sharedLoadFailed = false;
 
+// ---------- Offline-Modus ----------
+// Letzter erfolgreich geladener Stand wird lokal gecacht (Anzeige ohne Netz);
+// fehlgeschlagene Speicherungen landen in einer Warteschlange und werden
+// automatisch synchronisiert, sobald wieder Verbindung besteht.
+const OFFLINE_STATE_KEY = 'wakelog-offline-state';
+const PENDING_SYNC_KEY = 'wakelog-pending-sync';
+let offlineMode = false;
+
+function setOfflineBanner(show, pending){
+  let el = document.getElementById('offlineBanner');
+  if(!show){ if(el) el.remove(); return; }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'offlineBanner';
+    el.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:1200; background:#8A5A00; color:#fff; font-family:Inter,sans-serif; font-size:0.78rem; text-align:center; padding:0.5rem 0.6rem calc(0.5rem + env(safe-area-inset-bottom, 0px));';
+    document.body.appendChild(el);
+  }
+  el.textContent = pending
+    ? '📴 Offline — Änderungen sind gespeichert und werden bei Verbindung automatisch synchronisiert.'
+    : '📴 Offline-Modus — Anzeige aus dem letzten bekannten Stand.';
+}
+
+function cacheOfflineState(){
+  try{ localStorage.setItem(OFFLINE_STATE_KEY, JSON.stringify(state)); }
+  catch(e){
+    // Speicher voll (Fotos/Memos): abgespeckte Kopie ohne grosse Inhalte sichern
+    try{
+      const slim = Object.assign({}, state, { chatMessages: [], documents: [] });
+      localStorage.setItem(OFFLINE_STATE_KEY, JSON.stringify(slim));
+    } catch(e2){}
+  }
+}
+
+async function trySyncPending(){
+  let raw = null;
+  try{ raw = localStorage.getItem(PENDING_SYNC_KEY); } catch(e){}
+  if(!raw || !dataRef) return;
+  try{
+    await set(dataRef, JSON.parse(raw));
+    try{ localStorage.removeItem(PENDING_SYNC_KEY); } catch(e){}
+    offlineMode = false;
+    setOfflineBanner(false);
+    console.log('Offline-Änderungen synchronisiert');
+  } catch(e){}
+}
+window.addEventListener('online', () => { trySyncPending(); });
+setInterval(() => { trySyncPending(); }, 30000);
+
 async function loadShared(){
   try{
     const snap = await get(dataRef);
@@ -1379,12 +1427,31 @@ async function loadShared(){
       state.chatSeen = loaded.chatSeen || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
+      state.documents = loaded.documents || [];
+      state.reservations = loaded.reservations || {};
+      state.checklists = loaded.checklists || null;
     } else {
       state = defaultData();
     }
+    cacheOfflineState();
   } catch(e){
     console.error('Laden fehlgeschlagen', e);
     sharedLoadFailed = true;
+    // Offline: letzten bekannten Stand aus dem lokalen Cache verwenden
+    try{
+      const cached = localStorage.getItem(OFFLINE_STATE_KEY);
+      if(cached){
+        const snap = JSON.parse(cached);
+        if(snap && snap.parties && snap.parties.length){
+          state = snap;
+          sharedLoadFailed = false;
+          offlineMode = true;
+          let hasPending = false;
+          try{ hasPending = !!localStorage.getItem(PENDING_SYNC_KEY); } catch(e2){}
+          setOfflineBanner(true, hasPending);
+        }
+      }
+    } catch(e2){}
     if(!state.parties.length) state = defaultData();
   }
   let migrated = false;
@@ -1392,10 +1459,23 @@ async function loadShared(){
   if(migrated && state.settings){ await saveShared(); }
 }
 
+function buildSharedPayload(){
+  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
+}
+
 async function saveShared(){
+  const payload = buildSharedPayload();
   try{
-    await set(dataRef, { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null });
-  } catch(e){ console.error('Speichern fehlgeschlagen', e); }
+    await set(dataRef, payload);
+    try{ localStorage.removeItem(PENDING_SYNC_KEY); } catch(e){}
+    if(offlineMode){ offlineMode = false; setOfflineBanner(false); }
+    cacheOfflineState();
+  } catch(e){
+    console.error('Speichern fehlgeschlagen — Änderung wartet auf Synchronisation', e);
+    try{ localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(payload)); } catch(e2){}
+    cacheOfflineState();
+    setOfflineBanner(true, true);
+  }
   updateHeaderMeta();
 }
 
@@ -1421,6 +1501,9 @@ function subscribeRealtime(){
       checkNewBeerCalls(state.chatMessages || [], newChatMessages);
       state.chatMessages = newChatMessages;
       state.chatSeen = loaded.chatSeen || {};
+      state.documents = loaded.documents || [];
+      state.reservations = loaded.reservations || {};
+      state.checklists = loaded.checklists || null;
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
@@ -1506,6 +1589,47 @@ function evaluateAccess(){
   accessGranted = isAdminUser || partyStillValid;
 }
 
+const SAILOR_QUOTES = [
+  'Ein ruhiges Meer hat noch keinen guten Kapitän hervorgebracht.',
+  'Wer den Hafen nicht kennt, für den ist kein Wind der richtige.',
+  'Nicht der Wind, sondern das Segel bestimmt die Richtung.',
+  'Das Schiff ist im Hafen sicher — aber dafür wurde es nicht gebaut.',
+  'Erst die Leinen los, dann das Abenteuer.',
+  'Gute Seemannschaft beginnt an Land.',
+  'Kleines Boot, grosse Freiheit.',
+  'Wer das Wasser liebt, dem gehört der See.',
+  'Man verliert nie — entweder man gewinnt oder man lernt anlegen.',
+  'Kurs halten ist auch eine Kunst.',
+  'Salz im Haar, Sonne im Herzen.',
+  'Nach der Fahrt ist vor dem Ankerdöschen.',
+  'Wind kann man nicht kaufen, nutzen schon.',
+  'Jede Welle trägt dich, wenn du sie lässt.'
+];
+function sailorQuoteOfTheDay(){
+  const d = new Date();
+  const idx = (d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % SAILOR_QUOTES.length;
+  return SAILOR_QUOTES[idx];
+}
+
+// Kapitäns-Rang je nach gefahrenen Motorstunden der Partei (über alle Jahre)
+function captainRank(partyId){
+  let hours = 0;
+  try{
+    const hoursMap = computeHoursMap();
+    if(hoursMap){
+      (state.entries || []).forEach(e => {
+        if(!getEntryFlags(e).hasUsage) return;
+        const split = getEntryUsageSplit(e);
+        const pct = (split.split && split.split[partyId]) ? split.split[partyId] / 100 : 0;
+        hours += (hoursMap[e.id] || 0) * pct;
+      });
+    }
+  } catch(e){ return null; }
+  const ranks = [ [10, '🪢 Leichtmatrose'], [25, '⚓ Matrose'], [50, '🌊 Vollmatrose'], [100, '🧭 Bootsmann'], [200, '🛟 Steuermann'], [400, '👨‍✈️ Kapitän'] ];
+  for(const [limit, name] of ranks){ if(hours < limit) return name; }
+  return '🐋 Käpt\'n Ahab';
+}
+
 function updateHeaderMeta(){
   const el = document.getElementById('headerMeta');
   if(!el) return;
@@ -1520,7 +1644,8 @@ function updateHeaderMeta(){
   const prioBlock = prio
     ? '<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>'
     : '';
-  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>';
+  el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>' +
+    '<div style="width:100%; text-align:center; font-style:italic; opacity:0.75; margin-top:0.15rem;">„' + sailorQuoteOfTheDay() + '"</div>';
   const strip = document.getElementById('adminStrip');
   if(strip){
     const unread = getUnreadNotifications().length + getUnreadChatCount();
@@ -1528,7 +1653,7 @@ function updateHeaderMeta(){
     // Bildschirmbreite verteilt; die Standortzeile bleibt zentriert unter dem Widget.
     const badgeHtml = isAdminUser
       ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Admin</span>'
-      : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">User · ' + escapeHtml(partyName(session.partyId)) + '</span>' : '');
+      : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;" title="Rang nach gefahrenen Motorstunden">' + escapeHtml(partyName(session.partyId)) + (captainRank(session.partyId) ? ' · ' + captainRank(session.partyId) : '') + '</span>' : '');
     strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start; width:100%; gap:0.3rem;">' +
       '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
         '<div id="liveWeatherWidget"></div>' +
@@ -1968,7 +2093,9 @@ function renderCalendarTab(){
       else if(eff.partyId) style = 'background:' + partyColor(eff.partyId) + '33; border-color:' + partyColor(eff.partyId) + ';';
       const hasRequest = state.priorityRequests && state.priorityRequests[dateStr];
       const requestDot = hasRequest ? '<span class="cal-request-dot" title="Anfrage pendent"></span>' : '';
-      html += '<div class="' + cls + '" style="' + style + '" data-date="' + dateStr + '">' + d + requestDot + '</div>';
+      const resvCell = (state.reservations || {})[dateStr];
+      const resvMark = (resvCell && resvCell.partyId === eff.partyId) ? '<span style="position:absolute; bottom:1px; right:2px; font-size:0.55rem; line-height:1;" title="Fahrt angekündigt">🚤</span>' : '';
+      html += '<div class="' + cls + '" style="position:relative; ' + style + '" data-date="' + dateStr + '">' + d + requestDot + resvMark + '</div>';
     }
   }
   grid.innerHTML = html;
@@ -2154,6 +2281,19 @@ function renderCalendarDayPanel(){
     }
   } else {
     statusLine = '<b>' + escapeHtml(partyName(eff.partyId)) + '</b> hat an diesem Tag Vorrecht.';
+    // Fahrt-Ankündigung (Reservation): nur gültig, solange die Partei das Vorrecht hält
+    const resv = (state.reservations || {})[dateStr];
+    const resvValid = resv && resv.partyId === eff.partyId;
+    if(resvValid){
+      statusLine += ' <span style="display:block; margin-top:0.3rem;">🚤 <b>' + escapeHtml(partyName(resv.partyId)) + '</b> hat für diesen Tag eine Fahrt angekündigt.</span>';
+    }
+    if(isAdminUser || myId === eff.partyId){
+      if(!resvValid){
+        actions += '<button class="btn secondary" id="calReserveBtn">🚤 Fahrt ankündigen</button>';
+      } else if(isAdminUser || resv.partyId === myId){
+        actions += '<button class="btn secondary" id="calUnreserveBtn">Fahrt-Ankündigung zurückziehen</button>';
+      }
+    }
     const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
     if(isAdminUser || myId === eff.partyId){
       actions += '<button class="btn secondary" id="calGiveUpBtn">Diesen Tag abgeben</button>';
@@ -2179,6 +2319,23 @@ function renderCalendarDayPanel(){
       '<div class="gate-error" id="calFeedback" style="color:#1C9A64;"></div>' +
     '</div>';
 
+  const reserveBtn = document.getElementById('calReserveBtn');
+  if(reserveBtn) reserveBtn.addEventListener('click', async () => {
+    if(!state.reservations) state.reservations = {};
+    state.reservations[dateStr] = { partyId: eff.partyId, ts: Date.now() };
+    pushNotification('🚤 ' + partyName(eff.partyId) + ' hat für den ' + fmtDateCH(dateStr) + ' eine Fahrt angekündigt.', null);
+    logAudit('Fahrt angekündigt für ' + fmtDateCH(dateStr));
+    await saveShared();
+    renderCalendarTab();
+  });
+  const unreserveBtn = document.getElementById('calUnreserveBtn');
+  if(unreserveBtn) unreserveBtn.addEventListener('click', async () => {
+    if(state.reservations) delete state.reservations[dateStr];
+    pushNotification('🚤 Die Fahrt-Ankündigung für den ' + fmtDateCH(dateStr) + ' wurde zurückgezogen.', null);
+    logAudit('Fahrt-Ankündigung zurückgezogen für ' + fmtDateCH(dateStr));
+    await saveShared();
+    renderCalendarTab();
+  });
   const giveUpBtn = document.getElementById('calGiveUpBtn');
   if(giveUpBtn) giveUpBtn.addEventListener('click', () => {
     calendarPendingAction = { type: 'giveup', dateStr, actingId: eff.partyId };
@@ -3850,6 +4007,11 @@ function renderEntriesTable(){
   }));
 }
 
+document.addEventListener('click', (ev) => {
+  const img = ev.target.closest ? ev.target.closest('[data-lightbox-src]') : null;
+  if(img && img.src) openPhotoLightbox(img.src);
+});
+
 function openPhotoLightbox(src){
   const overlay = document.createElement('div');
   overlay.className = 'gate-overlay';
@@ -4155,6 +4317,7 @@ function renderSettlement(){
     '<div class="stat stat-highlight"><div class="num">' + fmtCHF(totalFuelExpense + totalAnnual) + '</div><div class="lbl">Gesamtaufwand</div></div>' +
   '</div>';
 
+  html += buildConsumptionTrendSection(year);
   html += '<h3 style="margin:2.6rem 0 0.4rem;">Jährliche Fixkosten (Details)</h3>' + annualCostItemsHtml(String(year), false);
 
   const maxAbs = Math.max(0.01, ...rows.map(r => Math.abs(r.balance)));
@@ -4301,6 +4464,41 @@ function getYearComparisonData(){
     const hours = state.entries.filter(e => yearOf(e.date) === y).reduce((s,e) => s + (getEntryFlags(e).hasUsage ? (hoursMap[e.id]||0) : 0), 0);
     return { year: y, total, hours, rows };
   });
+}
+
+// Verbrauchstrend: Ø-Rate (l/h) aller Nutzungseinträge des Jahres als Linie —
+// macht z. B. schleichend steigenden Verbrauch (Motorproblem, Bewuchs) sichtbar.
+function buildConsumptionTrendSection(year){
+  const pts = (state.entries || [])
+    .filter(e => String(new Date(e.date).getFullYear()) === String(year) && getEntryFlags(e).hasUsage && typeof e.consumption === 'number' && e.consumption > 0)
+    .sort((a,b) => (a.date || '').localeCompare(b.date || ''))
+    .map(e => ({ date: e.date, v: e.consumption }));
+  let inner;
+  if(pts.length < 2){
+    inner = '<div class="empty">Noch zu wenige Einträge für einen Trend (mind. 2 Fahrten mit Verbrauch).</div>';
+  } else {
+    const W = 320, H = 110, PAD = 26;
+    const vMin = Math.min(...pts.map(p => p.v));
+    const vMax = Math.max(...pts.map(p => p.v));
+    const span = (vMax - vMin) || 1;
+    const x = (i) => PAD + (i / (pts.length - 1)) * (W - 2 * PAD);
+    const y = (v) => (H - 18) - ((v - vMin) / span) * (H - 34);
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+    const dots = pts.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="2.6" fill="#B07B2E"/>').join('');
+    inner =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%; height:auto; display:block;">' +
+        '<line x1="' + PAD + '" y1="' + (H - 18) + '" x2="' + (W - PAD) + '" y2="' + (H - 18) + '" stroke="#D8CBB6" stroke-width="1"/>' +
+        '<text x="' + (PAD - 4) + '" y="' + (y(vMax) + 3) + '" text-anchor="end" font-size="8" fill="#8A8172" font-family="JetBrains Mono, monospace">' + fmtNum(vMax,1) + '</text>' +
+        '<text x="' + (PAD - 4) + '" y="' + (y(vMin) + 3) + '" text-anchor="end" font-size="8" fill="#8A8172" font-family="JetBrains Mono, monospace">' + fmtNum(vMin,1) + '</text>' +
+        '<text x="' + PAD + '" y="' + (H - 6) + '" text-anchor="start" font-size="8" fill="#8A8172" font-family="JetBrains Mono, monospace">' + fmtDateCH(pts[0].date) + '</text>' +
+        '<text x="' + (W - PAD) + '" y="' + (H - 6) + '" text-anchor="end" font-size="8" fill="#8A8172" font-family="JetBrains Mono, monospace">' + fmtDateCH(pts[pts.length - 1].date) + '</text>' +
+        '<path d="' + line + '" fill="none" stroke="#B07B2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        dots +
+      '</svg>';
+  }
+  return '<h3 style="margin:2.2rem 0 0.3rem;">Verbrauchstrend (l/h)</h3>' +
+    '<div class="hint" style="margin:0 0 0.5rem;">Tagesverbrauch je Fahrt über die Saison — steigt die Linie dauerhaft, lohnt ein Blick auf Motor und Rumpf.</div>' +
+    inner;
 }
 
 function buildComparisonBarsHtml(perYear, valueKey, maxVal, fmtFn){
@@ -5157,7 +5355,7 @@ let adminSubTab = 'parties';
 
 function renderAdminPanel(){
   const card = document.getElementById('adminCard');
-  const isReadOnlySubtab = !isAdminUser && adminSubTab !== 'costs';
+  const isReadOnlySubtab = !isAdminUser && adminSubTab !== 'costs' && adminSubTab !== 'docs';
 
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
@@ -5165,6 +5363,7 @@ function renderAdminPanel(){
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='costs'?' active':'') + '" data-subtab="costs">Fixkosten</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='docs'?' active':'') + '" data-subtab="docs">Dokumente</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
@@ -5176,6 +5375,7 @@ function renderAdminPanel(){
 
   if(adminSubTab === 'parties') renderAdminPartiesSection();
   else if(adminSubTab === 'costs') renderAdminCostsSection();
+  else if(adminSubTab === 'docs') renderAdminDocsSection();
   else if(adminSubTab === 'log') renderAdminAuditSection();
   else renderAdminGeneralSection();
 }
@@ -5269,6 +5469,246 @@ function renderAdminPartiesSection(){
   renderPriorityRule();
 }
 
+// Verkleinert ein Bild so lange (Auflösung + Qualität), bis es unter das
+// Grössenlimit fällt — grosse Handyfotos werden so automatisch passend gemacht.
+async function compressImageToLimit(file, maxBytes){
+  const steps = [ [1100, 0.7], [900, 0.6], [750, 0.5], [600, 0.45], [480, 0.4] ];
+  let out = null;
+  for(const [dim, q] of steps){
+    out = await compressImage(file, dim, q);
+    if(out.length <= maxBytes) return out;
+  }
+  return out;
+}
+
+// Editierbare Checklisten mit sinnvollen Startpunkten — der User passt sie an,
+// sobald er die realen Abläufe kennt.
+function defaultChecklists(){
+  const mk = (texts) => texts.map(t => ({ id: uid(), text: t, done: false }));
+  return {
+    slip: { title: '⛴️ Slip — Ein- & Auswassern', items: mk([
+      'Lenzstopfen eingesetzt (WICHTIG — vor dem Wasser prüfen!)',
+      'Zurrgurte erst an der Rampe lösen',
+      'Trailer-Lichtbalken abnehmen (Elektrik nicht ins Wasser)',
+      'Winde/Sicherungskette bis zuletzt eingehakt lassen',
+      'Leinen und Fender bereitlegen',
+      'Auto: Handbremse fest, ggf. Keile unterlegen',
+      'Nach dem Auswassern: Lenzstopfen ziehen, Boot abtropfen lassen'
+    ]) },
+    start: { title: '✅ Startklar-Check vor der Fahrt', items: mk([
+      'Benzinstand geprüft',
+      'Bilge kontrolliert / Lenzpumpe testen',
+      'Totmannschalter (Quickstopp) verbunden',
+      'Rettungswesten für alle an Bord',
+      'Anker, Leinen und Paddel an Bord',
+      'Wetter- und Windprognose gecheckt',
+      'Handy geladen / Notfallnummern parat',
+      'Motor kurz im Leerlauf warmlaufen lassen'
+    ]) },
+    winter: { title: '❄️ Einwintern', items: mk([
+      'Service/Konservierung mit Werft terminieren',
+      'Frischwasser- und Ballasttanks vollständig entleeren',
+      'Batterie abklemmen und über den Winter laden',
+      'Tank volltanken (verhindert Kondenswasser)',
+      'Polster raus und trocken lagern',
+      'Persenning/Abdeckung montieren',
+      'Wertsachen und Papiere aus dem Boot nehmen'
+    ]) }
+  };
+}
+
+function renderChecklistsBox(){
+  if(!state.checklists) state.checklists = defaultChecklists();
+  const lists = state.checklists;
+  return '<div class="admin-box">' +
+    '<label>📋 Checklisten</label>' +
+    '<div class="hint" style="margin-bottom:0.7rem;">Zum Abhaken vor Ort — Punkte lassen sich hinzufügen und löschen, damit ihr die Listen an eure Abläufe anpassen könnt. Haken werden geteilt gespeichert.</div>' +
+    Object.keys(lists).map(key => {
+      const l = lists[key];
+      return '<div style="margin-bottom:1.1rem;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">' +
+          '<b>' + escapeHtml(l.title) + '</b>' +
+          '<button type="button" class="del-btn" data-cl-reset="' + key + '">Haken zurücksetzen</button>' +
+        '</div>' +
+        (l.items || []).map(it =>
+          '<div style="display:flex; align-items:center; gap:0.5rem; padding:0.25rem 0;">' +
+            '<input type="checkbox" data-cl-check="' + key + ':' + it.id + '" ' + (it.done ? 'checked' : '') + ' style="flex-shrink:0;">' +
+            '<span style="flex:1; min-width:0; font-size:0.88rem;' + (it.done ? ' text-decoration:line-through; opacity:0.55;' : '') + '">' + escapeHtml(it.text) + '</span>' +
+            '<button type="button" class="del-btn" data-cl-del="' + key + ':' + it.id + '">✕</button>' +
+          '</div>'
+        ).join('') +
+        '<div style="display:flex; gap:0.4rem; margin-top:0.35rem;">' +
+          '<input type="text" data-cl-input="' + key + '" placeholder="Neuen Punkt hinzufügen …" style="flex:1; min-width:0; font-size:0.85rem; padding:0.45rem 0.6rem;">' +
+          '<button type="button" class="btn secondary" data-cl-add="' + key + '" style="flex-shrink:0; font-size:0.78rem; padding:0.45rem 0.7rem;">+</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+function wireChecklists(container){
+  container.querySelectorAll('[data-cl-check]').forEach(cb => cb.addEventListener('change', async () => {
+    const [key, itemId] = cb.dataset.clCheck.split(':');
+    const it = ((state.checklists[key] || {}).items || []).find(x => x.id === itemId);
+    if(!it) return;
+    it.done = cb.checked;
+    await saveShared();
+    refreshDocsChecklists();
+  }));
+  container.querySelectorAll('[data-cl-del]').forEach(btn => btn.addEventListener('click', async () => {
+    const [key, itemId] = btn.dataset.clDel.split(':');
+    const l = state.checklists[key];
+    if(!l) return;
+    l.items = (l.items || []).filter(x => x.id !== itemId);
+    await saveShared();
+    refreshDocsChecklists();
+  }));
+  container.querySelectorAll('[data-cl-add]').forEach(btn => btn.addEventListener('click', async () => {
+    const key = btn.dataset.clAdd;
+    const input = container.querySelector('[data-cl-input="' + key + '"]');
+    const text = (input.value || '').trim();
+    if(!text) return;
+    state.checklists[key].items.push({ id: uid(), text, done: false });
+    input.value = '';
+    await saveShared();
+    refreshDocsChecklists();
+  }));
+  container.querySelectorAll('[data-cl-reset]').forEach(btn => btn.addEventListener('click', async () => {
+    const l = state.checklists[btn.dataset.clReset];
+    if(!l) return;
+    (l.items || []).forEach(it => { it.done = false; });
+    await saveShared();
+    refreshDocsChecklists();
+  }));
+}
+
+function refreshDocsChecklists(){
+  const wrap = document.getElementById('checklistsWrap');
+  if(!wrap) return;
+  wrap.innerHTML = renderChecklistsBox();
+  wireChecklists(wrap);
+}
+
+const KNOT_GUIDE = [
+  { name: 'Palstek', use: 'Feste Schlaufe, die sich nicht zuzieht — z. B. Festmacher am Poller oder Rettungsschlaufe.', memo: '„Der Frosch kommt aus dem Teich, um den Baum, zurück in den Teich."', link: 'https://www.animatedknots.com/bowline-knot' },
+  { name: 'Kreuzknoten', use: 'Zwei gleich dicke Enden verbinden (z. B. Persenning-Bändsel).', memo: 'Rechts über links — links über rechts.', link: 'https://www.animatedknots.com/square-knot' },
+  { name: 'Webeleinstek (Mastwurf)', use: 'Fender an der Reling befestigen, Leine an Stange/Poller — der Alltagsknoten schlechthin.', memo: 'Zwei gegenläufige Schläge übereinander.', link: 'https://www.animatedknots.com/clove-hitch-knot-rope-end' },
+  { name: 'Rundtörn mit zwei halben Schlägen', use: 'Boot sicher an Ring, Poller oder Baum festmachen — hält auch unter Last und lässt sich wieder lösen.', memo: 'Einmal ganz herum, dann zweimal halb drum.', link: 'https://www.animatedknots.com/round-turn-two-half-hitches-knot' },
+  { name: 'Schotstek', use: 'Zwei ungleich dicke Leinen verbinden (z. B. Schleppleine verlängern).', memo: 'Die dünne Leine arbeitet, die dicke bildet die Bucht.', link: 'https://www.animatedknots.com/sheet-bend-knot' },
+  { name: 'Slipstek', use: 'Schnell lösbarer Knoten auf Zug — z. B. Wakeboard-/Schleppleine kurzzeitig belegen.', memo: 'Wie eine Schlaufe, die man mit einem Ruck öffnet.', link: 'https://www.animatedknots.com/slip-knot' },
+  { name: 'Klampe belegen', use: 'Festmacher korrekt an der Klampe sichern.', memo: 'Runder Törn, Kreuzschläge, Kopfschlag.', link: 'https://www.animatedknots.com/cleat-hitch-knot-dock-line' },
+  { name: 'Achtknoten', use: 'Stopperknoten am Leinenende — rutscht nicht durch Blöcke.', memo: 'Wie eine 8 legen, Ende durch.', link: 'https://www.animatedknots.com/figure-8-knot' },
+  { name: 'Stopperstek', use: 'Leine an einer anderen, belasteten Leine abstoppen (z. B. Ankerleine entlasten).', memo: 'Zwei Schläge in Zugrichtung, einer dagegen.', link: 'https://www.animatedknots.com/rolling-hitch-knot' }
+];
+
+function renderAdminDocsSection(){
+  const content = document.getElementById('adminSubContent');
+  content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Dokumentenablage</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Bootsausweis, Versicherung, Manöver-Anleitungen usw. — als Foto oder PDF (max. ca. 1.5 MB) für alle Parteien abrufbar. Hinweis: Behörden verlangen in der Regel die Originaldokumente; die Ablage dient als Nachschlagewerk und Zweitkopie.</div>' +
+      '<div class="field"><label for="docName">Bezeichnung</label><input id="docName" type="text" placeholder="z. B. Manöver-Anleitung, Bootsausweis"></div>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:0.8rem;">' +
+        '<button type="button" class="btn secondary" id="docPhotoBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📷 Foto hinzufügen</button>' +
+        '<button type="button" class="btn secondary" id="docPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📄 PDF hinzufügen</button>' +
+      '</div>' +
+      '<div class="hint" id="docFeedback" style="margin:0 0 0.5rem;"></div>' +
+      '<div id="docList"></div>' +
+    '</div>' +
+    '<div id="checklistsWrap"></div>' +
+    '<div class="admin-box">' +
+      '<label>🪢 Knoten-Guide</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Die wichtigsten Knoten fürs Boot — mit Link zur Schritt-für-Schritt-Animation.</div>' +
+      KNOT_GUIDE.map(k =>
+        '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">' +
+          '<b>' + k.name + '</b>' +
+          '<div class="hint" style="margin:0;">' + k.use + '</div>' +
+          '<div class="hint" style="margin:0; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
+          '<a href="' + k.link + '" target="_blank" rel="noopener" style="font-size:0.78rem;">▶ Animation ansehen</a>' +
+        '</div>'
+      ).join('') +
+    '</div>';
+
+  refreshDocsChecklists();
+  const feedback = document.getElementById('docFeedback');
+  function renderDocList(){
+    const listEl = document.getElementById('docList');
+    const docs = (state.documents || []).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+    if(!docs.length){ listEl.innerHTML = '<div class="empty">Noch keine Dokumente abgelegt.</div>'; return; }
+    listEl.innerHTML = docs.map(d => {
+      const canDelete = isAdminUser || d.uploadedBy === (session.partyId || 'admin');
+      const sizeKb = d.size ? Math.round(d.size / 1024) + ' KB' : '';
+      return '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.25rem;">' +
+        '<div style="display:flex; justify-content:space-between; width:100%; gap:0.5rem;"><b style="min-width:0; overflow-wrap:anywhere;">' + (d.kind === 'pdf' ? '📄 ' : '🖼️ ') + escapeHtml(d.name) + '</b><span class="hint" style="margin:0; flex-shrink:0;">' + sizeKb + '</span></div>' +
+        '<div class="hint" style="margin:0;">' + fmtChatTs(d.ts) + '</div>' +
+        (d.kind === 'image' ? '<img src="' + d.data + '" data-lightbox-src="1" style="max-width:110px; border-radius:8px; border:1px solid var(--bronze-line); cursor:pointer;">' : '') +
+        '<div style="display:flex; gap:0.6rem;">' +
+          (d.kind === 'pdf' ? '<button class="del-btn" data-doc-open="' + d.id + '">öffnen</button>' : '') +
+          (canDelete ? '<button class="del-btn" data-doc-del="' + d.id + '">löschen</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+    listEl.querySelectorAll('[data-doc-open]').forEach(btn => btn.addEventListener('click', () => {
+      const d = (state.documents || []).find(x => x.id === btn.dataset.docOpen);
+      if(!d) return;
+      try{
+        const parts = d.data.split(',');
+        const bin = atob(parts[1]);
+        const bytes = new Uint8Array(bin.length);
+        for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        window.open(URL.createObjectURL(blob), '_blank');
+      } catch(e){ alert('PDF konnte nicht geöffnet werden.'); }
+    }));
+    listEl.querySelectorAll('[data-doc-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const d = (state.documents || []).find(x => x.id === btn.dataset.docDel);
+      if(!d) return;
+      if(!confirm('Dokument "' + d.name + '" für alle löschen?')) return;
+      state.documents = (state.documents || []).filter(x => x.id !== d.id);
+      logAudit('Dokument gelöscht: ' + d.name);
+      await saveShared();
+      renderDocList();
+    }));
+  }
+  renderDocList();
+
+  async function addDocument(kind, dataUrl, size, fallbackName){
+    const nameInput = document.getElementById('docName');
+    const name = nameInput.value.trim() || fallbackName;
+    if(!state.documents) state.documents = [];
+    state.documents.push({ id: uid(), name, kind, data: dataUrl, size: size || dataUrl.length, ts: Date.now(), uploadedBy: session.partyId || 'admin' });
+    logAudit('Dokument abgelegt: ' + name);
+    await saveShared();
+    nameInput.value = '';
+    feedback.textContent = '✅ „' + name + '" abgelegt.';
+    setTimeout(() => { feedback.textContent = ''; }, 3000);
+    renderDocList();
+  }
+  document.getElementById('docPhotoBtn').addEventListener('click', () => openImagePicker(false, async (file) => {
+    try{
+      const dataUrl = await compressImageToLimit(file, 900000);
+      await addDocument('image', dataUrl, dataUrl.length, file.name || 'Foto');
+    } catch(e){ feedback.textContent = 'Foto konnte nicht gelesen werden.'; }
+  }));
+  document.getElementById('docPdfBtn').addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,.pdf';
+    input.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      setTimeout(() => input.remove(), 500);
+      if(!file) return;
+      if(file.size > 1500000){ feedback.textContent = 'PDF zu gross (max. ca. 1.5 MB) — Tipp: grosse PDFs besser im GitHub-Ordner neben der App ablegen und hier nur verlinken.'; return; }
+      const r = new FileReader();
+      r.onload = async () => { await addDocument('pdf', r.result, file.size, file.name || 'PDF'); };
+      r.readAsDataURL(file);
+    }, { once: true });
+    input.click();
+  });
+}
+
 function renderAdminCostsSection(){
   const content = document.getElementById('adminSubContent');
   content.innerHTML =
@@ -5286,6 +5726,13 @@ function renderAdminCostsSection(){
         '<div class="field"><label for="acDate">Datum&nbsp;*</label><input id="acDate" type="date"><div class="gate-error" id="err-ac-date">Bitte ein Datum angeben.</div></div>' +
       '</div>' +
       '<div class="field"><label>Wer hat bezahlt / vorgeschossen?&nbsp;*</label><div id="acPayerCheckboxes" class="checkbox-list"></div><div id="acPaidSplitArea" style="margin-top:0.6rem;"></div><div class="gate-error" id="err-ac-payer">Bitte mindestens eine zahlende Partei wählen.</div></div>' +
+      '<div class="field"><label>Beleg (optional)</label>' +
+        '<div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">' +
+          '<button type="button" class="btn secondary" id="acPhotoBtn" style="font-size:0.78rem; padding:0.5rem 0.7rem;">📎 Beleg anhängen</button>' +
+          '<span id="acPhotoStatus" class="hint" style="margin:0;"></span>' +
+        '</div>' +
+        '<img id="acPhotoPreview" style="display:none; max-width:120px; border-radius:8px; margin-top:0.4rem; border:1px solid var(--bronze-line);">' +
+      '</div>' +
       '<button class="btn" id="addAnnualCostBtn">Kostenposten hinzufügen</button>' +
       '<div class="gate-error" id="acFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
@@ -5302,6 +5749,14 @@ function renderAdminGeneralSection(){
   const content = document.getElementById('adminSubContent');
   const storedBootKey = getStoredBootKey();
   content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>Datensicherung</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Lädt den kompletten Datenbestand (Einträge, Parteien, Einstellungen, Chat, Dokumente …) als JSON-Datei herunter — als Sicherheitskopie oder um versehentliche Löschungen rückgängig zu machen.</div>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">' +
+        '<button type="button" class="btn secondary" id="backupDownloadBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">💾 Backup laden</button>' +
+        '<button type="button" class="btn secondary" id="backupRestoreBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📤 Wiederherstellen</button>' +
+      '</div>' +
+    '</div>' +
     '<div class="admin-box">' +
       '<label>Bootsschlüssel</label>' +
       '<div class="hint" style="margin-bottom:0.7rem;">Der gemeinsame Schlüssel, der die Daten in der Datenbank schützt. Jede Partei gibt ihn einmalig auf ihrem Gerät ein. Hier kannst du ihn anzeigen, falls du ihn jemandem erneut mitteilen musst.</div>' +
@@ -5521,6 +5976,50 @@ function renderAdminGeneralSection(){
     await saveShared();
     fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wurde zurückgesetzt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
     renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
+  });
+
+  document.getElementById('backupDownloadBtn').addEventListener('click', () => {
+    const json = JSON.stringify(buildSharedPayload(), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'wakelog-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    logAudit('Backup heruntergeladen');
+    saveShared();
+  });
+  document.getElementById('backupRestoreBtn').addEventListener('click', () => {
+    if(!isAdminUser) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      setTimeout(() => input.remove(), 500);
+      if(!file) return;
+      const r = new FileReader();
+      r.onload = async () => {
+        let data = null;
+        try{ data = JSON.parse(r.result); } catch(e){}
+        if(!data || !data.parties || !data.settings){
+          alert('Diese Datei ist kein gültiges WakeLog-Backup.');
+          return;
+        }
+        if(!confirm('ACHTUNG: Der aktuelle Datenbestand wird für ALLE Parteien vollständig durch das Backup ersetzt. Fortfahren?')) return;
+        state = data;
+        if(!state.auditLog) state.auditLog = [];
+        state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Backup wiederhergestellt (' + file.name + ')' });
+        await saveShared();
+        alert('Backup wiederhergestellt — die App lädt jetzt neu.');
+        location.reload();
+      };
+      r.readAsText(file);
+    }, { once: true });
+    input.click();
   });
 
   const bootKeyRevealBtn = document.getElementById('bootKeyRevealBtn');
@@ -5865,6 +6364,17 @@ function setupAnnualCostUI(){
     if(document.getElementById('acDate').value) document.getElementById('err-ac-date').classList.remove('show');
   });
 
+  let acPendingPhoto = null;
+  document.getElementById('acPhotoBtn').addEventListener('click', () => openImagePicker(false, async (file) => {
+    try{
+      acPendingPhoto = await compressImageToLimit(file, 700000);
+      const prev = document.getElementById('acPhotoPreview');
+      prev.src = acPendingPhoto; prev.style.display = 'block';
+      document.getElementById('acPhotoStatus').textContent = 'Beleg angehängt.';
+    } catch(e){
+      document.getElementById('acPhotoStatus').textContent = 'Beleg konnte nicht gelesen werden.';
+    }
+  }));
   document.getElementById('addAnnualCostBtn').addEventListener('click', async () => {
     clearAcErrors();
     let hasError = false;
@@ -5927,7 +6437,12 @@ function setupAnnualCostUI(){
       editingAcId = null;
       document.getElementById('addAnnualCostBtn').textContent = 'Kostenposten hinzufügen';
     } else {
-      state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, createdAt: Date.now() });
+      state.annualCosts[year].push({ id: uid(), type, description: desc, amount, date, paidBy, photo: acPendingPhoto || null, createdAt: Date.now() });
+      acPendingPhoto = null;
+      const acPrev = document.getElementById('acPhotoPreview');
+      if(acPrev){ acPrev.style.display = 'none'; acPrev.src = ''; }
+      const acStat = document.getElementById('acPhotoStatus');
+      if(acStat) acStat.textContent = '';
       logAudit('Fixkosten-Posten hinzugefügt: ' + type + ' (' + fmtCHF(amount) + ')');
     }
     await saveShared();
@@ -6022,6 +6537,7 @@ function annualCostItemsHtml(year, withActions){
       '<div class="hint" style="margin:0;">' + escapeHtml(c.description || '') + '</div>' +
       (c.date ? '<div class="hint" style="margin:0;">' + fmtDateCH(c.date) + '</div>' : '') +
       '<div class="hint" style="margin:0;">Bezahlt: ' + payerLabel + '</div>' +
+      (c.photo ? '<img src="' + c.photo + '" data-lightbox-src="1" style="max-width:90px; border-radius:8px; border:1px solid var(--bronze-line); cursor:pointer;" title="Beleg ansehen">' : '') +
       (canEdit ? '<div style="display:flex; gap:0.6rem;">' +
         '<button class="del-btn" data-ac-edit="' + c.id + '" data-ac-year="' + year + '">bearbeiten</button>' +
         '<button class="del-btn" data-ac-id="' + c.id + '" data-ac-year="' + year + '">löschen</button>' +
@@ -6154,8 +6670,24 @@ function startPolling(){
 
 async function init(){
   setupTabs();
+  if('serviceWorker' in navigator){
+    try{ navigator.serviceWorker.register('sw.js'); } catch(e){}
+  }
+  // 🥚 Easteregg: fünfmal aufs Logo tippen → Dosen-Jingle
+  (function(){
+    const logo = document.getElementById('heroLogo');
+    if(!logo) return;
+    let taps = 0, timer = null;
+    logo.addEventListener('click', () => {
+      taps++;
+      clearTimeout(timer);
+      timer = setTimeout(() => { taps = 0; }, 1500);
+      if(taps >= 5){ taps = 0; playCheersSound(); }
+    });
+  })();
   try{ await waitForAuth(); } catch(e){ console.error('Anmeldung fehlgeschlagen', e); }
   await resolveDataRef();
+  await trySyncPending();
   await loadShared();
   await loadSession();
   evaluateAccess();
