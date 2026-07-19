@@ -69,7 +69,7 @@ body{
   z-index:1;
   max-width:900px;
   margin:0 auto;
-  padding:calc(3vh + env(safe-area-inset-top, 0px)) 4.5% 2.5vh;
+  padding:calc(2.2vh + env(safe-area-inset-top, 0px)) 4.5% 1.5vh;
 }
 .hero-mesh{ position:absolute; inset:0; z-index:0; pointer-events:none; }
 .hero-mesh svg{ width:100%; height:100%; display:block; }
@@ -611,7 +611,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 .switch input:checked + .slider::before{ transform:translateX(18px); }
 
 @media (max-width: 560px){
-  .hero-container{ padding:calc(2.4vh + env(safe-area-inset-top, 0px)) 4.5% 2vh; }
+  .hero-container{ padding:calc(1.9vh + env(safe-area-inset-top, 0px)) 4.5% 1.2vh; }
   .hero h1{ font-size:2.1rem; }
   .scene-strip{ height:60px; }
   .wrap{ padding-bottom:4.25rem; }
@@ -626,7 +626,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
   input, select, input[type="date"]{ font-size:0.95rem; }
 }
 @media (orientation: landscape) and (max-height: 480px){
-  .hero-container{ padding:calc(1.5vh + env(safe-area-inset-top, 0px)) 4.5% 1.2vh; }
+  .hero-container{ padding:calc(1.2vh + env(safe-area-inset-top, 0px)) 4.5% 0.8vh; }
   .hero h1{ font-size:1.6rem; }
   .hero p{ display:none; }
   .scene-strip{ height:44px; }
@@ -725,7 +725,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <img src="header-logo.png" alt="WakeLog Logo" id="heroLogo" style="width:56px; height:56px; flex-shrink:0; cursor:pointer;">
           <div>
             <h1>WakeLog</h1>
-            <div class="sub">Fahrten, Tanken &amp; Kostenausgleich</div>
+            <div class="sub">Das Cockpit eurer Bootsgemeinschaft</div>
           </div>
         </div>
       </div>
@@ -743,9 +743,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         <div class="nav-indicator" id="navIndicator"></div>
         <button class="tab" data-tab="calendar">Kalender</button>
         <button class="tab active" data-tab="log">Logbuch</button>
-        <button class="tab" data-tab="adjustment">Ausgleich</button>
         <button class="tab" data-tab="settlement">Abrechnung</button>
-        <button class="tab" data-tab="docs">Dok</button>
+        <button class="tab" data-tab="docs">Dokumente</button>
         <button class="tab" data-tab="admin">Verwaltung</button>
       </div>
     </div>
@@ -870,7 +869,41 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       </div>
     </div>
 
-    <div class="panel" id="panel-adjustment">
+    <div class="panel" id="panel-settlement">
+      <div class="card" style="padding:0.9rem 1rem;">
+        <div class="admin-subnav" style="margin:0;">
+          <button type="button" class="admin-subtab-btn active" data-settletab="ausgleich">Ausgleich</button>
+          <button type="button" class="admin-subtab-btn" data-settletab="abrechnung">Jahresabrechnung</button>
+          <button type="button" class="admin-subtab-btn" data-settletab="vergleich">Jahresvergleich</button>
+        </div>
+      </div>
+      <div id="settleWrap-abrechnung" style="display:none;">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
+          <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
+          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
+            <button class="btn secondary" id="exportPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
+          </div>
+        </div>
+        <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
+        <div id="settlementContent"></div>
+      </div>
+      </div>
+      <div id="settleWrap-vergleich" style="display:none;">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:nowrap;">
+          <h2 style="margin:0; white-space:nowrap;">Jahresvergleich</h2>
+          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
+            <button class="btn secondary" id="exportComparisonPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
+            <button class="btn secondary" id="exportComparisonCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
+          </div>
+        </div>
+        <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
+        <div id="yearComparisonChart"></div>
+      </div>
+      </div>
+      <div id="settleWrap-ausgleich">
       <div class="card">
         <h2>Ausgleichszahlung erfassen</h2>
         <div class="hint" style="margin-bottom:0.9rem;">Wenn ihr zwischendurch schon eine Ausgleichszahlung gemacht habt (z. B. weil eine Partei stark im Rückstand war), trag sie hier ein — sie wird sofort in den Saldo in der Abrechnung eingerechnet.</div>
@@ -902,30 +935,6 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
         </div>
         <div class="gate-error" id="qrFeedback" style="color:#1C9A64;"></div>
       </div>
-    </div>
-
-    <div class="panel" id="panel-settlement">
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:1.1rem; flex-wrap:nowrap;">
-          <h2 style="margin:0; white-space:nowrap;">Jahresabrechnung</h2>
-          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
-            <button class="btn secondary" id="exportPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
-            <button class="btn secondary" id="exportCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
-          </div>
-        </div>
-        <div class="year-select"><label>Jahr</label><select id="settlementYear"></select></div>
-        <div id="settlementContent"></div>
-      </div>
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; margin-bottom:0.6rem; flex-wrap:nowrap;">
-          <h2 style="margin:0; white-space:nowrap;">Jahresvergleich</h2>
-          <div style="display:flex; gap:0.4rem; flex-shrink:0;">
-            <button class="btn secondary" id="exportComparisonPdfBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>
-            <button class="btn secondary" id="exportComparisonCsvBtn" style="white-space:nowrap; font-size:0.76rem; padding:0.5rem 0.7rem;">📊 CSV</button>
-          </div>
-        </div>
-        <div class="hint" style="margin-bottom:0.9rem;">Kosten und Motorstunden im Überblick über alle Jahre.</div>
-        <div id="yearComparisonChart"></div>
       </div>
     </div>
 
@@ -1300,7 +1309,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-4';
+const APP_VERSION = '2026-07-19-5';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1435,6 +1444,7 @@ async function loadShared(){
       state.documents = loaded.documents || [];
       state.reservations = loaded.reservations || {};
       state.checklists = loaded.checklists || null;
+      state.maneuvers = loaded.maneuvers || null;
     } else {
       state = defaultData();
     }
@@ -1465,7 +1475,7 @@ async function loadShared(){
 }
 
 function buildSharedPayload(){
-  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
+  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
 }
 
 async function saveShared(){
@@ -1521,6 +1531,7 @@ function subscribeRealtime(){
       } catch(e){}
       state.reservations = newReservations;
       state.checklists = loaded.checklists || null;
+      state.maneuvers = loaded.maneuvers || null;
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
       notifyNewRequests(state.priorityRequests || {}, newRequests);
@@ -1681,7 +1692,7 @@ function updateHeaderMeta(){
       badgeHtml +
       '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Abmelden</button>' +
     '</div>' +
-    '<div style="width:100%; text-align:center; font-family:\'JetBrains Mono\', monospace; font-size:0.62rem; font-style:italic; color:rgba(255,255,255,0.5); margin-top:1.5rem; margin-bottom:-0.6rem;">„' + sailorQuoteOfTheDay() + '"</div>';
+    '<div style="width:100%; text-align:center; font-family:\'JetBrains Mono\', monospace; font-size:0.62rem; font-style:italic; color:rgba(255,255,255,0.5); margin-top:0.9rem; margin-bottom:-0.4rem;">„' + sailorQuoteOfTheDay() + '"</div>';
     renderLiveWeatherWidgetCache();
   }
   updateAppBadge();
@@ -5683,12 +5694,10 @@ function renderChecklistsBox(){
   // Alte, längere Titel auf die kompakten einzeiligen Varianten migrieren
   if(lists.slip && lists.slip.title === '⛴️ Slip — Ein- & Auswassern') lists.slip.title = '⛴️ Ein- & Auswassern';
   if(lists.start && lists.start.title === '✅ Startklar-Check vor der Fahrt') lists.start.title = '✅ Startklar-Check';
-  return '<div class="admin-box">' +
-    '<label>📋 Checklisten</label>' +
-    '<div class="hint" style="margin-bottom:0.7rem;">Zum Abhaken vor Ort — Punkte lassen sich hinzufügen und löschen, damit ihr die Listen an eure Abläufe anpassen könnt. Haken werden geteilt gespeichert.</div>' +
+  return '<div class="hint" style="margin:0 0 0.6rem;">Zum Abhaken vor Ort — Punkte lassen sich hinzufügen und löschen. Haken werden geteilt gespeichert.</div>' +
     Object.keys(lists).map(key => {
       const l = lists[key];
-      return '<div style="margin-bottom:1.9rem;">' +
+      return '<div class="admin-box">' +
         '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">' +
           '<b style="min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(l.title) + '</b>' +
           '<button type="button" class="del-btn" data-cl-reset="' + key + '">Haken zurücksetzen</button>' +
@@ -5705,8 +5714,7 @@ function renderChecklistsBox(){
           '<button type="button" class="btn secondary" data-cl-add="' + key + '" style="flex-shrink:0; font-size:0.78rem; padding:0.45rem 0.7rem;">+</button>' +
         '</div>' +
       '</div>';
-    }).join('') +
-  '</div>';
+    }).join('');
 }
 
 function wireChecklists(container){
@@ -5853,35 +5861,117 @@ const MANEUVER_GUIDE = [
 
 ];
 
+function getManeuvers(){
+  return (state.maneuvers && state.maneuvers.length) ? state.maneuvers : MANEUVER_GUIDE;
+}
+
 function maneuversBoxHtml(){
-  return '<div class="admin-box">' +
-    '<label>🚤 Manöver-Guide</label>' +
-    '<div class="hint" style="margin-bottom:0.7rem;">Deine Notizen aus den Fahrstunden — pro Manöver antippen zum Aufklappen.</div>' +
-    MANEUVER_GUIDE.map(m =>
-      '<details style="margin-bottom:1.1rem; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.55rem 0.7rem; background:var(--foam);">' +
-        '<summary style="font-weight:700; cursor:pointer; font-size:0.9rem;">' + m.title + '</summary>' +
-        '<ol style="margin:0.6rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' +
-          m.steps.map(st => '<li>' + st + '</li>').join('') +
-        '</ol>' +
-        (m.extra ? '<div style="margin-top:0.5rem;"><b style="font-size:0.85rem;">' + m.extra.label + ':</b><ul style="margin:0.3rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' + m.extra.items.map(it => '<li>' + it + '</li>').join('') + '</ul></div>' : '') +
-      '</details>'
-    ).join('') +
-  '</div>';
+  return '<div style="display:flex; justify-content:flex-end; margin-bottom:0.6rem;">' +
+      '<button type="button" class="btn secondary" id="exportManeuversPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+    '</div>' +
+    getManeuvers().map((m, idx) =>
+      '<div class="admin-box" style="padding-bottom:0.6rem;">' +
+        '<details>' +
+          '<summary style="font-weight:700; cursor:pointer; font-size:0.9rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem;"><span style="min-width:0;">' + m.title + '</span>' + (isAdminUser ? '<span data-man-edit="' + idx + '" style="cursor:pointer; flex-shrink:0; display:inline-block; transform:scaleX(-1);" title="Bearbeiten">✏️</span>' : '') + '</summary>' +
+          '<ol style="margin:0.6rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' +
+            (m.steps || []).map(st => '<li>' + st + '</li>').join('') +
+          '</ol>' +
+          (m.extra && m.extra.items && m.extra.items.length ? '<div style="margin-top:0.5rem;"><b style="font-size:0.85rem;">' + m.extra.label + ':</b><ul style="margin:0.3rem 0 0.2rem; padding-left:1.2rem; font-size:0.86rem; display:flex; flex-direction:column; gap:0.35rem;">' + m.extra.items.map(it => '<li>' + it + '</li>').join('') + '</ul></div>' : '') +
+        '</details>' +
+      '</div>'
+    ).join('');
+}
+
+// Admin darf Manöver korrigieren; ab der ersten Änderung liegt die Liste in der DB
+function editManeuver(idx){
+  if(!isAdminUser) return;
+  const list = getManeuvers();
+  const m = list[idx];
+  if(!m) return;
+  const ov = document.createElement('div');
+  ov.className = 'gate-overlay';
+  ov.style.display = 'flex';
+  ov.style.zIndex = '9999';
+  ov.innerHTML =
+    '<div class="gate-card" style="max-width:480px; max-height:92vh; overflow-y:auto; -webkit-overflow-scrolling:touch;">' +
+      '<button type="button" class="modal-x" id="manEditCloseBtn" title="Schliessen">✕</button>' +
+      '<h2>Manöver bearbeiten</h2>' +
+      '<div class="field"><label for="manEditTitle">Titel</label><input id="manEditTitle" type="text"></div>' +
+      '<div class="field"><label for="manEditSteps">Schritte (eine Zeile = ein Schritt)</label><textarea id="manEditSteps" rows="10" style="width:100%; box-sizing:border-box; font-family:\'Inter\', sans-serif; font-size:0.85rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink);"></textarea></div>' +
+      (m.extra ? '<div class="field"><label for="manEditExtra">' + escapeHtml(m.extra.label) + ' (eine Zeile = ein Punkt)</label><textarea id="manEditExtra" rows="4" style="width:100%; box-sizing:border-box; font-family:\'Inter\', sans-serif; font-size:0.85rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink);"></textarea></div>' : '') +
+      '<button type="button" class="btn" id="manEditSaveBtn" style="width:100%; margin-top:0.4rem;">Speichern</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#manEditTitle').value = m.title;
+  ov.querySelector('#manEditSteps').value = (m.steps || []).join('\n');
+  if(m.extra) ov.querySelector('#manEditExtra').value = (m.extra.items || []).join('\n');
+  ov.querySelector('#manEditCloseBtn').addEventListener('click', () => ov.remove());
+  ov.querySelector('#manEditSaveBtn').addEventListener('click', async () => {
+    if(!state.maneuvers || !state.maneuvers.length){
+      state.maneuvers = JSON.parse(JSON.stringify(MANEUVER_GUIDE));
+    }
+    const target = state.maneuvers[idx];
+    target.title = ov.querySelector('#manEditTitle').value.trim() || target.title;
+    target.steps = ov.querySelector('#manEditSteps').value.split('\n').map(x => x.trim()).filter(Boolean);
+    if(target.extra){
+      target.extra.items = ov.querySelector('#manEditExtra').value.split('\n').map(x => x.trim()).filter(Boolean);
+    }
+    logAudit('Manöver bearbeitet: ' + target.title);
+    ov.remove();
+    await saveShared();
+    renderDocsTab();
+  });
+}
+
+function exportManeuversPdf(){
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Manöver-Guide</div></div>' +
+    '</div>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  getManeuvers().forEach(m => {
+    html += '<h3 style="margin:1.1rem 0 0.3rem;">' + m.title + '</h3>';
+    html += '<ol style="margin:0 0 0.4rem; padding-left:1.3rem;">' + (m.steps || []).map(st => '<li>' + st + '</li>').join('') + '</ol>';
+    if(m.extra && m.extra.items && m.extra.items.length){
+      html += '<b>' + escapeHtml(m.extra.label) + ':</b><ul style="margin:0.2rem 0 0.4rem; padding-left:1.3rem;">' + m.extra.items.map(it => '<li>' + it + '</li>').join('') + '</ul>';
+    }
+  });
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
+}
+
+function exportKnotsPdf(){
+  const printArea = document.getElementById('printArea');
+  if(!printArea) return;
+  let html = '<div class="print-header">' +
+      '<img src="header-logo.png" alt="WakeLog" class="print-logo">' +
+      '<div><h1>WakeLog</h1><div class="print-subtitle">Knoten-Guide</div></div>' +
+    '</div>' +
+    '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
+  KNOT_GUIDE.forEach(k => {
+    html += '<h3 style="margin:1.1rem 0 0.2rem;">' + k.name + '</h3>' +
+      '<div>' + k.use + '</div>' +
+      '<div style="font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
+      '<div style="font-size:0.85em; color:#555;">Animation: ' + k.link + '</div>';
+  });
+  printArea.innerHTML = html;
+  setTimeout(() => { window.print(); }, 100);
 }
 
 function knotsBoxHtml(){
-  return '<div class="admin-box">' +
-    '<label>🪢 Knoten-Guide</label>' +
-    '<div class="hint" style="margin-bottom:0.7rem;">Die wichtigsten Knoten fürs Boot — mit Link zur Schritt-für-Schritt-Animation.</div>' +
+  return '<div style="display:flex; justify-content:flex-end; margin-bottom:0.6rem;">' +
+      '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
+    '</div>' +
     KNOT_GUIDE.map(k =>
-      '<div class="party-row" style="flex-direction:column; align-items:flex-start; gap:0.25rem; margin-bottom:0.9rem;">' +
-        '<b style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + k.name + '</b>' +
-        '<div class="hint" style="margin:0;">' + k.use + '</div>' +
-        '<div class="hint" style="margin:0; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
+      '<div class="admin-box">' +
+        '<label style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + k.name + '</label>' +
+        '<div class="hint" style="margin:0 0 0.3rem;">' + k.use + '</div>' +
+        '<div class="hint" style="margin:0 0 0.3rem; font-style:italic;">Merkhilfe: ' + k.memo + '</div>' +
         '<a href="' + k.link + '" target="_blank" rel="noopener" style="font-size:0.78rem;">▶ Animation ansehen</a>' +
       '</div>'
-    ).join('') +
-  '</div>';
+    ).join('');
 }
 
 function renderDocsTab(){
@@ -5889,8 +5979,8 @@ function renderDocsTab(){
   if(!card) return;
   card.innerHTML =
     '<h2>Dokumente</h2>' +
-    '<div class="admin-subtabs">' +
-      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Bootsdok.</button>' +
+    '<div class="admin-subnav">' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Bootsdokumente</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='checklists'?' active':'') + '" data-docstab="checklists">Checklisten</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='knots'?' active':'') + '" data-docstab="knots">Knoten</button>' +
@@ -5908,10 +5998,19 @@ function renderDocsTab(){
   }
   if(docsSubTab === 'knots'){
     content.innerHTML = knotsBoxHtml();
+    const kBtn = document.getElementById('exportKnotsPdfBtn');
+    if(kBtn) kBtn.addEventListener('click', exportKnotsPdf);
     return;
   }
   if(docsSubTab === 'manoever'){
     content.innerHTML = maneuversBoxHtml() + '<div id="manoeverFilesWrap"></div>';
+    const mBtn = document.getElementById('exportManeuversPdfBtn');
+    if(mBtn) mBtn.addEventListener('click', exportManeuversPdf);
+    content.querySelectorAll('[data-man-edit]').forEach(el => el.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      editManeuver(parseInt(el.dataset.manEdit, 10));
+    }));
     renderDocFilesSection(document.getElementById('manoeverFilesWrap'), 'manoever');
     return;
   }
@@ -5926,7 +6025,7 @@ function renderDocFilesSection(content, category){
       '<div class="hint" style="margin-bottom:0.7rem;">' + (isMan
         ? 'Deine Notizen und Anleitungen für Manöver — Anlegen, Ablegen, Parken, Mann über Bord, Boot startklar machen … Als Foto oder PDF (max. ca. 1.5 MB), für alle Parteien abrufbar.'
         : 'Bootsausweis, Versicherung, Führerausweise usw. — als Foto oder PDF (max. ca. 1.5 MB) für alle Parteien abrufbar. Hinweis: Behörden verlangen in der Regel die Originaldokumente; die Ablage dient als Nachschlagewerk und Zweitkopie.') + '</div>' +
-      '<div class="field"><label for="docName">Bezeichnung</label><input id="docName" type="text" placeholder="z. B. Manöver-Anleitung, Bootsausweis"></div>' +
+      '<div class="field"><label for="docName">Bezeichnung</label><input id="docName" type="text" placeholder="z. B. Bootsausweis"></div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:0.8rem;">' +
         '<button type="button" class="btn secondary" id="docPhotoBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📷 Foto hinzufügen</button>' +
         '<button type="button" class="btn secondary" id="docPdfBtn" style="font-size:0.76rem; padding:0.5rem 0.4rem; width:100%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📄 PDF hinzufügen</button>' +
@@ -6881,8 +6980,26 @@ function startPolling(){
   subscribeRealtime();
 }
 
+let settlementSubTab = 'ausgleich';
+function wireSettlementSubnav(){
+  const btns = document.querySelectorAll('[data-settletab]');
+  function apply(){
+    btns.forEach(b => b.classList.toggle('active', b.dataset.settletab === settlementSubTab));
+    ['ausgleich','abrechnung','vergleich'].forEach(k => {
+      const w = document.getElementById('settleWrap-' + k);
+      if(w) w.style.display = (k === settlementSubTab) ? '' : 'none';
+    });
+    if(settlementSubTab === 'abrechnung'){
+      requestAnimationFrame(() => fitStampAmounts(document));
+    }
+  }
+  btns.forEach(b => b.addEventListener('click', () => { settlementSubTab = b.dataset.settletab; apply(); }));
+  apply();
+}
+
 async function init(){
   setupTabs();
+  wireSettlementSubnav();
   if('serviceWorker' in navigator){
     try{ navigator.serviceWorker.register('sw.js'); } catch(e){}
   }
