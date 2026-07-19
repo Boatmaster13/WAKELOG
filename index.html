@@ -1324,7 +1324,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-16';
+const APP_VERSION = '2026-07-19-17';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -6033,7 +6033,7 @@ function exportKnotsPdf(){
     '</div>' +
     '<div class="print-meta">Erstellt am ' + new Date().toLocaleDateString('de-CH') + '</div>';
   html += '<div style="font-size:0.95em; line-height:1.32;">';
-  KNOT_GUIDE.forEach(k => {
+  getKnotsSorted().forEach(k => {
     html += '<div style="page-break-inside:avoid; break-inside:avoid;">' +
       '<h3 style="margin:0.62rem 0 0.12rem; font-size:1.05em;">' + k.name + '</h3>' +
       '<div>' + k.use + '</div>' +
@@ -6046,12 +6046,16 @@ function exportKnotsPdf(){
   setTimeout(() => { window.print(); }, 100);
 }
 
+function getKnotsSorted(){
+  return KNOT_GUIDE.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
 function knotsBoxHtml(){
   return '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
       '<h3 style="margin:0; white-space:nowrap;">🪢 Knoten-Guide</h3>' +
       '<button type="button" class="btn secondary" id="exportKnotsPdfBtn" style="flex-shrink:0; font-size:0.76rem; padding:0.5rem 0.7rem;">📄 PDF</button>' +
     '</div>' +
-    KNOT_GUIDE.map(k => {
+    getKnotsSorted().map(k => {
       const photo = (state.knotPhotos || {})[k.name];
       return '<div class="admin-box">' +
         '<div style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.35rem;">' +
