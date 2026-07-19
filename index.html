@@ -407,14 +407,9 @@ input:disabled, select:disabled{
 .settings-group > summary::-webkit-details-marker{ display:none; }
 .settings-group > summary::after{ content:'▾'; font-size:0.8rem; opacity:0.55; transition:transform 0.15s; }
 .settings-group[open] > summary::after{ transform:rotate(180deg); }
-.settings-group > .settings-group-body{ padding:0.2rem 0.7rem 0.6rem; }
-.settings-group .admin-box{ border:none; padding-left:0; padding-right:0; margin-bottom:0.4rem; }
-.rule-toggle{ position:relative; width:42px; height:23px; flex-shrink:0; display:inline-block; }
-.rule-toggle input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; z-index:1; }
-.rule-toggle .track{ position:absolute; inset:0; background:#C6BBA8; border-radius:12px; transition:background 0.15s; }
-.rule-toggle input:checked ~ .track{ background:#1C9A64; }
-.rule-toggle .track::after{ content:''; position:absolute; top:2px; left:2px; width:19px; height:19px; background:#fff; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,0.3); transition:left 0.15s; }
-.rule-toggle input:checked ~ .track::after{ left:21px; }
+.settings-group > .settings-group-body{ padding:0.1rem 0.7rem 0.7rem; }
+.settings-group .admin-box{ margin-bottom:0.7rem; }
+
 .party-code-actions{ display:flex; gap:0.25rem; flex-wrap:nowrap; }
 .icon-btn{
   font-family:'Inter', sans-serif; font-size:0.76rem; font-weight:600;
@@ -886,9 +881,9 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card" style="padding:0.9rem 1rem;">
         <div class="admin-subnav" style="margin:0;">
           <button type="button" class="admin-subtab-btn active" data-settletab="abrechnung">Abrechnung</button>
-          <button type="button" class="admin-subtab-btn" data-settletab="vergleich">Vergleich</button>
           <button type="button" class="admin-subtab-btn" data-settletab="ausgleich">Ausgleich</button>
           <button type="button" class="admin-subtab-btn" data-settletab="fixkosten">Fixkosten</button>
+          <button type="button" class="admin-subtab-btn" data-settletab="vergleich">Vergleich</button>
         </div>
       </div>
       <div id="settleWrap-abrechnung" style="display:none;">
@@ -1329,7 +1324,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-15';
+const APP_VERSION = '2026-07-19-16';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -5493,7 +5488,7 @@ function renderAdminPanel(){
     (isReadOnlySubtab ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
-      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Allg. Einstellungen</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
     '</div>' +
     '<div id="adminSubContent" class="' + (isReadOnlySubtab ? 'admin-readonly' : '') + '"></div>';
@@ -5830,7 +5825,7 @@ const KNOT_GUIDE = [
   { name: 'Stopperstek', use: 'Leine an einer anderen, belasteten Leine abstoppen (z. B. Ankerleine entlasten).', memo: 'Zwei Schläge in Zugrichtung, einer dagegen.', link: 'https://www.animatedknots.com/rolling-hitch-knot' }
 ];
 
-let docsSubTab = 'files';
+let docsSubTab = 'checklists';
 const MANEUVER_GUIDE = [
   { title: '🧷 Ablegen', steps: [
     'Vorgehen gemäss Checkliste; wenn alles i. O., Befestigungen bei eingeschaltetem Motor zuerst im Lee lösen.',
@@ -6078,10 +6073,10 @@ function renderDocsTab(){
   card.innerHTML =
     '<h2>Dokumente</h2>' +
     '<div class="admin-subnav">' +
-      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Papiere</button>' +
-      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='checklists'?' active':'') + '" data-docstab="checklists">Checklisten</button>' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='manoever'?' active':'') + '" data-docstab="manoever">Manöver</button>' +
       '<button type="button" class="admin-subtab-btn' + (docsSubTab==='knots'?' active':'') + '" data-docstab="knots">Knoten</button>' +
+      '<button type="button" class="admin-subtab-btn' + (docsSubTab==='files'?' active':'') + '" data-docstab="files">Papiere</button>' +
     '</div>' +
     '<div id="docsSubContent"></div>';
   card.querySelectorAll('[data-docstab]').forEach(btn => btn.addEventListener('click', () => {
@@ -6288,7 +6283,7 @@ function renderAdminGeneralSection(){
         '<div style="border:1px solid var(--line); border-radius:var(--radius-sm); padding:0.6rem 0.7rem; margin-bottom:0.6rem; background:var(--foam);">' +
           '<label style="display:flex; align-items:center; gap:0.55rem; margin-bottom:0.3rem; cursor:pointer;">' +
             '<span style="font-weight:700; font-size:0.88rem; color:var(--ink); min-width:0; flex:1;">' + r.title + '</span>' +
-            '<span class="rule-toggle"><input type="checkbox" data-calc-rule="' + r.key + '" ' + (calcRules[r.key] ? 'checked' : '') + '><span class="track"></span></span>' +
+            '<span class="switch"><input type="checkbox" data-calc-rule="' + r.key + '" ' + (calcRules[r.key] ? 'checked' : '') + '><span class="slider"></span></span>' +
           '</label>' +
           '<div class="hint" style="margin:0;">' + (calcRules[r.key] ? r.on : r.off) + '</div>' +
         '</div>'
