@@ -1327,7 +1327,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-24-20';
+const APP_VERSION = '2026-07-24-21';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1705,7 +1705,7 @@ function updateHeaderMeta(){
     // Bildschirmbreite verteilt; die Standortzeile bleibt zentriert unter dem Widget.
     const badgeHtml = isAdminUser
       ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Admin</span>'
-      : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;" title="Rang nach gefahrenen Motorstunden">' + escapeHtml(partyName(session.partyId)) + (captainRank(session.partyId) ? ' · ' + captainRank(session.partyId) : '') + '</span>' : '');
+      : (session.partyId ? '<span class="admin-badge" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">' + escapeHtml(partyName(session.partyId)) + '</span>' : '');
     strip.innerHTML = '<div class="admin-strip" style="justify-content:space-between; align-items:flex-start; width:100%; gap:0.3rem; margin-top:0.7rem;">' +
       '<div style="display:flex; flex-direction:column; align-items:center; gap:0.2rem;">' +
         '<div id="liveWeatherWidget"></div>' +
@@ -2286,6 +2286,7 @@ function renderCalendarDayPanel(){
         state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
         logAudit(partyName(actingId) + ' hat Vorrecht am ' + fmtDateCH(dateStr) + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
         pushNotification(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' abgegeben', null);
+        playAppSound('brueder-ich-ha-termin');
         broadcastSound('brueder-ich-ha-termin');
         justGaveUp = true;
       } else if(action === 'undo'){
@@ -2427,7 +2428,6 @@ function renderCalendarDayPanel(){
   });
   const giveUpBtn = document.getElementById('calGiveUpBtn');
   if(giveUpBtn) giveUpBtn.addEventListener('click', () => {
-    playAppSound('brueder-ich-ha-termin');
     calendarPendingAction = { type: 'giveup', dateStr, actingId: eff.partyId };
     renderCalendarDayPanel();
   });
@@ -3132,7 +3132,7 @@ async function addEntry(){
     }
   }
 
-  if(hasError){ playAppSound('sautubel'); return; }
+  if(hasError) return;
 
   if(editingId){
     const idx = state.entries.findIndex(e => e.id === editingId);
@@ -5066,7 +5066,7 @@ function setupSettlementPaymentUI(year){
       return;
     }
 
-    if(hasError){ playAppSound('sautubel'); return; }
+    if(hasError) return;
 
     const currentYear = parseInt(document.getElementById('adjustmentYear').value);
     if(!state.settlementPayments) state.settlementPayments = {};
@@ -5590,7 +5590,6 @@ function renderGate(){
     const submit = async () => {
       const code = document.getElementById('gate-code').value.trim();
       const errEl = document.getElementById('gateError');
-      if(!code){ playAppSound('sautubel'); }
       if(role === 'admin'){
         if(code && state.settings.adminCode === code){
           session = { adminCode: code, partyCode: null, partyId: null };
@@ -7049,7 +7048,7 @@ function setupAnnualCostUI(){
       paidBy = { [payerIds[0]]: 100 };
     }
 
-    if(hasError){ playAppSound('sautubel'); return; }
+    if(hasError) return;
 
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
@@ -7339,6 +7338,22 @@ async function init(){
       if(taps >= 5){ taps = 0; playAppSound('erfinder'); }
     });
   })();
+  // 😤 Sautubel bei jeder roten Fehlermeldung: Beobachter meldet, sobald irgendwo
+  // eine .gate-error-Meldung sichtbar wird. Grüne Erfolgsmeldungen (Farbe #1C9A64)
+  // nutzen dieselben Elemente und bleiben stumm.
+  const errorSoundObserver = new MutationObserver(muts => {
+    muts.forEach(m => {
+      const el = m.target;
+      if(!(el instanceof HTMLElement)) return;
+      if(!el.classList.contains('gate-error') || !el.classList.contains('show')) return;
+      if(m.oldValue && m.oldValue.indexOf('show') !== -1) return; // war schon sichtbar
+      const c = (el.style.color || '').replace(/\s/g,'').toLowerCase();
+      if(c === '#1c9a64' || c === 'rgb(28,154,100)') return; // grüne Erfolgsmeldung
+      playAppSound('sautubel');
+    });
+  });
+  errorSoundObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+
   // 🛟 Sound beim Aufklappen des Manövers "Mensch über Bord" (greift für jedes
   // <details>, dessen Titel "Mensch über Bord" enthält — auch nach Umbenennungen).
   document.addEventListener('toggle', (ev) => {
@@ -7451,6 +7466,8 @@ async function init(){
         rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
         logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
         pushNotification(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')', null);
+        playAppSound('brueder-ich-ha-termin');
+        broadcastSound('brueder-ich-ha-termin');
       } else {
         if(!state.priorityRequests) state.priorityRequests = {};
         rangePendingDates.dates.forEach(d => { state.priorityRequests[d] = { requestedBy: targetParty, createdAt: Date.now() }; });
