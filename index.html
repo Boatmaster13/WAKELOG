@@ -930,7 +930,10 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <div class="field"><label for="spDate">Datum&nbsp;*</label><input id="spDate" type="date"><div class="gate-error" id="err-sp-date">Bitte ein Datum angeben.</div></div>
         </div>
         <div id="spQrArea" style="margin-top:0.7rem;"></div>
-        <button class="btn" id="addSettlementPaymentBtn" style="margin-top:1rem;">Zahlung erfassen</button>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+          <button class="btn" id="addSettlementPaymentBtn">Zahlung erfassen</button>
+          <button class="btn secondary" id="requestMoneyBtn">💰 Geld anfordern</button>
+        </div>
         <div class="gate-error" id="err-sp-general" style="color:#1C9A64;"></div>
       </div>
       <div class="card">
@@ -1314,7 +1317,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], seasonEvents: [], serviceReminder: null };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], seasonEvents: [], serviceReminder: null };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -1324,7 +1327,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-19-18';
+const APP_VERSION = '2026-07-24-19';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1381,7 +1384,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], seasonEvents: [], serviceReminder: null };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], seasonEvents: [], serviceReminder: null };
 }
 
 let sharedLoadFailed = false;
@@ -1453,6 +1456,7 @@ async function loadShared(){
       state.partyQrCodes = loaded.partyQrCodes || {};
       state.notifications = loaded.notifications || [];
       state.chatMessages = loaded.chatMessages || [];
+      state.soundEvents = loaded.soundEvents || [];
       state.chatSeen = loaded.chatSeen || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
@@ -1491,7 +1495,7 @@ async function loadShared(){
 }
 
 function buildSharedPayload(){
-  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, knotPhotos: state.knotPhotos || {}, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
+  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, soundEvents: state.soundEvents || [], documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, knotPhotos: state.knotPhotos || {}, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
 }
 
 async function saveShared(){
@@ -1531,6 +1535,9 @@ function subscribeRealtime(){
       const newChatMessages = loaded.chatMessages || [];
       checkNewBeerCalls(state.chatMessages || [], newChatMessages);
       state.chatMessages = newChatMessages;
+      const newSoundEvents = loaded.soundEvents || [];
+      checkNewSoundEvents(newSoundEvents);
+      state.soundEvents = newSoundEvents;
       state.chatSeen = loaded.chatSeen || {};
       state.documents = loaded.documents || [];
       const newReservations = loaded.reservations || {};
@@ -1895,6 +1902,8 @@ function respondToRequest(dateStr, accept){
   } else {
     logAudit(partyName(currentHolder || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' abgelehnt');
     pushNotification(partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt', req.requestedBy);
+    playAppSound('dreamer');
+    broadcastSound('dreamer');
   }
   delete state.priorityRequests[dateStr];
 }
@@ -2276,6 +2285,7 @@ function renderCalendarDayPanel(){
         state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
         logAudit(partyName(actingId) + ' hat Vorrecht am ' + fmtDateCH(dateStr) + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
         pushNotification(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' abgegeben', null);
+        broadcastSound('brueder-ich-ha-termin');
         justGaveUp = true;
       } else if(action === 'undo'){
         if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
@@ -2416,6 +2426,7 @@ function renderCalendarDayPanel(){
   });
   const giveUpBtn = document.getElementById('calGiveUpBtn');
   if(giveUpBtn) giveUpBtn.addEventListener('click', () => {
+    playAppSound('brueder-ich-ha-termin');
     calendarPendingAction = { type: 'giveup', dateStr, actingId: eff.partyId };
     renderCalendarDayPanel();
   });
@@ -3120,7 +3131,7 @@ async function addEntry(){
     }
   }
 
-  if(hasError) return;
+  if(hasError){ playAppSound('sautubel'); return; }
 
   if(editingId){
     const idx = state.entries.findIndex(e => e.id === editingId);
@@ -3207,6 +3218,79 @@ function checkNewBeerCalls(oldMessages, newMessages){
       }
       updateHeaderMeta();
     }
+  });
+}
+
+/* ===================== App-Sounds (Jingle-Paket) ===================== */
+// Die Dateien liegen im Ordner sounds/ neben index.html.
+const APP_SOUNDS = {
+  'dreamer': 'sounds/dreamer.m4a',
+  'guets-moergeli': 'sounds/guets-moergeli.m4a',
+  'hallo-vater': 'sounds/hallo-vater.m4a',
+  'hallo-muetter': 'sounds/hallo-muetter.m4a',
+  'gib-mir-geld': 'sounds/gib-mir-geld.m4a',
+  'brueder-ich-ha-termin': 'sounds/brueder-ich-ha-termin.m4a',
+  'erfinder': 'sounds/erfinder.m4a',
+  'richi': 'sounds/richi.m4a',
+  'sautubel': 'sounds/sautubel.m4a',
+  'heb-din-schlitte': 'sounds/heb-din-schlitte.m4a'
+};
+const lastSoundPlay = {};
+const pendingSoundKeys = [];
+let soundRetryArmed = false;
+function armSoundRetry(){
+  // Autoplay vom Browser blockiert (z. B. Hintergrund-Tab): beim nächsten Tipp nachholen.
+  if(soundRetryArmed) return;
+  soundRetryArmed = true;
+  window.addEventListener('pointerdown', () => {
+    soundRetryArmed = false;
+    const keys = pendingSoundKeys.splice(0);
+    keys.forEach(k => { delete lastSoundPlay[k]; playAppSound(k); });
+  }, { once: true });
+}
+function playAppSound(key){
+  const src = APP_SOUNDS[key];
+  if(!src) return;
+  const now = Date.now();
+  if(lastSoundPlay[key] && now - lastSoundPlay[key] < 1500) return; // kein Doppel-Abspielen
+  lastSoundPlay[key] = now;
+  try{
+    const a = new Audio(src);
+    const p = a.play();
+    if(p && typeof p.then === 'function'){
+      p.catch(() => { if(!pendingSoundKeys.includes(key)) pendingSoundKeys.push(key); armSoundRetry(); });
+    }
+  } catch(e){}
+}
+// Sound-Broadcast: Ereignisse werden in state.soundEvents geteilt, damit auch die
+// Empfängergeräte den Sound abspielen. Der Aufrufer muss danach saveShared() ausführen.
+const soundClientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+function broadcastSound(key){
+  if(!APP_SOUNDS[key]) return;
+  if(!state.soundEvents) state.soundEvents = [];
+  const now = Date.now();
+  const last = state.soundEvents[state.soundEvents.length - 1];
+  if(last && last.sound === key && now - last.ts < 3000) return; // Spam-Schutz
+  state.soundEvents = state.soundEvents.filter(ev => now - ev.ts < 10 * 60 * 1000).slice(-19);
+  state.soundEvents.push({ id: 'snd' + now + Math.random().toString(36).slice(2,6), ts: now, sound: key, from: soundClientId });
+}
+const seenSoundIds = new Set();
+let soundSyncInitialized = false;
+function checkNewSoundEvents(newEvents){
+  const evts = newEvents || [];
+  if(!soundSyncInitialized){
+    // Beim ersten Laden nichts abspielen — nur merken, was es schon gibt.
+    evts.forEach(ev => { if(ev && ev.id) seenSoundIds.add(ev.id); });
+    soundSyncInitialized = true;
+    return;
+  }
+  const now = Date.now();
+  evts.forEach(ev => {
+    if(!ev || !ev.id || seenSoundIds.has(ev.id)) return;
+    seenSoundIds.add(ev.id);
+    if(ev.from === soundClientId) return;           // eigenes Echo nicht doppelt abspielen
+    if(now - (ev.ts || 0) > 2 * 60 * 1000) return;  // alte Ereignisse ignorieren
+    playAppSound(ev.sound);
   });
 }
 
@@ -3523,6 +3607,10 @@ function showChatModal(){
           otherParties.map(p => '<button type="button" class="icon-btn chat-recipient-chip" data-id="' + p.id + '">' + escapeHtml(p.name) + '</button>').join('') +
         '</div>'
       ) : '') +
+      '<div style="display:flex; gap:0.4rem; margin-bottom:0.5rem;">' +
+        '<button type="button" class="btn secondary" id="chatWaveVaterBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.8rem; padding:0.5rem 0.4rem;">🙋‍♂️ Hallo Vater</button>' +
+        '<button type="button" class="btn secondary" id="chatWaveMuetterBtn" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.8rem; padding:0.5rem 0.4rem;">🙋‍♀️ Hallo Muetter</button>' +
+      '</div>' +
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
       '<div class="field" style="margin:0 0 0.35rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
@@ -3644,7 +3732,8 @@ function showChatModal(){
 
   document.getElementById('pushToggle').addEventListener('change', (ev) => {
     setPushEnabled(ev.target.checked);
-    if(ev.target.checked) requestNotificationPermission();
+    if(ev.target.checked){ requestNotificationPermission(); }
+    else { playAppSound('heb-din-schlitte'); }
   });
   const chatClearBtn = document.getElementById('chatClearBtn');
   if(chatClearBtn) chatClearBtn.addEventListener('click', async () => {
@@ -3657,6 +3746,20 @@ function showChatModal(){
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
   });
+
+  const sendWave = async (text, soundKey) => {
+    if(!session.partyId && !isAdminUser) return;
+    if(!state.chatMessages) state.chatMessages = [];
+    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text, photo: null, voice: null, type: 'normal', toPartyIds: chatRecipientIds });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    playAppSound(soundKey);
+    broadcastSound(soundKey);
+    await saveShared();
+    renderChatMessageListInto(document.getElementById('chatMessageList'));
+    updateHeaderMeta();
+  };
+  document.getElementById('chatWaveVaterBtn').addEventListener('click', () => sendWave('🙋‍♂️ Hallo Vater!', 'hallo-vater'));
+  document.getElementById('chatWaveMuetterBtn').addEventListener('click', () => sendWave('🙋‍♀️ Hallo Muetter!', 'hallo-muetter'));
 
   document.getElementById('chatSendBtn').addEventListener('click', async () => {
     if(!session.partyId && !isAdminUser) return;
@@ -4907,6 +5010,28 @@ function setupSettlementPaymentUI(year){
     if(!document.getElementById('spDate').value) document.getElementById('err-sp-date').classList.add('show');
   });
 
+  document.getElementById('requestMoneyBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('err-sp-general');
+    const showFb = (msg, ok) => { fb.style.color = ok ? '#1C9A64' : '#C0392B'; fb.textContent = msg; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4500); };
+    if(!session.partyId){ showFb('Nur Parteien können Geld anfordern.', false); return; }
+    const year = parseInt(document.getElementById('adjustmentYear').value);
+    const { rows } = computeSettlement(year);
+    const myName = partyName(session.partyId);
+    const byName = {}; state.parties.forEach(p => { byName[p.name] = p.id; });
+    const tx = settlementTransactions(rows).filter(t => t.to === myName);
+    if(!tx.length){ showFb('Aktuell schuldet dir gemäss Abrechnung ' + year + ' niemand etwas 🎉', true); return; }
+    if(!state.chatMessages) state.chatMessages = [];
+    tx.forEach(t => {
+      const debtorId = byName[t.from] || null;
+      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(t.amount) + ' aus der Abrechnung ' + year + ' an — TWINT sei Dank 😉', photo: null, voice: null, type: 'normal', toPartyIds: debtorId ? [debtorId] : null });
+    });
+    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    playAppSound('gib-mir-geld');
+    broadcastSound('gib-mir-geld');
+    await saveShared();
+    showFb('Geld-Anforderung verschickt: ' + tx.map(t => fmtCHF(t.amount) + ' von ' + t.from).join(', '), true);
+  });
+
   document.getElementById('addSettlementPaymentBtn').addEventListener('click', async () => {
     clearSpErrors();
     let hasError = false;
@@ -4929,7 +5054,7 @@ function setupSettlementPaymentUI(year){
       return;
     }
 
-    if(hasError) return;
+    if(hasError){ playAppSound('sautubel'); return; }
 
     const currentYear = parseInt(document.getElementById('adjustmentYear').value);
     if(!state.settlementPayments) state.settlementPayments = {};
@@ -5453,6 +5578,7 @@ function renderGate(){
     const submit = async () => {
       const code = document.getElementById('gate-code').value.trim();
       const errEl = document.getElementById('gateError');
+      if(!code){ playAppSound('sautubel'); }
       if(role === 'admin'){
         if(code && state.settings.adminCode === code){
           session = { adminCode: code, partyCode: null, partyId: null };
@@ -5467,7 +5593,11 @@ function renderGate(){
           errEl.textContent = 'Zugangscode ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.'; errEl.classList.add('show'); return;
         }
       }
-      await saveSession(); evaluateAccess(); hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
+      await saveSession(); evaluateAccess();
+      playAppSound('guets-moergeli');
+      broadcastSound('guets-moergeli');
+      saveShared();
+      hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
     document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
@@ -6907,7 +7037,7 @@ function setupAnnualCostUI(){
       paidBy = { [payerIds[0]]: 100 };
     }
 
-    if(hasError) return;
+    if(hasError){ playAppSound('sautubel'); return; }
 
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
@@ -7185,7 +7315,7 @@ async function init(){
   if('serviceWorker' in navigator){
     try{ navigator.serviceWorker.register('sw.js'); } catch(e){}
   }
-  // 🥚 Easteregg: fünfmal aufs Logo tippen → Dosen-Jingle
+  // 🥚 Easteregg: fünfmal aufs Logo tippen → "Erfinder"-Jingle
   (function(){
     const logo = document.getElementById('heroLogo');
     if(!logo) return;
@@ -7194,9 +7324,19 @@ async function init(){
       taps++;
       clearTimeout(timer);
       timer = setTimeout(() => { taps = 0; }, 1500);
-      if(taps >= 5){ taps = 0; playCheersSound(); }
+      if(taps >= 5){ taps = 0; playAppSound('erfinder'); }
     });
   })();
+  // 🛟 Sound beim Aufklappen des Manövers "Mensch über Bord" (greift für jedes
+  // <details>, dessen Titel "Mensch über Bord" enthält — auch nach Umbenennungen).
+  document.addEventListener('toggle', (ev) => {
+    const d = ev.target;
+    if(d && d.tagName === 'DETAILS' && d.open){
+      const sum = d.querySelector('summary');
+      if(sum && /mensch\s+(ü|ue)ber\s+bord/i.test(sum.textContent)) playAppSound('richi');
+    }
+  }, true);
+
   try{ await waitForAuth(); } catch(e){ console.error('Anmeldung fehlgeschlagen', e); }
   await resolveDataRef();
   await trySyncPending();
