@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-32';
+const APP_VERSION = '2026-07-25-33';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3499,7 +3499,7 @@ function pickFromPool(poolName){
 const lastPoolPlay = {};
 function playRandomSound(poolName){
   const now = Date.now();
-  if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 1500) return;
+  if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 900) return;
   lastPoolPlay[poolName] = now;
   const pool = (SOUND_POOLS[poolName] || []).slice();
   for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
@@ -3524,7 +3524,7 @@ function playSoundChain(keys){
     if(p && typeof p.then === 'function'){
       p.catch(err => {
         if(err && err.name === 'NotAllowedError'){
-          if(!pendingSoundKeys.includes(key)) pendingSoundKeys.push(key);
+          queuePendingSound(key);
           armSoundRetry();
         }
       });
@@ -3545,16 +3545,22 @@ function celebrateIfRecovered(){
   return false;
 }
 const lastSoundPlay = {};
-const pendingSoundKeys = [];
+const pendingSoundKeys = []; // Einträge: { key, ts }
 let soundRetryArmed = false;
+function queuePendingSound(key){
+  if(!pendingSoundKeys.some(p => p.key === key)) pendingSoundKeys.push({ key, ts: Date.now() });
+}
 function armSoundRetry(){
-  // Autoplay vom Browser blockiert (z. B. Hintergrund-Tab): beim nächsten Tipp nachholen.
+  // Autoplay vom Browser blockiert (v. a. iOS vor dem ersten Tipp): beim nächsten Tipp
+  // nachholen — aber gezielt: nur die 2 NEUESTEN Töne, nichts Älteres als 3 Minuten.
+  // Sonst entlädt sich auf dem iPhone beim Öffnen eine ganze Jingle-Salve aufs Mal.
   if(soundRetryArmed) return;
   soundRetryArmed = true;
   window.addEventListener('pointerdown', () => {
     soundRetryArmed = false;
-    const keys = pendingSoundKeys.splice(0);
-    keys.forEach((k, i) => { setTimeout(() => { delete lastSoundPlay[k]; playAppSound(k); }, i * 2200); });
+    const now = Date.now();
+    const entries = pendingSoundKeys.splice(0).filter(p => now - p.ts < 3 * 60 * 1000).slice(-2);
+    entries.forEach((p, i) => { setTimeout(() => { delete lastSoundPlay[p.key]; playAppSound(p.key); }, i * 2200); });
   }, { once: true });
 }
 function playAppSound(key, force){
@@ -3576,7 +3582,7 @@ function playAppSound(key, force){
         p.catch(err => {
           // NotSupportedError/404 → Fallback-Pfad; sonst Autoplay-Sperre → nachholen.
           if(fallbackUrl && err && err.name === 'NotSupportedError'){ return; /* error-Event übernimmt */ }
-          if(!pendingSoundKeys.includes(key)) pendingSoundKeys.push(key);
+          queuePendingSound(key);
           armSoundRetry();
         });
       }
@@ -3628,7 +3634,7 @@ function checkNewSoundMessages(oldMsgs, newMsgs){
       try{ last = parseInt(localStorage.getItem(SND_CATCHUP_KEY) || '0', 10) || 0; } catch(e){}
       const cutoff = Math.max(last, Date.now() - 7 * 24 * 3600 * 1000);
       (newMsgs || []).filter(m => msgSoundRelevantForMe(m) && (m.ts || 0) > cutoff)
-        .slice(-4) // hoechstens die 4 neuesten nachspielen
+        .slice(-2) // hoechstens die 2 neuesten nachspielen (iPhone: keine Jingle-Salve)
         .forEach(m => queueMsgSound(m.sound));
     } else {
       const oldIds = new Set((oldMsgs || []).map(m => m && m.id));
@@ -6203,6 +6209,9 @@ function renderGate(){
     const submit = async () => {
       const code = document.getElementById('gate-code').value.trim();
       const errEl = document.getElementById('gateError');
+      // Meldung vor jeder Prüfung zurücksetzen — so löst JEDER Fehlversuch den
+      // Fehlermeldungs-Beobachter (und damit einen Jingle) aus, nicht nur der erste.
+      errEl.classList.remove('show');
       // Bei falschem (nicht leerem) Code: "Restricted Area" statt Fehler-Pool
       if(code){
         const codeKnown = (state.settings && state.settings.adminCode === code) || state.parties.some(p => p.code === code);
