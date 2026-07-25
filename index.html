@@ -1321,7 +1321,7 @@ function waitForAuth(){
   });
 }
 
-let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], seasonEvents: [], serviceReminder: null };
+let state = { parties: [], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], feedback: [], seasonEvents: [], serviceReminder: null };
 let session = { partyCode: null, partyId: null, adminCode: null };
 let isAdminUser = false;
 let accessGranted = false;
@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-30';
+const APP_VERSION = '2026-07-25-32';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1388,7 +1388,7 @@ async function verifyTotp(hexSecret, enteredCode){
 }
 
 function defaultData(){
-  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], seasonEvents: [], serviceReminder: null };
+  return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], feedback: [], seasonEvents: [], serviceReminder: null };
 }
 
 let sharedLoadFailed = false;
@@ -1461,6 +1461,7 @@ async function loadShared(){
       state.notifications = loaded.notifications || [];
       state.chatMessages = loaded.chatMessages || [];
       state.soundEvents = loaded.soundEvents || [];
+      state.feedback = loaded.feedback || [];
       state.chatSeen = loaded.chatSeen || {};
       state.seasonEvents = loaded.seasonEvents || [];
       state.serviceReminder = loaded.serviceReminder || null;
@@ -1499,7 +1500,7 @@ async function loadShared(){
 }
 
 function buildSharedPayload(){
-  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, soundEvents: state.soundEvents || [], documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, knotPhotos: state.knotPhotos || {}, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
+  return { parties: state.parties, entries: state.entries, settings: state.settings, priorityRules: state.priorityRules || {}, annualCosts: state.annualCosts || {}, settlementPayments: state.settlementPayments || {}, auditLog: state.auditLog || [], priorityOverrides: state.priorityOverrides || {}, yearResetBackups: state.yearResetBackups || {}, priorityRequests: state.priorityRequests || {}, partyQrCodes: state.partyQrCodes || {}, notifications: (state.notifications || []).slice(0,200), chatMessages: (state.chatMessages || []).slice(0,300), chatSeen: state.chatSeen || {}, soundEvents: state.soundEvents || [], feedback: state.feedback || [], documents: state.documents || [], reservations: state.reservations || {}, checklists: state.checklists || null, maneuvers: state.maneuvers || null, knotPhotos: state.knotPhotos || {}, seasonEvents: state.seasonEvents || [], serviceReminder: state.serviceReminder || null };
 }
 
 async function saveShared(){
@@ -1543,6 +1544,7 @@ function subscribeRealtime(){
       const newSoundEvents = loaded.soundEvents || [];
       checkNewSoundEvents(newSoundEvents);
       state.soundEvents = newSoundEvents;
+      state.feedback = loaded.feedback || [];
       state.chatSeen = loaded.chatSeen || {};
       state.documents = loaded.documents || [];
       const newReservations = loaded.reservations || {};
@@ -1704,7 +1706,7 @@ function updateHeaderMeta(){
   el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem 0.8rem; flex-wrap:wrap; width:100%;">' + dateBlock + prioBlock + '</div>';
   const strip = document.getElementById('adminStrip');
   if(strip){
-    const unread = getUnreadNotifications().length + getUnreadChatCount();
+    const unread = getUnreadNotifications().length + getUnreadChatCount() + getPendingDecisionsForMe().length + getPendingRequestsForMe().length;
     // Alle Elemente (Widget, Icons, Badge, Abmelden) gleichmässig über die
     // Bildschirmbreite verteilt; die Standortzeile bleibt zentriert unter dem Widget.
     const badgeHtml = isAdminUser
@@ -1927,11 +1929,14 @@ function respondToRequest(dateStr, accept){
     if(!state.priorityOverrides) state.priorityOverrides = {};
     state.priorityOverrides[dateStr] = { givenUpBy: currentHolder, claimedBy: req.requestedBy, declinedBy: [] };
     logAudit(partyName(currentHolder) + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' angenommen');
-    pushNotification(partyName(currentHolder) + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' angenommen 🎉', req.requestedBy);
+    const acceptKey = pickFromPool('accept');
+    pushDayChatMessage({ type: 'dayaccept', date: dateStr, sound: acceptKey, fromPartyId: currentHolder, fromAdmin: isAdminUser, toPartyIds: [req.requestedBy], text: '✅ ' + partyName(currentHolder) + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' zugesagt — der Tag gehört dir! 🎉' });
+    if(acceptKey) playAppSound(acceptKey, true);
   } else {
     logAudit(partyName(currentHolder || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' abgelehnt');
-    pushDayChatMessage({ type: 'daydecline', date: dateStr, sound: 'dreamer', fromPartyId: currentHolder || null, fromAdmin: isAdminUser, toPartyIds: [req.requestedBy], text: '❌ ' + partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt.' });
-    playAppSound('dreamer');
+    const declineKey = pickFromPool('decline') || 'dreamer';
+    pushDayChatMessage({ type: 'daydecline', date: dateStr, sound: declineKey, fromPartyId: currentHolder || null, fromAdmin: isAdminUser, toPartyIds: [req.requestedBy], text: '❌ ' + partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt.' });
+    playAppSound(declineKey, true);
   }
   delete state.priorityRequests[dateStr];
 }
@@ -1982,16 +1987,21 @@ function showPendingRequestsQueue(){
         '<button type="button" id="pendingReqCloseBtn" title="Später entscheiden" style="position:absolute; top:0.55rem; right:0.6rem; width:34px; height:34px; border:none; background:transparent; font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink-soft);">✕</button>' +
         '<h2>Anfrage erhalten</h2>' +
         '<p><b>' + escapeHtml(partyName(req.requestedBy)) + '</b> möchte deinen Vorrechtstag am <b>' + dateLabel + '</b> übernehmen.' + (queue.length > 1 ? ' (danach noch ' + (queue.length - 1) + ' weitere Anfrage' + (queue.length - 1 === 1 ? '' : 'n') + ')' : '') + '</p>' +
-        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1rem;">' +
           '<button class="btn" id="pendingReqYesBtn">Ja, zusagen</button>' +
           '<button class="btn secondary" id="pendingReqNoBtn">Nein, ablehnen</button>' +
         '</div>' +
+        '<button type="button" class="btn secondary" id="pendingReqLaterBtn" style="width:100%; opacity:0.85;">⏭️ Später entscheiden</button>' +
+        '<div class="hint" style="margin:0.5rem 0 0; text-align:center;">Die Anfrage bleibt im Posteingang und dieses Fenster erscheint beim nächsten Anmelden erneut.</div>' +
       '</div>';
-    document.getElementById('pendingReqCloseBtn').addEventListener('click', () => {
+    const reqLater = () => {
       // Später entscheiden: bleibt offen und poppt beim nächsten Login erneut auf;
       // die Buttons stehen auch in der Chat-Nachricht weiterhin bereit.
       overlay.remove();
-    });
+      updateHeaderMeta();
+    };
+    document.getElementById('pendingReqCloseBtn').addEventListener('click', reqLater);
+    document.getElementById('pendingReqLaterBtn').addEventListener('click', reqLater);
     document.getElementById('pendingReqYesBtn').addEventListener('click', async () => {
       respondToRequest(dateStr, true);
       await saveShared();
@@ -2063,17 +2073,22 @@ function showPendingDecisionsQueue(){
           '<button class="btn" id="pendingYesBtn">Ja, übernehmen</button>' +
           '<button class="btn secondary" id="pendingNoBtn">Nein, danke</button>' +
         '</div>' +
-        (queue.length > 1 ? '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:0.9rem;">' +
+        (queue.length > 1 ? '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:0.9rem; margin-bottom:1rem;">' +
           '<button class="btn secondary" id="pendingAllYesBtn">Alle ' + queue.length + ' übernehmen</button>' +
           '<button class="btn secondary" id="pendingAllNoBtn">Alle ' + queue.length + ' ablehnen</button>' +
-        '</div>' : '');
+        '</div>' : '') +
+        '<button type="button" class="btn secondary" id="pendingLaterBtn" style="width:100%; opacity:0.85;">⏭️ Später entscheiden</button>' +
+        '<div class="hint" style="margin:0.5rem 0 0; text-align:center;">Die Entscheidung bleibt im Posteingang und dieses Fenster erscheint beim nächsten Anmelden erneut.</div>';
 
-    document.getElementById('pendingCloseBtn').addEventListener('click', () => {
+    const pendingLater = () => {
       // Später entscheiden: Popup schliessen, ohne etwas zu speichern — es poppt
-      // beim nächsten Login erneut auf, und die Buttons bleiben im Chat verfügbar.
+      // beim nächsten Login erneut auf, und die Buttons bleiben im Posteingang verfügbar.
       overlay.remove();
+      updateHeaderMeta();
       showPendingRequestsQueue();
-    });
+    };
+    document.getElementById('pendingCloseBtn').addEventListener('click', pendingLater);
+    document.getElementById('pendingLaterBtn').addEventListener('click', pendingLater);
     document.getElementById('pendingYesBtn').addEventListener('click', async () => {
       respondToPendingDay(dateStr, true);
       await saveShared();
@@ -3305,6 +3320,7 @@ async function addEntry(){
   }
 
   if(hasError) return;
+  celebrateIfRecovered();
 
   if(editingId){
     const idx = state.entries.findIndex(e => e.id === editingId);
@@ -3406,8 +3422,128 @@ const APP_SOUNDS = {
   'erfinder': 'sounds/erfinder.m4a',
   'richi': 'sounds/richi.m4a',
   'sautubel': 'sounds/sautubel.m4a',
-  'heb-din-schlitte': 'sounds/heb-din-schlitte.m4a'
+  'heb-din-schlitte': 'sounds/heb-din-schlitte.m4a',
+  // Neue Jingles (Paket 2)
+  'ach-leck-mich-doch': 'sounds/ach-leck-mich-doch.m4a',
+  'du-dummer-dreckswichser': 'sounds/du-dummer-dreckswichser.m4a',
+  'du-arschloch': 'sounds/du-arschloch.m4a',
+  'bist-du-komplett-durchgedreht': 'sounds/bist-du-komplett-durchgedreht.m4a',
+  'du-opfer': 'sounds/du-opfer.m4a',
+  'endlich-freitag': 'sounds/endlich-freitag.m4a',
+  'fuck': 'sounds/fuck.m4a',
+  'furz': 'sounds/furz.m4a',
+  'du-bloede-sau': 'sounds/du-bloede-sau.m4a',
+  'handlungsbedarf': 'sounds/handlungsbedarf.m4a',
+  'kein-widerspruch': 'sounds/kein-widerspruch.m4a',
+  'ja-scheisse': 'sounds/ja-scheisse.m4a',
+  'arschloch': 'sounds/arschloch.m4a',
+  'fickschnitzel': 'sounds/fickschnitzel.m4a',
+  'mahlzeit': 'sounds/mahlzeit.m4a',
+  'laeuft': 'sounds/laeuft.m4a',
+  'change-request': 'sounds/change-request.m4a',
+  'applaus': 'sounds/applaus.m4a',
+  'kaffee': 'sounds/kaffee.m4a',
+  'leck-mich-am-arsch': 'sounds/leck-mich-am-arsch.m4a',
+  // Noch nicht geliefert — Dateien einfach später unter genau diesen Namen in sounds/ legen:
+  'restricted-area': 'sounds/restricted-area.m4a',
+  'was-kannst-du-eigentlich': 'sounds/was-kannst-du-eigentlich.m4a',
+  'oh-mann': 'sounds/oh-mann.m4a',
+  'zonk': 'sounds/zonk.m4a',
+  'was-stimmt-bi-dier-noed': 'sounds/was-stimmt-bi-dier-noed.m4a',
+  'morgen': 'sounds/morgen.m4a',
+  'pfff': 'sounds/pfff.m4a',
+  'nein-nein-nein': 'sounds/nein-nein-nein.m4a',
+  'negativ': 'sounds/negativ.m4a',
+  'schoen-aber-nein': 'sounds/schoen-aber-nein.m4a',
+  'och-nee': 'sounds/och-nee.m4a',
+  'mhhh-noe': 'sounds/mhhh-noe.m4a',
+  'scheissegal': 'sounds/scheissegal.m4a',
+  'zuviel-geld': 'sounds/zuviel-geld.m4a',
+  'nicht-meine-kostenstelle': 'sounds/nicht-meine-kostenstelle.m4a',
+  'kuemmer-mich-drum': 'sounds/kuemmer-mich-drum.m4a',
+  'no-1': 'sounds/no-1.m4a', 'no-2': 'sounds/no-2.m4a', 'no-3': 'sounds/no-3.m4a', 'no-4': 'sounds/no-4.m4a', 'no-5': 'sounds/no-5.m4a',
+  'no-6': 'sounds/no-6.m4a', 'no-7': 'sounds/no-7.m4a', 'no-8': 'sounds/no-8.m4a', 'no-9': 'sounds/no-9.m4a', 'no-10': 'sounds/no-10.m4a',
+  'yes-1': 'sounds/yes-1.m4a', 'yes-2': 'sounds/yes-2.m4a', 'yes-3': 'sounds/yes-3.m4a', 'yes-4': 'sounds/yes-4.m4a', 'yes-5': 'sounds/yes-5.m4a',
+  'yes-6': 'sounds/yes-6.m4a', 'yes-7': 'sounds/yes-7.m4a', 'yes-8': 'sounds/yes-8.m4a', 'yes-9': 'sounds/yes-9.m4a', 'yes-10': 'sounds/yes-10.m4a'
 };
+
+// Zufalls-Pools. Fehlt eine Datei (noch nicht hochgeladen), probiert die Wiedergabe
+// automatisch den nächsten Kandidaten aus dem Pool — es bleibt also nie stumm,
+// solange mindestens eine Datei des Pools vorhanden ist.
+const SOUND_POOLS = {
+  'error': ['du-bloede-sau','du-opfer','was-kannst-du-eigentlich','oh-mann','zonk','laeuft','was-stimmt-bi-dier-noed','sautubel'],
+  'login': ['guets-moergeli','morgen','hallo-vater','hallo-muetter'],
+  'decline': ['no-1','no-2','no-3','no-4','no-5','no-6','no-7','no-8','no-9','no-10','bist-du-komplett-durchgedreht','pfff','nein-nein-nein','negativ','schoen-aber-nein','och-nee','mhhh-noe','scheissegal','dreamer'],
+  'accept': ['yes-1','yes-2','yes-3','yes-4','yes-5','yes-6','yes-7','yes-8','yes-9','yes-10'],
+  'geld-nein': ['was-stimmt-bi-dier-noed','leck-mich-am-arsch','ach-leck-mich-doch','pfff','schoen-aber-nein','scheissegal','zuviel-geld','nicht-meine-kostenstelle']
+};
+// Verfügbarkeit der Sounddateien (einmalige HEAD-Anfragen beim Start): Zufalls-Picks
+// bevorzugen vorhandene Dateien, noch fehlende Pool-Mitglieder werden übersprungen.
+const soundAvailability = {};
+function probeSoundAvailability(){
+  Object.keys(APP_SOUNDS).forEach(key => {
+    if(key in soundAvailability) return;
+    soundAvailability[key] = undefined;
+    fetch(APP_SOUNDS[key], { method: 'HEAD' })
+      .then(r => { soundAvailability[key] = !!r.ok; })
+      .catch(() => { soundAvailability[key] = null; }); // offline: unbekannt lassen
+  });
+}
+function pickFromPool(poolName){
+  const pool = SOUND_POOLS[poolName] || [];
+  if(!pool.length) return null;
+  const available = pool.filter(k => soundAvailability[k] !== false);
+  const source = available.length ? available : pool;
+  return source[Math.floor(Math.random() * source.length)];
+}
+const lastPoolPlay = {};
+function playRandomSound(poolName){
+  const now = Date.now();
+  if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 1500) return;
+  lastPoolPlay[poolName] = now;
+  const pool = (SOUND_POOLS[poolName] || []).slice();
+  for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+  playSoundChain(pool);
+}
+// Spielt den ersten verfügbaren Sound der Liste (fehlende Dateien werden übersprungen).
+function playSoundChain(keys){
+  if(!keys || !keys.length) return;
+  const key = keys[0];
+  const src = APP_SOUNDS[key];
+  if(!src){ playSoundChain(keys.slice(1)); return; }
+  try{
+    const a = new Audio(src);
+    a.addEventListener('error', () => {
+      const altSrc = src.indexOf('sounds/') === 0 ? src.slice(7) : null;
+      if(!altSrc){ playSoundChain(keys.slice(1)); return; }
+      const alt = new Audio(altSrc);
+      alt.addEventListener('error', () => playSoundChain(keys.slice(1)), { once: true });
+      alt.play().catch(() => {});
+    }, { once: true });
+    const p = a.play();
+    if(p && typeof p.then === 'function'){
+      p.catch(err => {
+        if(err && err.name === 'NotAllowedError'){
+          if(!pendingSoundKeys.includes(key)) pendingSoundKeys.push(key);
+          armSoundRetry();
+        }
+      });
+    }
+  } catch(e){}
+}
+// Fehlermeldungs-Sound kurz unterdrücken (z. B. wenn stattdessen "Restricted Area" spielt)
+let suppressErrorSoundUntil = 0;
+function suppressNextErrorSound(){ suppressErrorSoundUntil = Date.now() + 900; }
+// Für "Applaus beim zweiten Anlauf": merken, wann zuletzt eine Fehlermeldung kam
+let lastValidationErrorTs = 0;
+function celebrateIfRecovered(){
+  if(lastValidationErrorTs && Date.now() - lastValidationErrorTs < 5 * 60 * 1000){
+    lastValidationErrorTs = 0;
+    playAppSound('applaus', true);
+    return true;
+  }
+  return false;
+}
 const lastSoundPlay = {};
 const pendingSoundKeys = [];
 let soundRetryArmed = false;
@@ -3749,23 +3885,46 @@ function editChatMessage(msgId){
 // Buttons in Kalender-Chat-Nachrichten: erscheinen nur, solange die Entscheidung
 // noch offen ist (weder im Popup noch im Kalender noch im Chat getroffen).
 function dayActionButtons(m){
-  if(isAdminUser || !session.partyId || !m || !m.date) return '';
+  if(!m || (!m.date && m.type !== 'moneyreq')) return '';
+  if(isAdminUser || !session.partyId){
+    // Admin sieht nur die Status-Info, keine Entscheidungs-Buttons
+    if(m.type === 'dayfree'){
+      const ov = state.priorityOverrides ? state.priorityOverrides[m.date] : null;
+      if(ov && ov.claimedBy) return '<div style="margin-top:0.45rem; font-size:0.78rem; color:var(--ink-soft); border-top:1px dashed var(--line-strong); padding-top:0.35rem;">✅ Übernommen von <b>' + escapeHtml(partyName(ov.claimedBy)) + '</b>.</div>';
+    }
+    return '';
+  }
   const todayStr = new Date().toISOString().slice(0,10);
   const btnStyle = 'padding:0.45rem 0.7rem; font-size:0.82rem;';
+  const statusLine = (txt) => '<div style="margin-top:0.45rem; font-size:0.78rem; color:var(--ink-soft); border-top:1px dashed var(--line-strong); padding-top:0.35rem;">' + txt + '</div>';
   if(m.type === 'dayfree'){
+    const ov = state.priorityOverrides ? state.priorityOverrides[m.date] : null;
+    // Bereits entschieden? Dann den Ausgang direkt in der Nachricht zeigen.
+    if(ov && ov.claimedBy) return statusLine('✅ Übernommen von <b>' + escapeHtml(partyName(ov.claimedBy)) + '</b>' + (ov.claimedBy === session.partyId ? ' — der Tag gehört dir!' : '.'));
+    if(!ov || !ov.givenUpBy) return statusLine('↩️ Die Abgabe wurde inzwischen rückgängig gemacht.');
+    if(ov.declinedBy && ov.declinedBy.includes(session.partyId)) return statusLine('Du hast diesen Tag abgelehnt.');
     if(m.fromPartyId === session.partyId) return '';
     if(m.date < todayStr) return '';
-    const ov = state.priorityOverrides ? state.priorityOverrides[m.date] : null;
-    const undecided = ov && ov.givenUpBy && !ov.claimedBy && !((ov.declinedBy || []).includes(session.partyId));
-    if(!undecided) return '';
     return '<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">' +
       '<button type="button" class="btn" style="' + btnStyle + '" data-day-claim="' + m.date + '">Ja, übernehmen</button>' +
       '<button type="button" class="btn secondary" style="' + btnStyle + '" data-day-pass="' + m.date + '">Nein, danke</button>' +
     '</div>';
   }
+  if(m.type === 'moneyreq'){
+    if(m.declined) return statusLine('🙅 Abgelehnt' + (m.declinedBy ? ' von <b>' + escapeHtml(partyName(m.declinedBy)) + '</b>' : '') + '.');
+    if(!m.toPartyIds || !m.toPartyIds.includes(session.partyId)) return '';
+    return '<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">' +
+      '<button type="button" class="btn secondary" style="' + btnStyle + '" data-money-decline="' + m.id + '">🙅 Ablehnen</button>' +
+    '</div>';
+  }
   if(m.type === 'dayreq'){
     const req = state.priorityRequests ? state.priorityRequests[m.date] : null;
-    if(!req) return '';
+    if(!req){
+      // Anfrage wurde inzwischen beantwortet: Ausgang aus dem Kalenderstand ableiten.
+      const holder = effectivePriority(m.date).partyId;
+      if(holder === m.fromPartyId) return statusLine('✅ Zugesagt — der Tag gehört jetzt <b>' + escapeHtml(partyName(holder)) + '</b>.');
+      return statusLine('✔️ Erledigt — die Anfrage wurde beantwortet.');
+    }
     if(effectivePriority(m.date).partyId !== session.partyId) return '';
     return '<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">' +
       '<button type="button" class="btn" style="' + btnStyle + '" data-day-reqyes="' + m.date + '">Ja, zusagen</button>' +
@@ -3803,7 +3962,7 @@ function renderChatMessageListInto(list){
             : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>');
       const bubbleBg = isBeer ? '#F5E7B8' : (mine ? '#DCF3C8' : '#fff');
       const bubbleBorder = isBeer ? '#C9A227' : (mine ? '#A9D18E' : 'var(--bronze-line)');
-      const calDates = (m.type === 'dayfree' || m.type === 'dayreq' || m.type === 'daydecline') && m.date ? [m.date]
+      const calDates = (m.type === 'dayfree' || m.type === 'dayreq' || m.type === 'daydecline' || m.type === 'dayaccept') && m.date ? [m.date]
         : ((m.type === 'dayfree-range' || m.type === 'dayreq-range') && m.dates && m.dates.length ? m.dates : null);
       const calJumpAttrs = calDates ? ' data-cal-jump="' + calDates.join(',') + '" data-cal-sound="' + (m.sound || '') + '" title="Antippen: im Kalender ansehen" ' : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:90%; text-align:' + (mine ? 'right' : 'left') + ';">' +
@@ -3845,6 +4004,18 @@ function renderChatMessageListInto(list){
     list.querySelectorAll('[data-cal-jump]').forEach(el => el.addEventListener('click', (ev) => {
       if(ev.target.closest('button')) return; // Buttons in der Nachricht nicht als Sprung werten
       jumpToCalendarDates(el.dataset.calJump.split(','), el.dataset.calSound || null);
+    }));
+    list.querySelectorAll('[data-money-decline]').forEach(el => el.addEventListener('click', async () => {
+      const msg = (state.chatMessages || []).find(x => x.id === el.dataset.moneyDecline);
+      if(!msg || msg.declined) return;
+      msg.declined = true;
+      msg.declinedBy = session.partyId;
+      const noKey = pickFromPool('geld-nein') || 'leck-mich-am-arsch';
+      pushDayChatMessage({ type: 'normal', sound: noKey, fromPartyId: session.partyId, fromAdmin: isAdminUser, toPartyIds: msg.fromPartyId ? [msg.fromPartyId] : null, text: '🙅 ' + partyName(session.partyId) + ' lehnt die Geld-Anforderung' + (msg.amount ? ' über ' + fmtCHF(msg.amount) : '') + ' ab.' });
+      playAppSound(noKey, true);
+      logAudit(partyName(session.partyId) + ' hat eine Geld-Anforderung abgelehnt');
+      await saveShared();
+      renderChatMessageListInto(list);
     }));
     list.querySelectorAll('[data-day-claim]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayClaim, true))));
     list.querySelectorAll('[data-day-pass]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayPass, false))));
@@ -3890,9 +4061,10 @@ function showChatModal(){
       '<div class="field" style="margin:0 0 0.35rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
       '<div id="chatEmojiPanel" style="display:none; margin-bottom:0.4rem; padding:0.5rem; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm);">' +
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;"><span style="font-size:0.78rem; color:var(--ink-soft);">Emoji auswählen</span><button type="button" id="chatEmojiCloseBtn" title="Schliessen" style="border:none; background:transparent; font-size:1.15rem; line-height:1; cursor:pointer; color:var(--ink-soft); padding:0.15rem 0.3rem;">✕</button></div>' +
-        '<div style="display:grid; grid-template-columns:repeat(8, 1fr); gap:0.05rem; max-height:46vh; overflow-y:auto;">' +
-        ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😜', '🤪', '😎', '🥳', '🤩', '🤗', '🤔', '🙄', '😬', '😴', '🤯', '😳', '🥺', '😢', '😭', '😡', '🥶', '🤒', '🤢', '🙈', '🙉', '🙊', '💪', '👍', '👎', '👌', '✌️', '🤙', '🤝', '🙏', '👏', '🖐️', '👋', '❤️', '🧡', '💛', '💚', '💙', '💜', '🔥', '⭐', '🎉', '🎊', '🎂', '🎁', '☀️', '🌦️', '🌧️', '⛈️', '💨', '🌈', '🌊', '⚓', '🚤', '⛵', '🛟', '🧭', '🎣', '🐟', '🦆', '🍺', '🍻', '🥂', '🍷', '🍕', '🌭', '🍔', '⛽', '🔧', '🔩', '💰', '💸', '🪙', '✅', '❌', '❓', '❗', '⏰', '📅', '📍', '🔓', '🔒'].map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.45rem; padding:0.22rem 0.1rem; cursor:pointer; line-height:1;">' + e + '</button>').join('') +
+        '<div style="display:grid; grid-template-columns:repeat(8, 1fr); gap:0.05rem; max-height:46vh; overflow-y:auto; overscroll-behavior:contain;">' +
+        [{n:"Smileys",e:["😀", "😁", "😂", "😃", "😄", "😅", "😆", "😇", "😈", "😉", "😊", "😋", "😌", "😍", "😎", "😏", "😐", "😑", "😒", "😓", "😔", "😕", "😖", "😗", "😘", "😙", "😚", "😛", "😜", "😝", "😞", "😟", "😠", "😡", "😢", "😣", "😤", "😥", "😦", "😧", "😨", "😩", "😪", "😫", "😬", "😭", "😮", "😯", "😰", "😱", "😲", "😳", "😴", "😵", "😶", "😷", "😸", "😹", "😺", "😻", "😼", "😽", "😾", "😿", "🙀", "🙁", "🙂", "🙃", "🙄", "🙅", "🙆", "🙇", "🙈", "🙉", "🙊", "🙋", "🙌", "🙍", "🙎", "🙏", "🤐", "🤑", "🤒", "🤓", "🤔", "🤕", "🤖", "🤗", "🤘", "🤙", "🤚", "🤛", "🤜", "🤝", "🤞", "🤟", "🤠", "🤡", "🤢", "🤣", "🤤", "🤥", "🤦", "🤧", "🤨", "🤩", "🤪", "🤫", "🤬", "🤭", "🤮", "🤯", "🥰", "🥵", "🥶", "🥳", "🥺", "🧐", "🤠", "🤡", "🤥", "🤫", "🤭", "💀", "👻", "👽", "🤖", "💩"]},{n:"Gesten & Personen",e:["👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳", "💪", "🦾", "👂", "👃", "🧠", "👀", "👁️", "👅", "👄", "👦", "👧", "👨", "👩", "👪", "👫", "👬", "👭", "👮", "👯", "👰", "👱", "👲", "👳", "👴", "👵", "👶", "👷", "👸", "👹", "👺", "👻", "👼", "👽", "👾", "👿", "💀", "💁", "💂", "💃", "💄", "💅", "💆", "💇", "🧑", "🧔", "🧓", "🧕", "🤰", "🤱", "🧙", "🧚", "🧜", "🧑‍✈️", "🧑‍🔧", "🧑‍🍳", "🕵️", "💂", "👮", "👷", "🤴", "👸", "🎅", "🦸", "🦹", "🧟", "💃", "🕺", "🏊", "🚣", "🏄", "🤽", "⛷️", "🏂", "🚴"]},{n:"Boot & See",e:["⚓", "🚤", "⛵", "🛥️", "🛳️", "🚢", "🛶", "⛴️", "🛟", "🧭", "🌊", "🏝️", "🏖️", "⛱️", "🎣", "🐟", "🐠", "🐡", "🦈", "🐬", "🐳", "🐋", "🦀", "🦞", "🦑", "🐙", "🦆", "🦢", "⛽", "🔱", "🪝", "🌅", "🌇", "🌉", "🌁"]},{n:"Tiere & Natur",e:["🐀", "🐁", "🐂", "🐃", "🐄", "🐅", "🐆", "🐇", "🐈", "🐉", "🐊", "🐋", "🐌", "🐍", "🐎", "🐏", "🐐", "🐑", "🐒", "🐓", "🐔", "🐕", "🐖", "🐗", "🐘", "🐙", "🐚", "🐛", "🐜", "🐝", "🐞", "🐟", "🐠", "🐡", "🐢", "🐣", "🐤", "🐥", "🐦", "🐧", "🐨", "🐩", "🐪", "🐫", "🐬", "🐭", "🐮", "🐯", "🐰", "🐱", "🐲", "🐳", "🐴", "🐵", "🐶", "🐷", "🐸", "🐹", "🐺", "🐻", "🐼", "🐽", "🐾", "🐿", "🦁", "🦄", "🦅", "🦉", "🦇", "🦋", "🐝", "🐞", "🦗", "🕷️", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃", "🌷", "🌹", "🌺", "🌸", "🌼", "🌻", "☀️", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️", "❄️", "☃️", "⛄", "🌬️", "💨", "🌪️", "🌫️", "🌈", "☂️", "☔", "⚡", "🔥", "💧", "⭐", "🌟", "✨", "🌙", "🌎", "🪐"]},{n:"Essen & Trinken",e:["🍅", "🍆", "🍇", "🍈", "🍉", "🍊", "🍋", "🍌", "🍍", "🍎", "🍏", "🍐", "🍑", "🍒", "🍓", "🍔", "🍕", "🍖", "🍗", "🍘", "🍙", "🍚", "🍛", "🍜", "🍝", "🍞", "🍟", "🍠", "🍡", "🍢", "🍣", "🍤", "🍥", "🍦", "🍧", "🍨", "🍩", "🍪", "🍫", "🍬", "🍭", "🍮", "🍯", "🍰", "🍱", "🍲", "🍳", "🍴", "🍵", "🍶", "🍷", "🍸", "🍹", "🍺", "🍻", "🍼", "🍽", "🍾", "🍿", "🥐", "🥑", "🥒", "🥓", "🥔", "🥕", "🥖", "🥗", "🥘", "🥙", "🥚", "🥛", "🥜", "🥝", "🥞", "🥟", "🥠", "🥡", "🥢", "🥣", "🥤", "🥥", "🥦", "🥧", "🥨", "🥩", "🥪", "🥫", "🥬", "🥭", "🥮", "🥯", "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🍾", "☕", "🍵", "🧃", "🧉", "🥤", "🧋"]},{n:"Aktivit\u00e4t & Sport",e:["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🏓", "🏸", "🏒", "🥅", "⛳", "🏹", "🥊", "🥋", "🎽", "🛹", "⛸️", "🥌", "🎿", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️", "🎗️", "🎫", "🎪", "🎭", "🎨", "🎬", "🎤", "🎧", "🎼", "🎹", "🥁", "🎷", "🎺", "🎸", "🪕", "🎻", "🎲", "♟️", "🎯", "🎳", "🎮", "🎰", "🧩", "🪁", "🎉", "🎊", "🎂", "🎁", "🎈"]},{n:"Reisen & Orte",e:["🚀", "🚁", "🚂", "🚃", "🚄", "🚅", "🚆", "🚇", "🚈", "🚉", "🚊", "🚋", "🚌", "🚍", "🚎", "🚏", "🚐", "🚑", "🚒", "🚓", "🚔", "🚕", "🚖", "🚗", "🚘", "🚙", "🚚", "🚛", "🚜", "🚝", "🚞", "🚟", "🚠", "🚡", "🚢", "🚣", "🚤", "✈️", "🛩️", "🛫", "🛬", "🪂", "💺", "🚁", "🚀", "🛸", "🗼", "🗽", "🏰", "🏯", "🏟️", "🎡", "🎢", "🎠", "⛲", "⛺", "🏠", "🏡", "🏢", "🏥", "🏦", "🏪", "🏫", "⛪", "🕌", "🗿", "🗺️", "🧳"]},{n:"Objekte",e:["⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "💽", "💾", "💿", "📀", "📷", "📸", "📹", "🎥", "📽️", "📺", "📻", "🎙️", "⏰", "⏱️", "⏳", "🔋", "🔌", "💡", "🔦", "🕯️", "🗑️", "🛢️", "💸", "💵", "💰", "💳", "🪙", "⚖️", "🔧", "🔨", "⚒️", "🛠️", "⛏️", "🔩", "⚙️", "🧰", "🧲", "🔫", "💣", "🔪", "🛡️", "🚬", "⚰️", "🔮", "📿", "💈", "⚗️", "🔭", "🔬", "🕳️", "💊", "💉", "🩹", "🩺", "🌡️", "🧬", "🦠", "🧫", "🧪", "🧹", "🧺", "🧻", "🚽", "🔑", "🗝️", "🚪", "🪑", "🛏️", "🛋️", "🧸", "🖼️", "🛍️", "🎀", "🎏", "🪄", "📦", "📫", "📮", "✏️", "✒️", "🖊️", "🖍️", "📝", "💼", "📁", "📂", "📅", "📆", "📇", "📈", "📉", "📊", "📋", "📌", "📍", "📎", "📏", "📐", "✂️", "🔒", "🔓", "🔏", "🔐"]},{n:"Herzen & Symbole",e:["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓", "🆔", "⚛️", "✅", "☑️", "✔️", "❌", "❎", "➕", "➖", "➗", "✖️", "💯", "🔞", "📵", "🚭", "❗", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "🈯", "💹", "❇️", "✳️", "❎", "🌐", "💠", "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂", "🛃", "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶", "🈁", "🔣", "ℹ️", "🔤", "🔡", "🔠", "🆖", "🆗", "🆙", "🆒", "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]}].map(cat => '<div style="grid-column:1 / -1; font-size:0.7rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; padding:0.45rem 0.1rem 0.15rem;">' + cat.n + '</div>' + cat.e.map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.45rem; padding:0.22rem 0.1rem; cursor:pointer; line-height:1;">' + e + '</button>').join('')).join('') +
         '</div>' +
+      '</div>' +
       '</div>' +
       '<div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.1rem;">' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>' +
@@ -5356,7 +5528,7 @@ function setupSettlementPaymentUI(year){
       const amount = parseSwissAmount(document.getElementById('rmAmount').value);
       if(isNaN(amount) || amount <= 0){ errEl.classList.add('show'); return; }
       const debtorId = byName[t.from] || null;
-      pushDayChatMessage({ type: 'normal', sound: 'gib-mir-geld', fromPartyId: session.partyId, fromAdmin: isAdminUser, toPartyIds: debtorId ? [debtorId] : null, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(amount) + ' von ' + escapeHtml(t.from) + ' (Abrechnung ' + year + ') — TWINT sei Dank 😉' });
+      pushDayChatMessage({ type: 'moneyreq', amount: amount, sound: 'gib-mir-geld', fromPartyId: session.partyId, fromAdmin: isAdminUser, toPartyIds: debtorId ? [debtorId] : null, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(amount) + ' von ' + escapeHtml(t.from) + ' (Abrechnung ' + year + ') — TWINT sei Dank 😉' });
       playAppSound('gib-mir-geld', true);
       await saveShared();
       area.style.display = 'none';
@@ -5387,6 +5559,7 @@ function setupSettlementPaymentUI(year){
     }
 
     if(hasError) return;
+    celebrateIfRecovered();
 
     const currentYear = parseInt(document.getElementById('adjustmentYear').value);
     if(!state.settlementPayments) state.settlementPayments = {};
@@ -6030,6 +6203,11 @@ function renderGate(){
     const submit = async () => {
       const code = document.getElementById('gate-code').value.trim();
       const errEl = document.getElementById('gateError');
+      // Bei falschem (nicht leerem) Code: "Restricted Area" statt Fehler-Pool
+      if(code){
+        const codeKnown = (state.settings && state.settings.adminCode === code) || state.parties.some(p => p.code === code);
+        if(!codeKnown && soundAvailability['restricted-area'] !== false){ suppressNextErrorSound(); playAppSound('restricted-area', true); }
+      }
       if(role === 'admin'){
         if(code && state.settings.adminCode === code){
           session = { adminCode: code, partyCode: null, partyId: null };
@@ -6045,8 +6223,14 @@ function renderGate(){
         }
       }
       await saveSession(); evaluateAccess();
-      playAppSound('guets-moergeli');
-      broadcastSound('guets-moergeli');
+      if(!celebrateIfRecovered()){
+        // Freitags gebührt dem Wochenende die Ehre — sonst zufälliger Login-Gruss
+        const loginKey = (new Date().getDay() === 5) ? 'endlich-freitag' : pickFromPool('login');
+        if(loginKey){
+          playAppSound(loginKey, true);
+          broadcastSound(loginKey);
+        }
+      }
       saveShared();
       hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 600);
     };
@@ -6066,13 +6250,14 @@ function renderAdminPanel(){
 
   card.innerHTML =
     '<h2>Verwaltung</h2>' +
-    (isReadOnlySubtab ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
+    (isReadOnlySubtab && adminSubTab !== 'feedback' ? '<div class="notice">Nur der Administrator kann hier Änderungen vornehmen — du siehst diese Einstellungen zur Information, kannst aber nichts anpassen.</div>' : '') +
     '<div class="admin-subnav">' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='parties'?' active':'') + '" data-subtab="parties">Parteien</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='general'?' active':'') + '" data-subtab="general">Einstellungen</button>' +
       '<button type="button" class="admin-subtab-btn' + (adminSubTab==='log'?' active':'') + '" data-subtab="log">Protokoll</button>' +
+      '<button type="button" class="admin-subtab-btn' + (adminSubTab==='feedback'?' active':'') + '" data-subtab="feedback">Feedback</button>' +
     '</div>' +
-    '<div id="adminSubContent" class="' + (isReadOnlySubtab ? 'admin-readonly' : '') + '"></div>';
+    '<div id="adminSubContent" class="' + (isReadOnlySubtab && adminSubTab !== 'feedback' ? 'admin-readonly' : '') + '"></div>';
 
   card.querySelectorAll('.admin-subtab-btn').forEach(btn => {
     btn.addEventListener('click', () => { adminSubTab = btn.dataset.subtab; renderAdminPanel(); });
@@ -6080,6 +6265,7 @@ function renderAdminPanel(){
 
   if(adminSubTab === 'parties') renderAdminPartiesSection();
   else if(adminSubTab === 'log') renderAdminAuditSection();
+  else if(adminSubTab === 'feedback') renderAdminFeedbackSection();
   else renderAdminGeneralSection();
 }
 
@@ -6350,6 +6536,69 @@ function wireBootKeyBox(){
       }
     });
   }
+}
+
+// 💡 Feedback-Rubrik: Änderungswünsche zur App — für alle Parteien offen.
+function renderAdminFeedbackSection(){
+  const content = document.getElementById('adminSubContent');
+  const items = (state.feedback || []).slice().sort((a,b) => (b.ts || 0) - (a.ts || 0));
+  const canSubmit = !!session.partyId || isAdminUser;
+  content.innerHTML =
+    '<div class="admin-box">' +
+      '<label>💡 Feedback & Änderungswünsche</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Was soll an WakeLog besser werden? Wünsche, Fehler, Ideen — hier landet alles beim Administrator.</div>' +
+      '<textarea id="feedbackText" rows="4" style="width:100%; box-sizing:border-box; font-size:0.95rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--foam); color:var(--ink);" placeholder="Dein Änderungswunsch …"></textarea>' +
+      '<div class="gate-error" id="err-feedback">Bitte zuerst einen Text eingeben.</div>' +
+      '<button class="btn" id="feedbackSubmitBtn" style="margin-top:0.6rem;"' + (canSubmit ? '' : ' disabled') + '>📮 Absenden</button>' +
+      '<div class="gate-error" id="feedbackOk" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box">' +
+      '<label>Eingegangenes Feedback</label>' +
+      (!items.length ? '<div class="empty">Noch kein Feedback vorhanden.</div>' :
+        items.map(f =>
+          '<div style="border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); background:var(--foam); padding:0.6rem 0.7rem; margin-bottom:0.6rem;">' +
+            '<div class="hint" style="margin:0 0 0.25rem;">' + escapeHtml(f.fromName || partyName(f.fromPartyId)) + ' · ' + new Date(f.ts).toLocaleDateString('de-CH') + ', ' + new Date(f.ts).toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr</div>' +
+            '<div style="font-size:0.9rem; white-space:pre-wrap;">' + escapeHtml(f.text) + '</div>' +
+            (f.reply ?
+              '<div style="margin-top:0.5rem; border-top:1px dashed var(--line-strong); padding-top:0.4rem; font-size:0.84rem;">✅ <b>Administrator:</b> ' + escapeHtml(f.reply) + '</div>' :
+              (isAdminUser ? '<div style="margin-top:0.5rem;"><button type="button" class="btn secondary" style="padding:0.45rem 0.7rem; font-size:0.82rem;" data-feedback-reply="' + f.id + '">✅ Na klar, ich kümmer mich drum</button></div>' :
+               '<div class="hint" style="margin:0.4rem 0 0;">Noch keine Antwort.</div>')) +
+          '</div>'
+        ).join('')) +
+    '</div>';
+
+  document.getElementById('feedbackSubmitBtn').addEventListener('click', async () => {
+    const ta = document.getElementById('feedbackText');
+    const errEl = document.getElementById('err-feedback');
+    const okEl = document.getElementById('feedbackOk');
+    const text = ta.value.trim();
+    errEl.classList.remove('show');
+    if(!text){ errEl.classList.add('show'); return; }
+    if(!state.feedback) state.feedback = [];
+    const fromName = isAdminUser && !session.partyId ? 'Administrator' : partyName(session.partyId);
+    state.feedback.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromName, text, reply: null });
+    // Auch als Posteingang-Nachricht, damit der Admin es sofort mitbekommt (inkl. Jingle)
+    pushDayChatMessage({ type: 'normal', sound: 'handlungsbedarf', fromPartyId: session.partyId, fromAdmin: isAdminUser, toPartyIds: null, text: '💡 Feedback von ' + fromName + ': «' + text + '» — siehe Verwaltung → Feedback.' });
+    playAppSound('handlungsbedarf', true);
+    logAudit(fromName + ' hat Feedback zur App eingereicht');
+    await saveShared();
+    celebrateIfRecovered();
+    renderAdminFeedbackSection();
+    const ok = document.getElementById('feedbackOk');
+    if(ok){ ok.textContent = '✅ Danke! Dein Feedback ist eingegangen.'; ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 3500); }
+  });
+
+  content.querySelectorAll('[data-feedback-reply]').forEach(btn => btn.addEventListener('click', async () => {
+    const f = (state.feedback || []).find(x => x.id === btn.dataset.feedbackReply);
+    if(!f || f.reply) return;
+    f.reply = 'Na klar, ich kümmer mich drum!';
+    f.replyTs = Date.now();
+    pushDayChatMessage({ type: 'normal', sound: 'kuemmer-mich-drum', fromPartyId: null, fromAdmin: true, toPartyIds: f.fromPartyId ? [f.fromPartyId] : null, text: '✅ Antwort auf dein Feedback («' + f.text.slice(0, 60) + (f.text.length > 60 ? '…' : '') + '»): Na klar, ich kümmer mich drum!' });
+    playAppSound('kuemmer-mich-drum', true);
+    logAudit('Administrator hat auf Feedback geantwortet');
+    await saveShared();
+    renderAdminFeedbackSection();
+  }));
 }
 
 function renderAdminPartiesSection(){
@@ -7500,6 +7749,7 @@ function setupAnnualCostUI(){
     }
 
     if(hasError) return;
+    celebrateIfRecovered();
 
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
@@ -7777,12 +8027,15 @@ async function init(){
   if('serviceWorker' in navigator){
     try{ navigator.serviceWorker.register('sw.js'); } catch(e){}
   }
+  probeSoundAvailability();
+
   const verFooter = document.getElementById('appVersionFooter');
   if(verFooter){
     verFooter.textContent = 'WakeLog · Version ' + APP_VERSION + ' — antippen für Update-Prüfung';
     verFooter.style.cursor = 'pointer';
     verFooter.title = 'Auf Updates prüfen';
     verFooter.addEventListener('click', () => {
+      playAppSound('change-request', true);
       flashVersionFooter('🔍 Suche nach Updates …');
       checkForUpdate(true);
     });
@@ -7811,7 +8064,9 @@ async function init(){
       if(m.oldValue && m.oldValue.indexOf('show') !== -1) return; // war schon sichtbar
       const c = (el.style.color || '').replace(/\s/g,'').toLowerCase();
       if(c === '#1c9a64' || c === 'rgb(28,154,100)') return; // grüne Erfolgsmeldung
-      playAppSound('sautubel');
+      lastValidationErrorTs = Date.now();
+      if(Date.now() < suppressErrorSoundUntil) return; // z. B. falsches Passwort → Restricted Area
+      playRandomSound('error');
     });
   });
   errorSoundObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
