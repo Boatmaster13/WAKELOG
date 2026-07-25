@@ -934,6 +934,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
           <button class="btn" id="addSettlementPaymentBtn">Zahlung erfassen</button>
           <button class="btn secondary" id="requestMoneyBtn">💰 Geld anfordern</button>
         </div>
+        <div class="admin-box" id="requestMoneyArea" style="display:none; margin-top:0.9rem;"></div>
         <div class="gate-error" id="err-sp-general" style="color:#1C9A64;"></div>
       </div>
       <div class="card">
@@ -1329,7 +1330,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-24';
+const APP_VERSION = '2026-07-25-25';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1939,9 +1940,66 @@ function respondToPendingDay(dateStr, accept){
 // Beim Anmelden: Hinweis-Popup, wenn seit dem letzten Besuch neue Nachrichten
 // im Posteingang liegen (Chat = Posteingang). Erscheint nur, wenn nicht ohnehin
 // das "Vorrecht angeboten"-Popup ansteht.
+function getPendingRequestsForMe(){
+  if(isAdminUser || !session.partyId || !state.priorityRequests) return [];
+  return Object.keys(state.priorityRequests)
+    .filter(d => state.priorityRequests[d] && effectivePriority(d).partyId === session.partyId)
+    .sort();
+}
+
+// Login-Popup für unbeantwortete Anfragen: poppt bei jedem Anmelden erneut auf,
+// solange die Entscheidung weder hier, im Chat noch im Kalender getroffen wurde.
+function showPendingRequestsQueue(){
+  let queue = getPendingRequestsForMe();
+  if(!queue.length) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  document.body.appendChild(overlay);
+
+  function renderNext(){
+    queue = queue.filter(d => state.priorityRequests && state.priorityRequests[d]);
+    if(!queue.length){ overlay.remove(); return; }
+    const dateStr = queue[0];
+    const req = state.priorityRequests[dateStr];
+    const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+    overlay.innerHTML =
+      '<div class="gate-card" style="position:relative;">' +
+        '<button type="button" id="pendingReqCloseBtn" title="Später entscheiden" style="position:absolute; top:0.55rem; right:0.6rem; width:34px; height:34px; border:none; background:transparent; font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink-soft);">✕</button>' +
+        '<h2>Anfrage erhalten</h2>' +
+        '<p><b>' + escapeHtml(partyName(req.requestedBy)) + '</b> möchte deinen Vorrechtstag am <b>' + dateLabel + '</b> übernehmen.' + (queue.length > 1 ? ' (danach noch ' + (queue.length - 1) + ' weitere Anfrage' + (queue.length - 1 === 1 ? '' : 'n') + ')' : '') + '</p>' +
+        '<div style="display:flex; gap:0.6rem; flex-wrap:wrap;">' +
+          '<button class="btn" id="pendingReqYesBtn">Ja, zusagen</button>' +
+          '<button class="btn secondary" id="pendingReqNoBtn">Nein, ablehnen</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('pendingReqCloseBtn').addEventListener('click', () => {
+      // Später entscheiden: bleibt offen und poppt beim nächsten Login erneut auf;
+      // die Buttons stehen auch in der Chat-Nachricht weiterhin bereit.
+      overlay.remove();
+    });
+    document.getElementById('pendingReqYesBtn').addEventListener('click', async () => {
+      respondToRequest(dateStr, true);
+      await saveShared();
+      queue.shift();
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+    document.getElementById('pendingReqNoBtn').addEventListener('click', async () => {
+      respondToRequest(dateStr, false);
+      await saveShared();
+      queue.shift();
+      renderCalendarTab(); renderInstruments();
+      renderNext();
+    });
+  }
+  renderNext();
+}
+
 function showNewMessagesPopupIfAny(){
   if(!accessGranted) return;
-  if(getPendingDecisionsForMe().length) return;
+  if(getPendingDecisionsForMe().length || getPendingRequestsForMe().length) return;
   const unread = getUnreadChatCount();
   if(!unread) return;
   const overlay = document.createElement('div');
@@ -1965,7 +2023,7 @@ function showNewMessagesPopupIfAny(){
 
 function showPendingDecisionsQueue(){
   const dates = getPendingDecisionsForMe();
-  if(!dates.length) return;
+  if(!dates.length){ showPendingRequestsQueue(); return; }
   let queue = dates.slice();
 
   const overlay = document.createElement('div');
@@ -1974,7 +2032,7 @@ function showPendingDecisionsQueue(){
   document.body.appendChild(overlay);
 
   function renderNext(){
-    if(!queue.length){ overlay.remove(); return; }
+    if(!queue.length){ overlay.remove(); showPendingRequestsQueue(); return; }
     const dateStr = queue[0];
     const ov = state.priorityOverrides ? state.priorityOverrides[dateStr] : null;
     if(!ov || ov.claimedBy || (ov.declinedBy || []).includes(session.partyId)){
@@ -1998,9 +2056,10 @@ function showPendingDecisionsQueue(){
         '</div>' : '');
 
     document.getElementById('pendingCloseBtn').addEventListener('click', () => {
-      // Später entscheiden: Popup schliessen, ohne etwas zu speichern — die
-      // Entscheidungs-Buttons bleiben dann in der Chat-Nachricht verfügbar.
+      // Später entscheiden: Popup schliessen, ohne etwas zu speichern — es poppt
+      // beim nächsten Login erneut auf, und die Buttons bleiben im Chat verfügbar.
       overlay.remove();
+      showPendingRequestsQueue();
     });
     document.getElementById('pendingYesBtn').addEventListener('click', async () => {
       respondToPendingDay(dateStr, true);
@@ -2056,6 +2115,52 @@ function currentPriorityLabel(){
   if(!eff.base) return null;
   if(eff.open) return { party: 'Frei — noch nicht übernommen', color: '#999' };
   return { party: partyName(eff.partyId), color: partyColor(eff.partyId) };
+}
+
+// Sprung aus einer Kalender-Chat-Nachricht: zum betreffenden Tag/Zeitraum wechseln,
+// Jingle abspielen und bei mehreren Terminen eine kleine Tour (←/→) anbieten.
+let calendarTour = null;
+function jumpToCalendarDates(dates, sound){
+  const clean = (dates || []).filter(Boolean).sort();
+  if(!clean.length) return;
+  document.querySelectorAll('.gate-overlay').forEach(o => { if(o.querySelector('#chatMessageList')) o.remove(); });
+  const calTab = document.querySelector('.tab[data-tab="calendar"]');
+  if(calTab) calTab.click();
+  calendarTour = { dates: clean, sound: sound || null, idx: 0 };
+  showCalendarTourStep();
+}
+function showCalendarTourStep(){
+  if(!calendarTour || !calendarTour.dates.length) return;
+  const dateStr = calendarTour.dates[calendarTour.idx];
+  calendarViewYear = parseInt(dateStr.slice(0,4));
+  calendarViewMonth = parseInt(dateStr.slice(5,7)) - 1;
+  calendarSelectedDate = null; // damit selectCalendarDay nicht togglet
+  renderCalendarTab();
+  selectCalendarDay(dateStr);
+  renderCalendarTourBar();
+  if(calendarTour.sound) playAppSound(calendarTour.sound, true);
+  const grid = document.getElementById('calendarGrid');
+  if(grid) grid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function renderCalendarTourBar(){
+  const grid = document.getElementById('calendarGrid');
+  let bar = document.getElementById('calTourBar');
+  if(!calendarTour || calendarTour.dates.length <= 1){ if(bar) bar.remove(); return; }
+  if(!bar || !bar.isConnected){
+    bar = document.createElement('div');
+    bar.id = 'calTourBar';
+    if(grid && grid.parentNode) grid.parentNode.insertBefore(bar, grid);
+    else return;
+  }
+  bar.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:0.6rem; margin:0.5rem 0; padding:0.4rem 0.6rem; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); font-size:0.84rem;';
+  bar.innerHTML =
+    '<button type="button" class="btn secondary" id="calTourPrev" style="padding:0.35rem 0.7rem;"' + (calendarTour.idx === 0 ? ' disabled' : '') + '>←</button>' +
+    '<span>Termin ' + (calendarTour.idx + 1) + ' / ' + calendarTour.dates.length + '</span>' +
+    '<button type="button" class="btn secondary" id="calTourNext" style="padding:0.35rem 0.7rem;"' + (calendarTour.idx >= calendarTour.dates.length - 1 ? ' disabled' : '') + '>→</button>' +
+    '<button type="button" title="Tour beenden" style="border:none; background:transparent; font-size:1.1rem; cursor:pointer; color:var(--ink-soft);" id="calTourClose">✕</button>';
+  document.getElementById('calTourPrev').addEventListener('click', () => { if(calendarTour.idx > 0){ calendarTour.idx--; showCalendarTourStep(); } });
+  document.getElementById('calTourNext').addEventListener('click', () => { if(calendarTour.idx < calendarTour.dates.length - 1){ calendarTour.idx++; showCalendarTourStep(); } });
+  document.getElementById('calTourClose').addEventListener('click', () => { calendarTour = null; const b = document.getElementById('calTourBar'); if(b) b.remove(); });
 }
 
 let calendarViewYear = new Date().getFullYear();
@@ -3676,8 +3781,11 @@ function renderChatMessageListInto(list){
             : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>');
       const bubbleBg = isBeer ? '#F5E7B8' : (mine ? '#DCF3C8' : '#fff');
       const bubbleBorder = isBeer ? '#C9A227' : (mine ? '#A9D18E' : 'var(--bronze-line)');
+      const calDates = (m.type === 'dayfree' || m.type === 'dayreq' || m.type === 'daydecline') && m.date ? [m.date]
+        : ((m.type === 'dayfree-range' || m.type === 'dayreq-range') && m.dates && m.dates.length ? m.dates : null);
+      const calJumpAttrs = calDates ? ' data-cal-jump="' + calDates.join(',') + '" data-cal-sound="' + (m.sound || '') + '" title="Antippen: im Kalender ansehen" ' : '';
       return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:90%; text-align:' + (mine ? 'right' : 'left') + ';">' +
-        '<div style="display:inline-block; text-align:left; max-width:100%; background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;">' +
+        '<div' + calJumpAttrs + ' style="display:inline-block; text-align:left; max-width:100%; background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;' + (calDates ? ' cursor:pointer;' : '') + '">' +
           senderLine +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
           (m.sound && APP_SOUNDS[m.sound] ? '<div><button type="button" data-play-sound="' + m.sound + '" style="margin-top:0.45rem; display:inline-flex; align-items:center; gap:0.35rem; border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); border-radius:999px; padding:0.3rem 0.75rem; font-size:0.78rem; cursor:pointer;">▶️ Jingle abspielen</button></div>' : '') +
@@ -3712,6 +3820,10 @@ function renderChatMessageListInto(list){
       renderChatMessageListInto(list);
     };
     list.querySelectorAll('[data-play-sound]').forEach(el => el.addEventListener('click', () => playAppSound(el.dataset.playSound, true)));
+    list.querySelectorAll('[data-cal-jump]').forEach(el => el.addEventListener('click', (ev) => {
+      if(ev.target.closest('button')) return; // Buttons in der Nachricht nicht als Sprung werten
+      jumpToCalendarDates(el.dataset.calJump.split(','), el.dataset.calSound || null);
+    }));
     list.querySelectorAll('[data-day-claim]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayClaim, true))));
     list.querySelectorAll('[data-day-pass]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayPass, false))));
     list.querySelectorAll('[data-day-reqyes]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToRequest(el.dataset.dayReqyes, true))));
@@ -3754,8 +3866,11 @@ function showChatModal(){
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
       '<div class="field" style="margin:0 0 0.35rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
-      '<div id="chatEmojiPanel" style="display:none; flex-wrap:wrap; gap:0.15rem; margin-bottom:0.4rem; padding:0.45rem; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); max-height:132px; overflow-y:auto;">' +
-        ['👍','🙏','😂','🤣','😅','😊','😍','🥳','🎉','❤️','😘','😜','😎','🤙','👌','✌️','🤝','💪','🙈','😴','🤯','😡','🥶','😢','🍺','🍻','🥂','⚓','🚤','⛵','🌊','☀️','🌦️','🌧️','💨','🌈','🐟','🎣','🛟','🧭','⛽','🔧','💰','✅','❌','❓','⏰','📅','🔥'].map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.35rem; padding:0.15rem 0.25rem; cursor:pointer; line-height:1;">' + e + '</button>').join('') +
+      '<div id="chatEmojiPanel" style="display:none; margin-bottom:0.4rem; padding:0.5rem; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm);">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;"><span style="font-size:0.78rem; color:var(--ink-soft);">Emoji auswählen</span><button type="button" id="chatEmojiCloseBtn" title="Schliessen" style="border:none; background:transparent; font-size:1.15rem; line-height:1; cursor:pointer; color:var(--ink-soft); padding:0.15rem 0.3rem;">✕</button></div>' +
+        '<div style="display:grid; grid-template-columns:repeat(8, 1fr); gap:0.05rem; max-height:46vh; overflow-y:auto;">' +
+        ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😜', '🤪', '😎', '🥳', '🤩', '🤗', '🤔', '🙄', '😬', '😴', '🤯', '😳', '🥺', '😢', '😭', '😡', '🥶', '🤒', '🤢', '🙈', '🙉', '🙊', '💪', '👍', '👎', '👌', '✌️', '🤙', '🤝', '🙏', '👏', '🖐️', '👋', '❤️', '🧡', '💛', '💚', '💙', '💜', '🔥', '⭐', '🎉', '🎊', '🎂', '🎁', '☀️', '🌦️', '🌧️', '⛈️', '💨', '🌈', '🌊', '⚓', '🚤', '⛵', '🛟', '🧭', '🎣', '🐟', '🦆', '🍺', '🍻', '🥂', '🍷', '🍕', '🌭', '🍔', '⛽', '🔧', '🔩', '💰', '💸', '🪙', '✅', '❌', '❓', '❗', '⏰', '📅', '📍', '🔓', '🔒'].map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.45rem; padding:0.22rem 0.1rem; cursor:pointer; line-height:1;">' + e + '</button>').join('') +
+        '</div>' +
       '</div>' +
       '<div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.1rem;">' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>' +
@@ -3896,7 +4011,10 @@ function showChatModal(){
   const emojiBtn = document.getElementById('chatEmojiBtn');
   const emojiPanel = document.getElementById('chatEmojiPanel');
   emojiBtn.addEventListener('click', () => {
-    emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'flex' : 'none';
+    emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('chatEmojiCloseBtn').addEventListener('click', () => {
+    emojiPanel.style.display = 'none';
   });
   overlay.querySelectorAll('.chat-emoji-pick').forEach(btn => btn.addEventListener('click', () => {
     const inp = document.getElementById('chatTextInput');
@@ -5168,25 +5286,60 @@ function setupSettlementPaymentUI(year){
     if(!document.getElementById('spDate').value) document.getElementById('err-sp-date').classList.add('show');
   });
 
-  document.getElementById('requestMoneyBtn').addEventListener('click', async () => {
+  document.getElementById('requestMoneyBtn').addEventListener('click', () => {
     const fb = document.getElementById('err-sp-general');
     const showFb = (msg, ok) => { fb.style.color = ok ? '#1C9A64' : '#C0392B'; fb.textContent = msg; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4500); };
+    const area = document.getElementById('requestMoneyArea');
+    if(area.style.display !== 'none'){ area.style.display = 'none'; return; }
     if(!session.partyId){ showFb('Nur Parteien können Geld anfordern.', false); return; }
     const year = parseInt(document.getElementById('adjustmentYear').value);
     const { rows } = computeSettlement(year);
+    const myRow = rows.find(r => r.id === session.partyId);
+    // Anfordern ist nur möglich, wenn die eigene Partei im Plus ist.
+    if(!myRow || myRow.balance <= 0.005){
+      showFb('💰 Geld anfordern ist nur möglich, wenn deine Partei gemäss Abrechnung ' + year + ' im Plus ist.', false);
+      return;
+    }
     const myName = partyName(session.partyId);
     const byName = {}; state.parties.forEach(p => { byName[p.name] = p.id; });
     const tx = settlementTransactions(rows).filter(t => t.to === myName);
-    if(!tx.length){ showFb('Aktuell schuldet dir gemäss Abrechnung ' + year + ' niemand etwas 🎉', true); return; }
-    if(!state.chatMessages) state.chatMessages = [];
-    tx.forEach(t => {
-      const debtorId = byName[t.from] || null;
-      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(t.amount) + ' aus der Abrechnung ' + year + ' an — TWINT sei Dank 😉', photo: null, voice: null, type: 'normal', sound: 'gib-mir-geld', toPartyIds: debtorId ? [debtorId] : null });
+    if(!tx.length){
+      showFb('Gemäss Abrechnung ' + year + ' steht aktuell keine Zahlung an dich aus.', false);
+      return;
+    }
+    area.style.display = 'block';
+    area.innerHTML =
+      '<div class="hint" style="margin-bottom:0.6rem;">Du bist ' + fmtCHF(myRow.balance) + ' im Plus. Fordere den Betrag an — die Anfrage geht als Chat-Nachricht (inkl. Jingle 🎺) an die Partei.</div>' +
+      '<div class="row">' +
+        '<div class="field"><label for="rmFrom">Von wem</label><select id="rmFrom">' +
+          tx.map((t, i) => '<option value="' + i + '">' + escapeHtml(t.from) + ' (schuldet dir ' + fmtCHF(t.amount) + ')</option>').join('') +
+        '</select></div>' +
+        '<div class="field"><label for="rmAmount">Betrag (CHF) *</label><input type="text" inputmode="decimal" class="amount-input" id="rmAmount" value="' + tx[0].amount.toFixed(2) + '" style="min-width:130px;"></div>' +
+      '</div>' +
+      '<div class="gate-error" id="err-rm-amount">Bitte einen gültigen Betrag grösser als 0 angeben.</div>' +
+      '<div style="display:flex; gap:0.5rem; flex-wrap:wrap;">' +
+        '<button class="btn" id="rmSendBtn">💰 Senden</button>' +
+        '<button class="btn secondary" id="rmCancelBtn">Abbrechen</button>' +
+      '</div>';
+    const fromSel = document.getElementById('rmFrom');
+    fromSel.addEventListener('change', () => {
+      const t = tx[parseInt(fromSel.value)];
+      if(t) document.getElementById('rmAmount').value = t.amount.toFixed(2);
     });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
-    playAppSound('gib-mir-geld');
-    await saveShared();
-    showFb('Geld-Anforderung verschickt: ' + tx.map(t => fmtCHF(t.amount) + ' von ' + t.from).join(', '), true);
+    document.getElementById('rmCancelBtn').addEventListener('click', () => { area.style.display = 'none'; });
+    document.getElementById('rmSendBtn').addEventListener('click', async () => {
+      const errEl = document.getElementById('err-rm-amount');
+      errEl.classList.remove('show');
+      const t = tx[parseInt(document.getElementById('rmFrom').value)] || tx[0];
+      const amount = parseSwissAmount(document.getElementById('rmAmount').value);
+      if(isNaN(amount) || amount <= 0){ errEl.classList.add('show'); return; }
+      const debtorId = byName[t.from] || null;
+      pushDayChatMessage({ type: 'normal', sound: 'gib-mir-geld', fromPartyId: session.partyId, fromAdmin: isAdminUser, toPartyIds: debtorId ? [debtorId] : null, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(amount) + ' von ' + escapeHtml(t.from) + ' (Abrechnung ' + year + ') — TWINT sei Dank 😉' });
+      playAppSound('gib-mir-geld', true);
+      await saveShared();
+      area.style.display = 'none';
+      showFb('Geld-Anforderung über ' + fmtCHF(amount) + ' an ' + t.from + ' verschickt.', true);
+    });
   });
 
   document.getElementById('addSettlementPaymentBtn').addEventListener('click', async () => {
@@ -7656,7 +7809,10 @@ async function init(){
   document.getElementById('settlementYear').addEventListener('change', renderSettlement);
   document.addEventListener('mouseup', finalizeCalendarDrag);
   document.addEventListener('click', (ev) => {
-    if(!calendarSelectedDate) return;
+    // Auch reagieren, wenn nur eine (versehentliche) Mehrtagesauswahl existiert —
+    // der frühere Abbruch bei fehlendem Einzeltag verhinderte genau das Aufheben.
+    const hasDragMarks = !!document.querySelector('.cal-day.drag-selected');
+    if(!calendarSelectedDate && !hasDragMarks) return;
     // Wenn das geklickte Element nicht mehr im DOM hängt, wurde das Panel durch den
     // Button-Klick gerade neu gerendert (z. B. "Diesen Tag abgeben" → Bestätigungsdialog).
     // Das ist KEIN Klick ausserhalb — sonst wird der Bestätigungsdialog sofort geschlossen
@@ -7746,13 +7902,13 @@ async function init(){
         if(!state.priorityOverrides) state.priorityOverrides = {};
         rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
         logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
-        pushDayChatMessage({ type: 'dayfree-range', sound: 'brueder-ich-ha-termin', fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '🔓 ' + partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Details im Kalender.' });
+        pushDayChatMessage({ type: 'dayfree-range', dates: rangePendingDates.dates.slice(), sound: 'brueder-ich-ha-termin', fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '🔓 ' + partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Details im Kalender.' });
         playAppSound('brueder-ich-ha-termin');
       } else {
         if(!state.priorityRequests) state.priorityRequests = {};
         rangePendingDates.dates.forEach(d => { state.priorityRequests[d] = { requestedBy: targetParty, createdAt: Date.now() }; });
         logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage angefragt (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
-        pushDayChatMessage({ type: 'dayreq-range', sound: null, fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '📅 ' + partyName(targetParty) + ' möchte ' + rangePendingDates.dates.length + ' Vorrechtstage übernehmen (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Zusagen bitte im Kalender.' });
+        pushDayChatMessage({ type: 'dayreq-range', dates: rangePendingDates.dates.slice(), sound: null, fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '📅 ' + partyName(targetParty) + ' möchte ' + rangePendingDates.dates.length + ' Vorrechtstage übernehmen (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Zusagen bitte im Kalender.' });
       }
       await saveShared();
       const actionWord = rangeMode === 'giveup' ? 'abgegeben' : 'angefragt';
