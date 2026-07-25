@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-27';
+const APP_VERSION = '2026-07-25-28';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1843,7 +1843,7 @@ function showUpdateBanner(){
   if(updateBannerShown) return;
   updateBannerShown = true;
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:200; background:var(--hull); color:#fff; padding:0.8rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:0.8rem; font-family:Inter,sans-serif; font-size:0.85rem; box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+  banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:200; background:var(--hull); color:#fff; padding:calc(0.8rem + env(safe-area-inset-top, 0px)) 1rem 0.8rem; display:flex; align-items:center; justify-content:space-between; gap:0.8rem; font-family:Inter,sans-serif; font-size:0.85rem; box-shadow:0 2px 10px rgba(0,0,0,0.3);';
   banner.innerHTML =
     '<span>🔄 Eine neue Version von WakeLog ist verfügbar.</span>' +
     '<button type="button" style="background:var(--volt); color:var(--hull); border:none; border-radius:var(--radius-sm); padding:0.5rem 1rem; font-weight:700; cursor:pointer; white-space:nowrap;">Jetzt aktualisieren</button>';
@@ -3901,7 +3901,7 @@ function showChatModal(){
         '<button type="button" class="btn secondary chat-icon-btn" id="chatVoiceBtn" title="Sprachmemo aufnehmen">🎤</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatWaveVaterBtn" title="Hallo Vater senden">🙋‍♂️</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatWaveMuetterBtn" title="Hallo Muetter senden">🙋‍♀️</button>' +
-        '<button type="button" class="btn" id="chatSendBtn" style="flex:1; min-width:0; padding:0.6rem 0.4rem; white-space:nowrap;">Senden ➤</button>' +
+        '<button type="button" class="btn" id="chatSendBtn" title="Senden" style="width:44px; height:40px; flex-shrink:0; margin-left:auto; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:1.15rem; border-radius:999px;">➤</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
