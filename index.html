@@ -964,6 +964,8 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
       <div class="card" id="adminCard"></div>
     </div>
 
+    <div id="appVersionFooter" style="text-align:center; margin:1.8rem 0 0.6rem; font-size:0.7rem; color:var(--ink-soft); opacity:0.6;"></div>
+
     </div>
   </div>
 </div>
@@ -1327,7 +1329,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-24-21';
+const APP_VERSION = '2026-07-25-23';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1534,6 +1536,7 @@ function subscribeRealtime(){
       state.notifications = loaded.notifications || [];
       const newChatMessages = loaded.chatMessages || [];
       checkNewBeerCalls(state.chatMessages || [], newChatMessages);
+      checkNewSoundMessages(state.chatMessages || [], newChatMessages);
       state.chatMessages = newChatMessages;
       const newSoundEvents = loaded.soundEvents || [];
       checkNewSoundEvents(newSoundEvents);
@@ -1691,8 +1694,7 @@ function updateHeaderMeta(){
   const dateBlock = '<span style="white-space:nowrap;">' +
     now.toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) +
     ', ' + now.toLocaleTimeString('de-CH', { hour:'2-digit', minute:'2-digit' }) + ' Uhr' +
-    ' (KW ' + isoWeekNumber(todayStr) + ')' +
-    ' <span style="opacity:0.5;" title="App-Version">v' + APP_VERSION.slice(5) + '</span></span>';
+    ' (KW ' + isoWeekNumber(todayStr) + ')</span>';
   const prio = currentPriorityLabel();
   const prioBlock = prio
     ? '<span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:' + prio.color + '; flex-shrink:0;"></span>' + escapeHtml(prio.party) + '</span>'
@@ -1870,6 +1872,9 @@ function basePriorityPartyId(dateStr){
   if(rule.mode === 'rotation' && rule.order && rule.order.length){
     return rotationPartyId(rule.order, year, dateStr);
   }
+  if(rule.mode === 'shares' && rule.shares){
+    return sharesPartyId(year, rule.shares, dateStr);
+  }
   return null;
 }
 
@@ -1890,6 +1895,15 @@ function getPendingDecisionsForMe(){
   return result.sort();
 }
 
+// Kalender-Ereignisse landen als Chat-Nachricht (Chat = Posteingang). Traegt die
+// Nachricht einen sound-Schluessel, spielen ihn die Empfaenger beim Eintreffen ab —
+// und dank Nachhol-Mechanismus auch, wenn sie sich erst spaeter anmelden.
+function pushDayChatMessage(msg){
+  if(!state.chatMessages) state.chatMessages = [];
+  state.chatMessages.push(Object.assign({ id: uid(), ts: Date.now(), photo: null, voice: null }, msg));
+  if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+}
+
 function respondToRequest(dateStr, accept){
   const req = state.priorityRequests ? state.priorityRequests[dateStr] : null;
   if(!req) return;
@@ -1902,9 +1916,8 @@ function respondToRequest(dateStr, accept){
     pushNotification(partyName(currentHolder) + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' angenommen 🎉', req.requestedBy);
   } else {
     logAudit(partyName(currentHolder || '') + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' abgelehnt');
-    pushNotification(partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt', req.requestedBy);
+    pushDayChatMessage({ type: 'daydecline', date: dateStr, sound: 'dreamer', fromPartyId: currentHolder || null, fromAdmin: isAdminUser, toPartyIds: [req.requestedBy], text: '❌ ' + partyName(currentHolder || '') + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' abgelehnt.' });
     playAppSound('dreamer');
-    broadcastSound('dreamer');
   }
   delete state.priorityRequests[dateStr];
 }
@@ -1944,7 +1957,8 @@ function showPendingDecisionsQueue(){
     }
     const dateLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('de-CH', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
     overlay.innerHTML =
-      '<div class="gate-card">' +
+      '<div class="gate-card" style="position:relative;">' +
+        '<button type="button" id="pendingCloseBtn" title="Später entscheiden" style="position:absolute; top:0.55rem; right:0.6rem; width:34px; height:34px; border:none; background:transparent; font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink-soft);">✕</button>' +
         '<h2>Vorrecht angeboten</h2>' +
         '<p>' + escapeHtml(partyName(ov.givenUpBy)) + ' hat den Vorrechtstag am <b>' + dateLabel + '</b> abgegeben. Möchtest du ihn übernehmen?' + (queue.length > 1 ? ' (noch ' + (queue.length - 1) + ' weitere' + (queue.length - 1 === 1 ? 'r Tag' : ' Tage') + ' danach)' : '') + '</p>' +
         '<div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1rem;">' +
@@ -1956,6 +1970,11 @@ function showPendingDecisionsQueue(){
           '<button class="btn secondary" id="pendingAllNoBtn">Alle ' + queue.length + ' ablehnen</button>' +
         '</div>' : '');
 
+    document.getElementById('pendingCloseBtn').addEventListener('click', () => {
+      // Später entscheiden: Popup schliessen, ohne etwas zu speichern — die
+      // Entscheidungs-Buttons bleiben dann in der Chat-Nachricht verfügbar.
+      overlay.remove();
+    });
     document.getElementById('pendingYesBtn').addEventListener('click', async () => {
       respondToPendingDay(dateStr, true);
       await saveShared();
@@ -2285,9 +2304,8 @@ function renderCalendarDayPanel(){
         if(!state.priorityOverrides) state.priorityOverrides = {};
         state.priorityOverrides[dateStr] = { givenUpBy: actingId, claimedBy: null, declinedBy: [] };
         logAudit(partyName(actingId) + ' hat Vorrecht am ' + fmtDateCH(dateStr) + ' abgegeben' + (isAdminUser ? ' (durch Administrator)' : ''));
-        pushNotification(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' abgegeben', null);
+        pushDayChatMessage({ type: 'dayfree', date: dateStr, sound: 'brueder-ich-ha-termin', fromPartyId: actingId, fromAdmin: isAdminUser, toPartyIds: null, text: '🔓 ' + partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' abgegeben — der Tag ist frei.' });
         playAppSound('brueder-ich-ha-termin');
-        broadcastSound('brueder-ich-ha-termin');
         justGaveUp = true;
       } else if(action === 'undo'){
         if(state.priorityOverrides) delete state.priorityOverrides[dateStr];
@@ -2313,7 +2331,7 @@ function renderCalendarDayPanel(){
         state.priorityRequests[dateStr] = { requestedBy: actingId, createdAt: Date.now() };
         logAudit(partyName(actingId) + ' hat den Vorrechtstag am ' + fmtDateCH(dateStr) + ' angefragt');
         const holderId = effectivePriority(dateStr).partyId;
-        pushNotification(partyName(actingId) + ' möchte deinen Vorrechtstag am ' + fmtDateCH(dateStr) + ' übernehmen', holderId);
+        pushDayChatMessage({ type: 'dayreq', date: dateStr, sound: null, fromPartyId: actingId, fromAdmin: isAdminUser, toPartyIds: holderId ? [holderId] : null, text: '📅 ' + partyName(actingId) + ' möchte deinen Vorrechtstag am ' + fmtDateCH(dateStr) + ' übernehmen.' });
         justRequested = true;
       }
       calendarPendingAction = null;
@@ -3246,7 +3264,7 @@ function armSoundRetry(){
   window.addEventListener('pointerdown', () => {
     soundRetryArmed = false;
     const keys = pendingSoundKeys.splice(0);
-    keys.forEach(k => { delete lastSoundPlay[k]; playAppSound(k); });
+    keys.forEach((k, i) => { setTimeout(() => { delete lastSoundPlay[k]; playAppSound(k); }, i * 2200); });
   }, { once: true });
 }
 function playAppSound(key){
@@ -3287,6 +3305,49 @@ function broadcastSound(key){
   if(last && last.sound === key && now - last.ts < 3000) return; // Spam-Schutz
   state.soundEvents = state.soundEvents.filter(ev => now - ev.ts < 10 * 60 * 1000).slice(-19);
   state.soundEvents.push({ id: 'snd' + now + Math.random().toString(36).slice(2,6), ts: now, sound: key, from: soundClientId });
+}
+// Sounds, die an Chat-Nachrichten haengen (m.sound): live abspielen, wenn die
+// Nachricht eintrifft — und beim App-Start nachholen, was seit dem letzten Besuch
+// dieses Geraets dazukam (loest das Problem, dass Empfaenger beim spaeteren
+// Anmelden sonst nichts hoeren, weil sie beim Ereignis offline waren).
+const SND_CATCHUP_KEY = 'wakelogSndCatchupTs';
+let msgSoundInitialized = false;
+let nextMsgSoundAt = 0;
+function queueMsgSound(key){
+  const now = Date.now();
+  const at = Math.max(now, nextMsgSoundAt);
+  nextMsgSoundAt = at + 2200; // Jingles nacheinander statt uebereinander
+  if(at <= now){ playAppSound(key); }
+  else { setTimeout(() => playAppSound(key), at - now); }
+}
+function msgSoundRelevantForMe(m){
+  if(!m || !m.sound || !APP_SOUNDS[m.sound]) return false;
+  const myId = session.partyId;
+  if(myId && m.fromPartyId === myId) return false;            // eigene Nachricht
+  if(!myId && isAdminUser && m.fromAdmin) return false;        // eigene Admin-Nachricht
+  if(m.toPartyIds && m.toPartyIds.length){
+    return !!(myId && m.toPartyIds.includes(myId));            // gezielt adressiert
+  }
+  return true;                                                 // an alle
+}
+function checkNewSoundMessages(oldMsgs, newMsgs){
+  try{
+    if(!msgSoundInitialized){
+      msgSoundInitialized = true;
+      let last = 0;
+      try{ last = parseInt(localStorage.getItem(SND_CATCHUP_KEY) || '0', 10) || 0; } catch(e){}
+      const cutoff = Math.max(last, Date.now() - 7 * 24 * 3600 * 1000);
+      (newMsgs || []).filter(m => msgSoundRelevantForMe(m) && (m.ts || 0) > cutoff)
+        .slice(-4) // hoechstens die 4 neuesten nachspielen
+        .forEach(m => queueMsgSound(m.sound));
+    } else {
+      const oldIds = new Set((oldMsgs || []).map(m => m && m.id));
+      (newMsgs || []).forEach(m => {
+        if(m && m.id && !oldIds.has(m.id) && msgSoundRelevantForMe(m)) queueMsgSound(m.sound);
+      });
+    }
+    try{ localStorage.setItem(SND_CATCHUP_KEY, String(Date.now())); } catch(e){}
+  } catch(e){}
 }
 const seenSoundIds = new Set();
 let soundSyncInitialized = false;
@@ -3531,6 +3592,35 @@ function editChatMessage(msgId){
   });
 }
 
+// Buttons in Kalender-Chat-Nachrichten: erscheinen nur, solange die Entscheidung
+// noch offen ist (weder im Popup noch im Kalender noch im Chat getroffen).
+function dayActionButtons(m){
+  if(isAdminUser || !session.partyId || !m || !m.date) return '';
+  const todayStr = new Date().toISOString().slice(0,10);
+  const btnStyle = 'padding:0.45rem 0.7rem; font-size:0.82rem;';
+  if(m.type === 'dayfree'){
+    if(m.fromPartyId === session.partyId) return '';
+    if(m.date < todayStr) return '';
+    const ov = state.priorityOverrides ? state.priorityOverrides[m.date] : null;
+    const undecided = ov && ov.givenUpBy && !ov.claimedBy && !((ov.declinedBy || []).includes(session.partyId));
+    if(!undecided) return '';
+    return '<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">' +
+      '<button type="button" class="btn" style="' + btnStyle + '" data-day-claim="' + m.date + '">Ja, übernehmen</button>' +
+      '<button type="button" class="btn secondary" style="' + btnStyle + '" data-day-pass="' + m.date + '">Nein, danke</button>' +
+    '</div>';
+  }
+  if(m.type === 'dayreq'){
+    const req = state.priorityRequests ? state.priorityRequests[m.date] : null;
+    if(!req) return '';
+    if(effectivePriority(m.date).partyId !== session.partyId) return '';
+    return '<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">' +
+      '<button type="button" class="btn" style="' + btnStyle + '" data-day-reqyes="' + m.date + '">Ja, zusagen</button>' +
+      '<button type="button" class="btn secondary" style="' + btnStyle + '" data-day-reqno="' + m.date + '">Nein, ablehnen</button>' +
+    '</div>';
+  }
+  return '';
+}
+
 function renderChatMessageListInto(list){
   // Chat = Posteingang: Chat-Nachrichten und automatische Mitteilungen
   // erscheinen zeitlich sortiert in EINEM Verlauf.
@@ -3563,6 +3653,7 @@ function renderChatMessageListInto(list){
         '<div style="background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;">' +
           senderLine +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
+          dayActionButtons(m) +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
           (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
         '</div>' +
@@ -3586,6 +3677,16 @@ function renderChatMessageListInto(list){
         })() + '</div>' +
       '</div>';
     }).join('');
+    const dayAction = async (fn) => {
+      await fn();
+      await saveShared();
+      renderCalendarTab(); renderInstruments();
+      renderChatMessageListInto(list);
+    };
+    list.querySelectorAll('[data-day-claim]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayClaim, true))));
+    list.querySelectorAll('[data-day-pass]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayPass, false))));
+    list.querySelectorAll('[data-day-reqyes]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToRequest(el.dataset.dayReqyes, true))));
+    list.querySelectorAll('[data-day-reqno]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToRequest(el.dataset.dayReqno, false))));
     list.querySelectorAll('[data-msg-info]').forEach(el => el.addEventListener('click', () => showChatMessageInfo(el.dataset.msgInfo)));
     list.querySelectorAll('[data-msg-edit]').forEach(el => el.addEventListener('click', () => editChatMessage(el.dataset.msgEdit)));
     list.querySelectorAll('[data-msg-del]').forEach(el => el.addEventListener('click', () => deleteChatMessage(el.dataset.msgDel)));
@@ -3761,17 +3862,14 @@ function showChatModal(){
 
   const sendWave = async (text, soundKey) => {
     if(!session.partyId && !isAdminUser) return;
-    if(!state.chatMessages) state.chatMessages = [];
-    state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text, photo: null, voice: null, type: 'normal', toPartyIds: chatRecipientIds });
-    if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
+    pushDayChatMessage({ type: 'normal', sound: soundKey, fromPartyId: session.partyId, fromAdmin: isAdminUser, text, toPartyIds: chatRecipientIds });
     playAppSound(soundKey);
-    broadcastSound(soundKey);
     await saveShared();
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
   };
-  document.getElementById('chatWaveVaterBtn').addEventListener('click', () => sendWave('🙋‍♂️ Hallo Vater!', 'hallo-vater'));
-  document.getElementById('chatWaveMuetterBtn').addEventListener('click', () => sendWave('🙋‍♀️ Hallo Muetter!', 'hallo-muetter'));
+  document.getElementById('chatWaveVaterBtn').addEventListener('click', () => sendWave('🙋‍♂️', 'hallo-vater'));
+  document.getElementById('chatWaveMuetterBtn').addEventListener('click', () => sendWave('🙋‍♀️', 'hallo-muetter'));
 
   document.getElementById('chatSendBtn').addEventListener('click', async () => {
     if(!session.partyId && !isAdminUser) return;
@@ -5035,11 +5133,10 @@ function setupSettlementPaymentUI(year){
     if(!state.chatMessages) state.chatMessages = [];
     tx.forEach(t => {
       const debtorId = byName[t.from] || null;
-      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(t.amount) + ' aus der Abrechnung ' + year + ' an — TWINT sei Dank 😉', photo: null, voice: null, type: 'normal', toPartyIds: debtorId ? [debtorId] : null });
+      state.chatMessages.push({ id: uid(), ts: Date.now(), fromPartyId: session.partyId, fromAdmin: isAdminUser, text: '💰 GIB MIR GELD! ' + myName + ' fordert ' + fmtCHF(t.amount) + ' aus der Abrechnung ' + year + ' an — TWINT sei Dank 😉', photo: null, voice: null, type: 'normal', sound: 'gib-mir-geld', toPartyIds: debtorId ? [debtorId] : null });
     });
     if(state.chatMessages.length > 300) state.chatMessages = state.chatMessages.slice(-300);
     playAppSound('gib-mir-geld');
-    broadcastSound('gib-mir-geld');
     await saveShared();
     showFb('Geld-Anforderung verschickt: ' + tx.map(t => fmtCHF(t.amount) + ' von ' + t.from).join(', '), true);
   });
@@ -5166,6 +5263,46 @@ function isoWeekNumber(dateStr){
   const yearStart = new Date(d.getFullYear(), 0, 1);
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
+// Vorrecht nach Anteilen (z. B. Anteil am Anschaffungswert): Jede Partei erhält
+// so viele Vorrechtstage, wie ihrem Prozent-Anteil entspricht — übers Jahr
+// gleichmässig durchmischt (bei 2/3 zu 1/3 also z. B. A, A, B, A, A, B, ...).
+// Der Algorithmus ist deterministisch: Tag für Tag bekommt die Partei mit dem
+// grössten Rückstand auf ihren Soll-Anteil den Zuschlag. Dadurch zeigen alle
+// Geräte exakt denselben Kalender, und eine Regeländerung wirkt sofort überall.
+const sharesAssignmentCache = {};
+function sharesAssignmentForYear(year, shares){
+  const ids = state.parties.map(p => p.id).filter(id => (shares[id] || 0) > 0);
+  const total = ids.reduce((s, id) => s + shares[id], 0);
+  if(!ids.length || total <= 0) return null;
+  const key = year + '|' + ids.map(id => id + ':' + shares[id]).join(',');
+  if(sharesAssignmentCache[key]) return sharesAssignmentCache[key];
+  const yr = parseInt(year);
+  const days = ((yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0) ? 366 : 365;
+  const counts = {};
+  ids.forEach(id => { counts[id] = 0; });
+  const out = [];
+  for(let d = 1; d <= days; d++){
+    let best = null, bestDef = -Infinity;
+    ids.forEach(id => {
+      const def = (shares[id] / total) * d - counts[id];
+      if(def > bestDef + 1e-9){ bestDef = def; best = id; }
+    });
+    counts[best]++;
+    out.push(best);
+  }
+  sharesAssignmentCache[key] = out;
+  return out;
+}
+function sharesPartyId(year, shares, dateStr){
+  const assignment = sharesAssignmentForYear(year, shares || {});
+  if(!assignment) return null;
+  const start = new Date(parseInt(year), 0, 1);
+  const cur = new Date(dateStr + 'T00:00:00');
+  const dayIndex = Math.round((cur - start) / 86400000);
+  if(dayIndex < 0 || dayIndex >= assignment.length) return null;
+  return assignment[dayIndex];
+}
+
 function rotationPartyId(order, year, dateStr){
   if(!order || !order.length) return null;
   const weekNum = isoWeekNumber(dateStr);
@@ -5187,6 +5324,15 @@ function renderPriorityRuleBody(){
     return;
   }
 
+  const sharesDisplayText = (r) => {
+    const parts = state.parties.filter(p => (r.shares[p.id] || 0) > 0)
+      .map(p => escapeHtml(p.name) + ' ' + fmtNum(r.shares[p.id], 1) + '%');
+    const today = new Date().toISOString().slice(0,10);
+    const todayId = sharesPartyId(year, r.shares, today);
+    return 'Verteilung nach Anteilen: ' + parts.join(', ') + '. Die Vorrechtstage sind übers Jahr gleichmässig durchmischt im entsprechenden Verhältnis verteilt.' +
+      (todayId ? ' Heute hat <b>' + escapeHtml(partyName(todayId)) + '</b> Vorrecht.' : '');
+  };
+
   if(!isAdminUser){
     let display;
     if(rule && rule.mode === 'evenodd'){
@@ -5196,6 +5342,8 @@ function renderPriorityRuleBody(){
       const currentId = rotationPartyId(rule.order, year, today);
       const weekNum = isoWeekNumber(today);
       display = 'Automatische Wochenrotation: ' + rule.order.map(id => escapeHtml(partyName(id))).join(' → ') + '. Aktuell (KW ' + weekNum + '): <b>' + escapeHtml(partyName(currentId)) + '</b> hat Vorrecht.';
+    } else if(rule && rule.mode === 'shares' && rule.shares){
+      display = sharesDisplayText(rule);
     } else if(rule && rule.mode === 'custom' && rule.text){
       display = escapeHtml(rule.text);
     } else {
@@ -5205,19 +5353,73 @@ function renderPriorityRuleBody(){
     return;
   }
 
+  // Gemeinsamer "Nach Anteilen"-Block (für 2 und mehr Parteien)
+  const sharesRule = (rule && rule.mode === 'shares' && rule.shares) ? rule.shares : null;
+  const defaultShare = Math.round(1000 / state.parties.length) / 10;
+  const sharesBodyHtml =
+    '<div class="hint" style="margin-bottom:0.7rem;">Vorrecht im Verhältnis der Anteile — z.&nbsp;B. am Anschaffungswert des Bootes: Zahlt eine Partei nur einen Drittel, erhält sie auch nur einen Drittel der Vorrechtstage. Die App verteilt die Tage übers Jahr gleichmässig durchmischt und passt den Kalender beim Speichern sofort an.</div>' +
+    '<div class="row">' +
+      state.parties.map(p => '<div class="field"><label>' + escapeHtml(p.name) + ' — Anteil in %</label><input type="text" inputmode="decimal" class="prioShareInput" data-party="' + p.id + '" value="' + fmtNum(sharesRule ? (sharesRule[p.id] || 0) : defaultShare, 1) + '"></div>').join('') +
+    '</div>' +
+    '<div class="gate-error" id="prioSharesError">Die Anteile müssen zusammen 100&nbsp;% ergeben.</div>' +
+    '<button class="btn secondary" id="savePrioSharesBtn">Anteile für ' + year + ' speichern</button>';
+
+  const wireSharesSave = () => {
+    const saveBtn = document.getElementById('savePrioSharesBtn');
+    if(!saveBtn) return;
+    saveBtn.addEventListener('click', async () => {
+      const fb = document.getElementById('prioFeedback');
+      const errEl = document.getElementById('prioSharesError');
+      const inputs = Array.from(document.querySelectorAll('.prioShareInput'));
+      const shares = {};
+      let sum = 0;
+      inputs.forEach(inp => {
+        const v = parseFloat(String(inp.value).replace(',', '.'));
+        const num = isFinite(v) && v > 0 ? v : 0;
+        shares[inp.dataset.party] = num;
+        sum += num;
+      });
+      if(Math.abs(sum - 100) > 1){ errEl.classList.add('show'); return; }
+      errEl.classList.remove('show');
+      state.priorityRules[year] = { mode: 'shares', shares };
+      logAudit('Vorrangregel für ' + year + ' gespeichert (nach Anteilen: ' + state.parties.filter(p => shares[p.id] > 0).map(p => partyName(p.id) + ' ' + fmtNum(shares[p.id],1) + '%').join(', ') + ')');
+      await saveShared();
+      renderCalendarTab(); renderInstruments();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert — der Kalender wurde angepasst.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
+      renderPriorityRuleBody();
+    });
+  };
+
   if(twoParties){
     const a = state.parties[0], b = state.parties[1];
+    const mode = (rule && rule.mode === 'shares') ? 'shares' : 'evenodd';
     const evenSel = (rule && rule.mode === 'evenodd') ? rule.evenPartyId : '';
     body.innerHTML =
-      '<div class="row">' +
-        '<div class="field"><label for="prioEven">Vorrecht an geraden Kalendertagen</label>' +
-          '<select id="prioEven"><option value="">— wählen —</option>' +
-          state.parties.map(p => '<option value="' + p.id + '"' + (evenSel === p.id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') +
-          '</select></div>' +
-        '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><input type="text" id="prioOddDisplay" value="' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '" disabled></div>' +
+      '<div class="type-toggle" id="prioModeToggle" style="margin-bottom:0.9rem;">' +
+        '<button type="button" data-mode="evenodd" class="' + (mode === 'evenodd' ? 'active' : '') + '">Gerade/Ungerade Tage</button>' +
+        '<button type="button" data-mode="shares" class="' + (mode === 'shares' ? 'active' : '') + '">Nach Anteilen</button>' +
       '</div>' +
-      '<button class="btn" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '<div id="prioEvenoddBody" style="display:' + (mode === 'evenodd' ? 'block' : 'none') + ';">' +
+        '<div class="row">' +
+          '<div class="field"><label for="prioEven">Vorrecht an geraden Kalendertagen</label>' +
+            '<select id="prioEven"><option value="">— wählen —</option>' +
+            state.parties.map(p => '<option value="' + p.id + '"' + (evenSel === p.id ? ' selected' : '') + '>' + escapeHtml(p.name) + '</option>').join('') +
+            '</select></div>' +
+          '<div class="field"><label>Vorrecht an ungeraden Kalendertagen</label><input type="text" id="prioOddDisplay" value="' + (evenSel ? escapeHtml(partyName(state.parties.find(p => p.id !== evenSel).id)) : '—') + '" disabled></div>' +
+        '</div>' +
+        '<button class="btn" id="savePrioBtn">Regel für ' + year + ' speichern</button>' +
+      '</div>' +
+      '<div id="prioSharesBody" style="display:' + (mode === 'shares' ? 'block' : 'none') + ';">' + sharesBodyHtml + '</div>' +
       '<div class="gate-error" id="prioFeedback" style="color:#1C9A64;"></div>';
+
+    document.querySelectorAll('#prioModeToggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#prioModeToggle button').forEach(bt => bt.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('prioEvenoddBody').style.display = btn.dataset.mode === 'evenodd' ? 'block' : 'none';
+        document.getElementById('prioSharesBody').style.display = btn.dataset.mode === 'shares' ? 'block' : 'none';
+      });
+    });
 
     document.getElementById('prioEven').addEventListener('change', (ev) => {
       const other = state.parties.find(p => p.id !== ev.target.value);
@@ -5231,8 +5433,10 @@ function renderPriorityRuleBody(){
       state.priorityRules[year] = { mode: 'evenodd', evenPartyId: evenId, oddPartyId: oddParty.id };
       logAudit('Vorrangregel für ' + year + ' gespeichert (gerade: ' + partyName(evenId) + ', ungerade: ' + partyName(oddParty.id) + ')');
       await saveShared();
-      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+      renderCalendarTab(); renderInstruments();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert — der Kalender wurde angepasst.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
     });
+    wireSharesSave();
   } else {
     const mode = (rule && rule.mode) ? rule.mode : 'rotation';
     const order = (rule && rule.mode === 'rotation' && rule.order && rule.order.length === state.parties.length) ? rule.order : state.parties.map(p => p.id);
@@ -5241,6 +5445,7 @@ function renderPriorityRuleBody(){
     body.innerHTML =
       '<div class="type-toggle" id="prioModeToggle" style="margin-bottom:0.9rem;">' +
         '<button type="button" data-mode="rotation" class="' + (mode === 'rotation' ? 'active' : '') + '">Automatische Wochenrotation</button>' +
+        '<button type="button" data-mode="shares" class="' + (mode === 'shares' ? 'active' : '') + '">Nach Anteilen</button>' +
         '<button type="button" data-mode="custom" class="' + (mode === 'custom' ? 'active' : '') + '">Freitext</button>' +
       '</div>' +
       '<div id="prioRotationBody" style="display:' + (mode === 'rotation' ? 'block' : 'none') + ';">' +
@@ -5253,6 +5458,7 @@ function renderPriorityRuleBody(){
         '<div class="gate-error" id="prioOrderError">Jede Partei darf nur einmal in der Reihenfolge vorkommen.</div>' +
         '<button class="btn secondary" id="savePrioRotationBtn">Rotation für ' + year + ' speichern</button>' +
       '</div>' +
+      '<div id="prioSharesBody" style="display:' + (mode === 'shares' ? 'block' : 'none') + ';">' + sharesBodyHtml + '</div>' +
       '<div id="prioCustomBody" style="display:' + (mode === 'custom' ? 'block' : 'none') + ';">' +
         '<div class="hint" style="margin-bottom:0.7rem;">Beschreibe die Vorrangregel für ' + year + ' hier frei als Text.</div>' +
         '<textarea id="prioText" rows="3" style="width:100%; font-family:\'JetBrains Mono\', monospace; font-size:1rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--line-strong); background:var(--foam); color:var(--ink);" placeholder="z. B. Wochenweise abwechselnd: Partei A, Partei B, Partei C nach Absprache.">' + escapeHtml(text) + '</textarea>' +
@@ -5265,6 +5471,7 @@ function renderPriorityRuleBody(){
         document.querySelectorAll('#prioModeToggle button').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('prioRotationBody').style.display = btn.dataset.mode === 'rotation' ? 'block' : 'none';
+        document.getElementById('prioSharesBody').style.display = btn.dataset.mode === 'shares' ? 'block' : 'none';
         document.getElementById('prioCustomBody').style.display = btn.dataset.mode === 'custom' ? 'block' : 'none';
       });
     });
@@ -5280,7 +5487,8 @@ function renderPriorityRuleBody(){
       state.priorityRules[year] = { mode: 'rotation', order: newOrder };
       logAudit('Vorrangregel für ' + year + ' gespeichert (Wochenrotation: ' + newOrder.map(id => partyName(id)).join(' → ') + ')');
       await saveShared();
-      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
+      renderCalendarTab(); renderInstruments();
+      fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert — der Kalender wurde angepasst.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
       renderPriorityRuleBody();
     });
 
@@ -5290,8 +5498,10 @@ function renderPriorityRuleBody(){
       state.priorityRules[year] = { mode: 'custom', text: val };
       logAudit('Vorrangregel für ' + year + ' gespeichert (Freitext)');
       await saveShared();
+      renderCalendarTab(); renderInstruments();
       fb.style.color = '#1C9A64'; fb.textContent = 'Regel gespeichert.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2500);
     });
+    wireSharesSave();
   }
 }
 
@@ -7326,6 +7536,9 @@ async function init(){
   if('serviceWorker' in navigator){
     try{ navigator.serviceWorker.register('sw.js'); } catch(e){}
   }
+  const verFooter = document.getElementById('appVersionFooter');
+  if(verFooter) verFooter.textContent = 'WakeLog · Version ' + APP_VERSION;
+
   // 🥚 Easteregg: fünfmal aufs Logo tippen → "Erfinder"-Jingle
   (function(){
     const logo = document.getElementById('heroLogo');
@@ -7465,14 +7678,13 @@ async function init(){
         if(!state.priorityOverrides) state.priorityOverrides = {};
         rangePendingDates.dates.forEach(d => { state.priorityOverrides[d] = { givenUpBy: targetParty, claimedBy: null, declinedBy: [] }; });
         logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
-        pushNotification(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')', null);
+        pushDayChatMessage({ type: 'dayfree-range', sound: 'brueder-ich-ha-termin', fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '🔓 ' + partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage abgegeben (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Details im Kalender.' });
         playAppSound('brueder-ich-ha-termin');
-        broadcastSound('brueder-ich-ha-termin');
       } else {
         if(!state.priorityRequests) state.priorityRequests = {};
         rangePendingDates.dates.forEach(d => { state.priorityRequests[d] = { requestedBy: targetParty, createdAt: Date.now() }; });
         logAudit(partyName(targetParty) + ' hat ' + rangePendingDates.dates.length + ' Vorrechtstage angefragt (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')');
-        pushNotification(partyName(targetParty) + ' möchte ' + rangePendingDates.dates.length + ' Vorrechtstage übernehmen (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ')', null);
+        pushDayChatMessage({ type: 'dayreq-range', sound: null, fromPartyId: targetParty, fromAdmin: isAdminUser, toPartyIds: null, text: '📅 ' + partyName(targetParty) + ' möchte ' + rangePendingDates.dates.length + ' Vorrechtstage übernehmen (' + fmtDateCH(startVal) + ' bis ' + fmtDateCH(endVal) + ') — Zusagen bitte im Kalender.' });
       }
       await saveShared();
       const actionWord = rangeMode === 'giveup' ? 'abgegeben' : 'angefragt';
