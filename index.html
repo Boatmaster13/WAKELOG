@@ -1329,7 +1329,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-23';
+const APP_VERSION = '2026-07-25-24';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1934,6 +1934,33 @@ function respondToPendingDay(dateStr, accept){
     if(!ov.declinedBy.includes(myId)) ov.declinedBy.push(myId);
     logAudit(partyName(myId) + ' hat das angebotene Vorrecht am ' + fmtDateCH(dateStr) + ' abgelehnt');
   }
+}
+
+// Beim Anmelden: Hinweis-Popup, wenn seit dem letzten Besuch neue Nachrichten
+// im Posteingang liegen (Chat = Posteingang). Erscheint nur, wenn nicht ohnehin
+// das "Vorrecht angeboten"-Popup ansteht.
+function showNewMessagesPopupIfAny(){
+  if(!accessGranted) return;
+  if(getPendingDecisionsForMe().length) return;
+  const unread = getUnreadChatCount();
+  if(!unread) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'gate-overlay';
+  overlay.style.display = 'flex';
+  overlay.innerHTML =
+    '<div class="gate-card" style="text-align:center; position:relative;">' +
+      '<button type="button" id="newMsgCloseBtn" title="Später lesen" style="position:absolute; top:0.55rem; right:0.6rem; width:34px; height:34px; border:none; background:transparent; font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink-soft);">✕</button>' +
+      '<div style="font-size:2.5rem; margin-bottom:0.6rem;">📬</div>' +
+      '<h2>Neue Nachrichten</h2>' +
+      '<p>Während deiner Abwesenheit ' + (unread === 1 ? 'ist <b>1 neue Nachricht</b>' : 'sind <b>' + unread + ' neue Nachrichten</b>') + ' im Posteingang eingetroffen.</p>' +
+      '<button class="btn" id="newMsgOpenBtn" style="width:100%;">📩 Posteingang öffnen</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('newMsgCloseBtn').addEventListener('click', () => overlay.remove());
+  document.getElementById('newMsgOpenBtn').addEventListener('click', () => {
+    overlay.remove();
+    showChatModal();
+  });
 }
 
 function showPendingDecisionsQueue(){
@@ -3267,11 +3294,11 @@ function armSoundRetry(){
     keys.forEach((k, i) => { setTimeout(() => { delete lastSoundPlay[k]; playAppSound(k); }, i * 2200); });
   }, { once: true });
 }
-function playAppSound(key){
+function playAppSound(key, force){
   const src = APP_SOUNDS[key];
   if(!src) return;
   const now = Date.now();
-  if(lastSoundPlay[key] && now - lastSoundPlay[key] < 1500) return; // kein Doppel-Abspielen
+  if(!force && lastSoundPlay[key] && now - lastSoundPlay[key] < 1500) return; // kein Doppel-Abspielen
   lastSoundPlay[key] = now;
   const tryPlay = (url, fallbackUrl) => {
     try{
@@ -3649,10 +3676,11 @@ function renderChatMessageListInto(list){
             : '<div class="hint" style="margin:0 0 0.2rem;">' + escapeHtml(chatSenderName(m)) + toLabel + '</div>');
       const bubbleBg = isBeer ? '#F5E7B8' : (mine ? '#DCF3C8' : '#fff');
       const bubbleBorder = isBeer ? '#C9A227' : (mine ? '#A9D18E' : 'var(--bronze-line)');
-      return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:90%;">' +
-        '<div style="background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;">' +
+      return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + '; max-width:90%; text-align:' + (mine ? 'right' : 'left') + ';">' +
+        '<div style="display:inline-block; text-align:left; max-width:100%; background:' + bubbleBg + '; border:1.5px solid ' + bubbleBorder + '; border-radius:14px; ' + (mine ? 'border-bottom-right-radius:4px;' : 'border-bottom-left-radius:4px;') + ' padding:0.55rem 0.75rem; font-size:0.88rem;">' +
           senderLine +
           (m.text ? '<div>' + escapeHtml(m.text) + '</div>' : '') +
+          (m.sound && APP_SOUNDS[m.sound] ? '<div><button type="button" data-play-sound="' + m.sound + '" style="margin-top:0.45rem; display:inline-flex; align-items:center; gap:0.35rem; border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); border-radius:999px; padding:0.3rem 0.75rem; font-size:0.78rem; cursor:pointer;">▶️ Jingle abspielen</button></div>' : '') +
           dayActionButtons(m) +
           (m.photo ? '<img src="' + m.photo + '" style="max-width:100%; border-radius:8px; margin-top:0.4rem; display:block;">' : '') +
           (m.voice && m.voice.indexOf('data:audio') === 0 ? '<audio controls src="' + m.voice + '" style="width:100%; min-width:190px; margin-top:0.4rem; display:block;"></audio>' : '') +
@@ -3683,6 +3711,7 @@ function renderChatMessageListInto(list){
       renderCalendarTab(); renderInstruments();
       renderChatMessageListInto(list);
     };
+    list.querySelectorAll('[data-play-sound]').forEach(el => el.addEventListener('click', () => playAppSound(el.dataset.playSound, true)));
     list.querySelectorAll('[data-day-claim]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayClaim, true))));
     list.querySelectorAll('[data-day-pass]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToPendingDay(el.dataset.dayPass, false))));
     list.querySelectorAll('[data-day-reqyes]').forEach(el => el.addEventListener('click', () => dayAction(async () => respondToRequest(el.dataset.dayReqyes, true))));
@@ -3725,7 +3754,11 @@ function showChatModal(){
       '<div id="chatPhotoPreviewArea" style="margin-bottom:0.6rem;"></div>' +
       '<div id="chatVoiceArea" style="margin-bottom:0.6rem;"></div>' +
       '<div class="field" style="margin:0 0 0.35rem;"><textarea id="chatTextInput" rows="5" placeholder="Nachricht schreiben …" style="width:100%; font-family:\'Inter\', sans-serif; font-size:0.9rem; padding:0.6rem 0.7rem; border-radius:var(--radius-sm); border:1.5px solid var(--bronze-line); background:var(--foam); color:var(--ink); resize:none;"></textarea></div>' +
+      '<div id="chatEmojiPanel" style="display:none; flex-wrap:wrap; gap:0.15rem; margin-bottom:0.4rem; padding:0.45rem; background:var(--foam); border:1.5px solid var(--bronze-line); border-radius:var(--radius-sm); max-height:132px; overflow-y:auto;">' +
+        ['👍','🙏','😂','🤣','😅','😊','😍','🥳','🎉','❤️','😘','😜','😎','🤙','👌','✌️','🤝','💪','🙈','😴','🤯','😡','🥶','😢','🍺','🍻','🥂','⚓','🚤','⛵','🌊','☀️','🌦️','🌧️','💨','🌈','🐟','🎣','🛟','🧭','⛽','🔧','💰','✅','❌','❓','⏰','📅','🔥'].map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.35rem; padding:0.15rem 0.25rem; cursor:pointer; line-height:1;">' + e + '</button>').join('') +
+      '</div>' +
       '<div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.1rem;">' +
+        '<button type="button" class="btn secondary chat-icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatPhotoCameraBtn" title="Foto aufnehmen">📷</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatPhotoGalleryBtn" title="Aus Galerie wählen">🖼️</button>' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatVoiceBtn" title="Sprachmemo aufnehmen">🎤</button>' +
@@ -3859,6 +3892,21 @@ function showChatModal(){
     renderChatMessageListInto(document.getElementById('chatMessageList'));
     updateHeaderMeta();
   });
+
+  const emojiBtn = document.getElementById('chatEmojiBtn');
+  const emojiPanel = document.getElementById('chatEmojiPanel');
+  emojiBtn.addEventListener('click', () => {
+    emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'flex' : 'none';
+  });
+  overlay.querySelectorAll('.chat-emoji-pick').forEach(btn => btn.addEventListener('click', () => {
+    const inp = document.getElementById('chatTextInput');
+    const start = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+    const end = inp.selectionEnd != null ? inp.selectionEnd : inp.value.length;
+    inp.value = inp.value.slice(0, start) + btn.dataset.emoji + inp.value.slice(end);
+    const pos = start + btn.dataset.emoji.length;
+    inp.focus();
+    try{ inp.setSelectionRange(pos, pos); } catch(e){}
+  }));
 
   const sendWave = async (text, soundKey) => {
     if(!session.partyId && !isAdminUser) return;
@@ -5582,7 +5630,7 @@ function showRecoveryCodeOnce(recoveryCode, totpSecret){
   const btn = document.getElementById('recoveryConfirmBtn');
   checkbox.addEventListener('change', () => { btn.disabled = !checkbox.checked; });
   btn.addEventListener('click', () => {
-    hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
+    hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 600);
   });
 }
 
@@ -5768,7 +5816,7 @@ function renderGate(){
         '<button type="button" class="active" data-role="party">Partei</button>' +
         '<button type="button" data-role="admin">Administrator</button>' +
       '</div>' +
-      '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><div style="display:flex; gap:0.4rem;"><input id="gate-code" type="text" placeholder="z. B. AB3F7K" value="' + (urlLoginCode ? escapeHtml(urlLoginCode) : '') + '" style="flex:1; min-width:0;"><button type="button" class="btn secondary" id="gateCodePasteBtn" title="Aus Zwischenablage einfügen" style="flex-shrink:0; padding:0.5rem 0.7rem;">📋</button></div></div>' +
+      '<div class="field"><label for="gate-code" id="gate-code-label">Dein Zugangscode</label><div style="display:flex; gap:0.4rem;"><input id="gate-code" type="password" autocomplete="current-password" placeholder="z. B. AB3F7K" value="' + (urlLoginCode ? escapeHtml(urlLoginCode) : '') + '" style="flex:1; min-width:0;"><button type="button" class="btn secondary" id="gateCodeEyeBtn" title="Code anzeigen/verbergen" style="flex-shrink:0; padding:0.5rem 0.7rem;">👁️</button><button type="button" class="btn secondary" id="gateCodePasteBtn" title="Aus Zwischenablage einfügen" style="flex-shrink:0; padding:0.5rem 0.7rem;">📋</button></div></div>' +
       '<button class="btn" id="gateBtn">Bestätigen</button>' +
       '<div class="gate-error" id="gateError">Dieser Code ist ungültig oder wurde vom Administrator widerrufen. Bitte beim Administrator nachfragen.</div>' +
       '<div style="text-align:center; margin-top:1rem;"><a href="#" id="forgotAdminLink" style="font-size:0.78rem; color:var(--ink-faint);">Administrator-Code vergessen?</a></div>';
@@ -5776,6 +5824,13 @@ function renderGate(){
     document.getElementById('forgotAdminLink').addEventListener('click', (ev) => {
       ev.preventDefault();
       renderRecoveryFlow();
+    });
+    document.getElementById('gateCodeEyeBtn').addEventListener('click', () => {
+      const inp = document.getElementById('gate-code');
+      const eye = document.getElementById('gateCodeEyeBtn');
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      eye.textContent = show ? '🙈' : '👁️';
     });
     document.getElementById('gateCodePasteBtn').addEventListener('click', async () => {
       const res = await pasteCodeInto(document.getElementById('gate-code'), 'partycode');
@@ -5818,7 +5873,7 @@ function renderGate(){
       playAppSound('guets-moergeli');
       broadcastSound('guets-moergeli');
       saveShared();
-      hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600);
+      hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 600);
     };
     document.getElementById('gateBtn').addEventListener('click', submit);
     document.getElementById('gate-code').addEventListener('keydown', ev => { if(ev.key === 'Enter') submit(); });
@@ -7607,12 +7662,25 @@ async function init(){
     // Das ist KEIN Klick ausserhalb — sonst wird der Bestätigungsdialog sofort geschlossen
     // und die Abgabe kommt nie zustande (Tag wird nicht grau).
     if(!ev.target.isConnected) return;
-    const insideCalendar = ev.target.closest('#calendarGrid') || ev.target.closest('#calendarDayPanel');
+    const insideCalendar = ev.target.closest('#calendarGrid') || ev.target.closest('#calendarDayPanel') || ev.target.closest('#calRangeBox');
     if(!insideCalendar){
       calendarSelectedDate = null;
       calendarPendingAction = null;
       const panel = document.getElementById('calendarDayPanel');
       if(panel) panel.innerHTML = '';
+      // Versehentliche Mehrtagesauswahl (z. B. beim Scrollen) aufheben:
+      // Markierungen entfernen und die Zeitraum-Box wieder einklappen.
+      calendarDragStart = null;
+      calendarDragCurrent = null;
+      const marked = document.querySelectorAll('.cal-day.drag-selected');
+      if(marked.length){
+        marked.forEach(c => c.classList.remove('drag-selected'));
+        rangePendingDates = null;
+        const rangeBox = document.getElementById('calRangeBox');
+        if(rangeBox) rangeBox.style.display = 'none';
+        const rangeFb = document.getElementById('calRangeFeedback');
+        if(rangeFb) rangeFb.classList.remove('show');
+      }
     }
   });
   document.addEventListener('touchend', finalizeCalendarDrag);
@@ -7815,7 +7883,7 @@ async function init(){
   document.getElementById('f-expense').addEventListener('input', updatePaidSplitTotal);
 
   if(!state.settings || !accessGranted){ showGate(); }
-  else { hideGate(); renderAll(); requestNotificationPermission(); setTimeout(showPendingDecisionsQueue, 600); }
+  else { hideGate(); renderAll(); requestNotificationPermission(); setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 600); }
   startPolling();
   setupInactivityTracking();
   setupUpdateChecking();
