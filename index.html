@@ -976,7 +976,7 @@ tr:last-child td{ border-bottom:1px solid var(--line-strong); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, get, set, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, get, set, remove, onValue, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-45';
+const APP_VERSION = '2026-07-25-47';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1758,6 +1758,7 @@ function updateHeaderMeta(){
       '</div>' +
       '<a href="https://www.meteoschweiz.admin.ch/home.html?tab=alarm" target="_blank" rel="noopener" class="inbox-btn" title="Offizielle Sturmwarnung">⚠️</a>' +
       '<button type="button" class="inbox-btn" id="beerCallBtn" title="Ankerdöschen ausrufen">🍺</button>' +
+      '<button type="button" class="inbox-btn" id="muteBtn" title="' + (isJinglesMuted() ? 'Jingles einschalten' : 'Jingles stummschalten') + '">' + (isJinglesMuted() ? '🔇' : '🔊') + '</button>' +
       '<button type="button" class="inbox-btn" id="inboxBtn" title="Posteingang">' + (unread > 0 ? '📩<span class="inbox-count">' + (unread > 9 ? '9+' : unread) + '</span>' : '📭') + '</button>' +
       badgeHtml +
       '<button type="button" class="logout-btn" id="logoutBtn" style="white-space:nowrap; display:inline-flex; align-items:center; height:32px; box-sizing:border-box;">Abmelden</button>' +
@@ -1771,6 +1772,19 @@ setInterval(() => { if(!document.hidden && typeof accessGranted !== 'undefined' 
 
 function handleAdminStripClick(ev){
   if(ev.target.closest('#logoutBtn')){ logout(); return; }
+  if(ev.target.closest('#muteBtn')){
+    if(isJinglesMuted()){
+      // Wieder einschalten: Flag zuerst löschen, dann Bestätigungs-Jingle
+      try{ localStorage.setItem('wakelogMuted', '0'); } catch(e){}
+      playAppSound('laeuft', true);
+    } else {
+      // Stummschalten: "Heb din Schlitte" als letzter Ton, danach ist Ruhe
+      playAppSound('heb-din-schlitte', true);
+      try{ localStorage.setItem('wakelogMuted', '1'); } catch(e){}
+    }
+    updateHeaderMeta();
+    return;
+  }
   if(ev.target.closest('#inboxBtn')){ showInboxModal(); return; }
   if(ev.target.closest('#beerCallBtn')){
     showBeerCallConfirm();
@@ -3571,7 +3585,12 @@ function playRandomSound(poolName){
   playSoundChain(source.slice(start).concat(source.slice(0, start)));
 }
 // Spielt den ersten verfügbaren Sound der Liste (fehlende Dateien werden übersprungen).
+// Globaler Jingle-Stummschalter (pro Gerät, 🔊/🔇-Kachel im Header)
+function isJinglesMuted(){
+  try{ return localStorage.getItem('wakelogMuted') === '1'; } catch(e){ return false; }
+}
 function playSoundChain(keys){
+  if(isJinglesMuted()) return;
   if(!keys || !keys.length) return;
   const key = keys[0];
   const src = APP_SOUNDS[key];
@@ -3623,6 +3642,7 @@ function armSoundRetry(){
   }, { once: true });
 }
 function playAppSound(key, force){
+  if(isJinglesMuted()) return;
   const src = APP_SOUNDS[key];
   if(!src) return;
   const now = Date.now();
@@ -3740,6 +3760,7 @@ function checkNewSoundEvents(newEvents){
 }
 
 function playBoatHorn(){
+  if(isJinglesMuted()) return;
   try{
     const horn = new Audio('boat-horn.mp3');
     horn.volume = 0.9;
@@ -3783,6 +3804,7 @@ function playSynthCheers(){
   } catch(e){}
 }
 function playCheersSound(){
+  if(isJinglesMuted()) return;
   // Feste Reihenfolge: 1. "sound-can-open.mp3", 2. "drink-sip-and-swallow.mp3",
   // 3. ein zufälliger "sound-burp-N.mp3" (N = 1..10).
   // Alle Dateien liegen im selben Ordner wie index.html.
@@ -8125,8 +8147,23 @@ async function init(){
   // längerer Abwesenheit (>5 Min) erscheinen offene Entscheidungen/Anfragen erneut
   // als Popup, genau wie bei einer frischen Anmeldung.
   let appHiddenSince = 0;
+  let dbSleepTimer = null;
+  let dbAsleep = false;
   document.addEventListener('visibilitychange', () => {
-    if(document.hidden){ appHiddenSince = Date.now(); return; }
+    if(document.hidden){
+      appHiddenSince = Date.now();
+      // Nach 2 Min im Hintergrund die Live-Verbindung trennen (Akku-Schlafmodus)
+      clearTimeout(dbSleepTimer);
+      dbSleepTimer = setTimeout(() => {
+        try{ goOffline(db); dbAsleep = true; } catch(e){}
+      }, 2 * 60 * 1000);
+      return;
+    }
+    clearTimeout(dbSleepTimer);
+    if(dbAsleep){
+      try{ goOnline(db); } catch(e){}
+      dbAsleep = false;
+    }
     try{ if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); } catch(e){}
     try{ trySyncPending(); } catch(e){}
     try{
