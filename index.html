@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-40';
+const APP_VERSION = '2026-07-25-41';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3519,8 +3519,20 @@ function probeSoundAvailability(){
   Object.keys(APP_SOUNDS).forEach(key => {
     if(key in soundAvailability) return;
     soundAvailability[key] = undefined;
-    fetch(APP_SOUNDS[key], { method: 'HEAD' })
-      .then(r => { soundAvailability[key] = !!r.ok; })
+    const src = APP_SOUNDS[key];
+    fetch(src, { method: 'HEAD' })
+      .then(r => {
+        if(r.ok){ soundAvailability[key] = true; return; }
+        // Nicht in sounds/ gefunden: liegt die Datei im Hauptverzeichnis?
+        const rootSrc = src.indexOf('sounds/') === 0 ? src.slice(7) : null;
+        if(!rootSrc){ soundAvailability[key] = false; return; }
+        fetch(rootSrc, { method: 'HEAD' })
+          .then(r2 => {
+            if(r2.ok){ APP_SOUNDS[key] = rootSrc; soundAvailability[key] = true; }
+            else soundAvailability[key] = false;
+          })
+          .catch(() => { soundAvailability[key] = null; });
+      })
       .catch(() => { soundAvailability[key] = null; }); // offline: unbekannt lassen
   });
 }
