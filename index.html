@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-35';
+const APP_VERSION = '2026-07-25-36';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1649,20 +1649,35 @@ function evaluateAccess(){
 }
 
 const SAILOR_QUOTES = [
-  'Ein ruhiges Meer hat noch keinen guten Kapitän hervorgebracht.',
-  'Wer den Hafen nicht kennt, für den ist kein Wind der richtige.',
-  'Nicht der Wind, sondern das Segel bestimmt die Richtung.',
-  'Das Schiff ist im Hafen sicher — aber dafür wurde es nicht gebaut.',
+  // Surf- & Wakeboard-Weisheiten statt Segler-Sprüche
+  'Nach der Fahrt ist vor dem Ankerdöschen.',
+  'Die beste Welle ist immer die, die du gefahren bist.',
+  'Wakeboarden: die einzige Sportart, bei der Abgang und Applaus gleich klingen.',
+  'Erst denken, dann lenken — ausser beim Wellenspringen.',
+  'Glatte See am Morgen macht dem Wakeboarder keine Sorgen.',
+  'Wer nicht stürzt, hat es nicht probiert.',
+  'Salz... äh, Seewasser im Haar, Sonne im Herzen.',
+  'Ein Tag auf dem Wasser ersetzt drei beim Therapeuten.',
+  'Die Leine ist gespannt, der Rest ist Haltung.',
+  'Balance ist keine Frage des Alters — nur der Landung.',
+  'Sprit im Tank, Grinsen im Gesicht.',
+  'Das Brett vergisst nie, wer zu spät aufgestanden ist.',
+  'Flat water, full send.',
+  'Wellen macht man sich am besten selbst.',
   'Erst die Leinen los, dann das Abenteuer.',
-  'Gute Seemannschaft beginnt an Land.',
   'Kleines Boot, grosse Freiheit.',
   'Wer das Wasser liebt, dem gehört der See.',
-  'Man verliert nie — entweder man gewinnt oder man lernt anlegen.',
-  'Kurs halten ist auch eine Kunst.',
-  'Salz im Haar, Sonne im Herzen.',
-  'Nach der Fahrt ist vor dem Ankerdöschen.',
-  'Wind kann man nicht kaufen, nutzen schon.',
-  'Jede Welle trägt dich, wenn du sie lässt.'
+  'Ein nasser Neopren ist der Beweis für einen guten Tag.',
+  'Aufstehen ist Pflicht — auf dem Brett wie im Leben.',
+  'Der See ruft. Wer bin ich, dass ich widerspreche?',
+  'Kaffee an Land, Adrenalin auf dem Wasser.',
+  'Man verliert nie — entweder man steht auf oder man taucht ab.',
+  'Die Frisur hält. Bis zum ersten Sprung.',
+  'Motorstunden zählen nicht, wenn man dabei lacht.',
+  'Wer zuletzt fährt, macht das Deck sauber.',
+  'Physik ist, wenn es trotzdem carvt.',
+  'Heute schon geflogen? Frag das Wakeboard.',
+  'Sonnencreme vergessen merkt man erst beim Ankerdöschen.'
 ];
 function sailorQuoteOfTheDay(){
   const d = new Date();
