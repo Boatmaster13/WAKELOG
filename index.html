@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-42';
+const APP_VERSION = '2026-07-25-44';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3553,7 +3553,7 @@ function pickFromPool(poolName){
 const lastPoolPlay = {};
 function playRandomSound(poolName){
   const now = Date.now();
-  if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 900) return;
+  if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 350) return;
   lastPoolPlay[poolName] = now;
   const pool = SOUND_POOLS[poolName] || [];
   const available = pool.filter(k => soundAvailability[k] !== false);
@@ -8114,11 +8114,22 @@ async function init(){
   }
   probeSoundAvailability();
 
-  // Kehrt die App aus dem Hintergrund zurück, einmalig auffrischen
+  // Kehrt die App aus dem Hintergrund zurück, einmalig auffrischen — und nach
+  // längerer Abwesenheit (>5 Min) erscheinen offene Entscheidungen/Anfragen erneut
+  // als Popup, genau wie bei einer frischen Anmeldung.
+  let appHiddenSince = 0;
   document.addEventListener('visibilitychange', () => {
-    if(document.hidden) return;
+    if(document.hidden){ appHiddenSince = Date.now(); return; }
     try{ if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); } catch(e){}
     try{ trySyncPending(); } catch(e){}
+    try{
+      const awayMs = appHiddenSince ? Date.now() - appHiddenSince : 0;
+      appHiddenSince = 0;
+      const overlayOpen = Array.from(document.querySelectorAll('.gate-overlay')).some(o => o.id !== 'gateOverlay' && o.style.display !== 'none');
+      if(typeof accessGranted !== 'undefined' && accessGranted && awayMs > 5 * 60 * 1000 && !overlayOpen){
+        setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 500);
+      }
+    } catch(e){}
   });
 
   const verFooter = document.getElementById('appVersionFooter');
@@ -8159,7 +8170,7 @@ async function init(){
         // Login-Fehleingabe: NUR Restricted Area (bei jedem Versuch), nie der Fehler-Pool.
         // Solange restricted-area.m4a noch fehlt, springt übergangsweise der Pool ein.
         lastGateErrorTs = Date.now();
-        if(Date.now() - (lastPoolPlay['gate'] || 0) < 700) return; // Doppel-Mutation im selben Versuch
+        if(Date.now() - (lastPoolPlay['gate'] || 0) < 350) return; // Doppel-Mutation im selben Versuch
         lastPoolPlay['gate'] = Date.now();
         if(soundAvailability['restricted-area'] !== false) playAppSound('restricted-area', true);
         else playRandomSound('error');
