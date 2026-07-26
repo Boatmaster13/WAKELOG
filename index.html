@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-33';
+const APP_VERSION = '2026-07-25-35';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1439,7 +1439,7 @@ async function trySyncPending(){
   } catch(e){}
 }
 window.addEventListener('online', () => { trySyncPending(); });
-setInterval(() => { trySyncPending(); }, 30000);
+setInterval(() => { if(!document.hidden) trySyncPending(); }, 30000);
 
 async function loadShared(){
   try{
@@ -1728,7 +1728,7 @@ function updateHeaderMeta(){
   }
   updateAppBadge();
 }
-setInterval(() => { if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); }, 30000);
+setInterval(() => { if(!document.hidden && typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); }, 30000);
 
 function handleAdminStripClick(ev){
   if(ev.target.closest('#logoutBtn')){ logout(); return; }
@@ -1856,7 +1856,8 @@ function showUpdateBanner(){
 }
 function setupUpdateChecking(){
   setTimeout(checkForUpdate, 1500);
-  setInterval(checkForUpdate, 2 * 60 * 1000);
+  // Akku-Schonung: seltener prüfen und nur, wenn die App sichtbar ist
+  setInterval(() => { if(!document.hidden) checkForUpdate(); }, 10 * 60 * 1000);
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible') checkForUpdate();
   });
@@ -1929,7 +1930,7 @@ function respondToRequest(dateStr, accept){
     if(!state.priorityOverrides) state.priorityOverrides = {};
     state.priorityOverrides[dateStr] = { givenUpBy: currentHolder, claimedBy: req.requestedBy, declinedBy: [] };
     logAudit(partyName(currentHolder) + ' hat die Anfrage von ' + partyName(req.requestedBy) + ' für ' + fmtDateCH(dateStr) + ' angenommen');
-    const acceptKey = pickFromPool('accept');
+    const acceptKey = pickFromPool('accept') || 'applaus'; // Übergang, bis yes-1..10 hochgeladen sind
     pushDayChatMessage({ type: 'dayaccept', date: dateStr, sound: acceptKey, fromPartyId: currentHolder, fromAdmin: isAdminUser, toPartyIds: [req.requestedBy], text: '✅ ' + partyName(currentHolder) + ' hat deine Anfrage für den ' + fmtDateCH(dateStr) + ' zugesagt — der Tag gehört dir! 🎉' });
     if(acceptKey) playAppSound(acceptKey, true);
   } else {
@@ -3320,7 +3321,6 @@ async function addEntry(){
   }
 
   if(hasError) return;
-  celebrateIfRecovered();
 
   if(editingId){
     const idx = state.entries.findIndex(e => e.id === editingId);
@@ -3461,6 +3461,8 @@ const APP_SOUNDS = {
   'zuviel-geld': 'sounds/zuviel-geld.m4a',
   'nicht-meine-kostenstelle': 'sounds/nicht-meine-kostenstelle.m4a',
   'kuemmer-mich-drum': 'sounds/kuemmer-mich-drum.m4a',
+  'verdammt': 'sounds/verdammt.m4a',
+  'verflixt': 'sounds/verflixt.m4a',
   'no-1': 'sounds/no-1.m4a', 'no-2': 'sounds/no-2.m4a', 'no-3': 'sounds/no-3.m4a', 'no-4': 'sounds/no-4.m4a', 'no-5': 'sounds/no-5.m4a',
   'no-6': 'sounds/no-6.m4a', 'no-7': 'sounds/no-7.m4a', 'no-8': 'sounds/no-8.m4a', 'no-9': 'sounds/no-9.m4a', 'no-10': 'sounds/no-10.m4a',
   'yes-1': 'sounds/yes-1.m4a', 'yes-2': 'sounds/yes-2.m4a', 'yes-3': 'sounds/yes-3.m4a', 'yes-4': 'sounds/yes-4.m4a', 'yes-5': 'sounds/yes-5.m4a',
@@ -3475,7 +3477,8 @@ const SOUND_POOLS = {
   'login': ['guets-moergeli','morgen','hallo-vater','hallo-muetter'],
   'decline': ['no-1','no-2','no-3','no-4','no-5','no-6','no-7','no-8','no-9','no-10','bist-du-komplett-durchgedreht','pfff','nein-nein-nein','negativ','schoen-aber-nein','och-nee','mhhh-noe','scheissegal','dreamer'],
   'accept': ['yes-1','yes-2','yes-3','yes-4','yes-5','yes-6','yes-7','yes-8','yes-9','yes-10'],
-  'geld-nein': ['was-stimmt-bi-dier-noed','leck-mich-am-arsch','ach-leck-mich-doch','pfff','schoen-aber-nein','scheissegal','zuviel-geld','nicht-meine-kostenstelle']
+  'geld-nein': ['was-stimmt-bi-dier-noed','leck-mich-am-arsch','ach-leck-mich-doch','pfff','schoen-aber-nein','scheissegal','zuviel-geld','nicht-meine-kostenstelle'],
+  'admin-reply': ['kuemmer-mich-drum','change-request']
 };
 // Verfügbarkeit der Sounddateien (einmalige HEAD-Anfragen beim Start): Zufalls-Picks
 // bevorzugen vorhandene Dateien, noch fehlende Pool-Mitglieder werden übersprungen.
@@ -3489,21 +3492,32 @@ function probeSoundAvailability(){
       .catch(() => { soundAvailability[key] = null; }); // offline: unbekannt lassen
   });
 }
+// Feste Reihenfolge (Round-Robin) statt Zufall: Jeder Pool spielt seine Jingles der
+// Reihe nach durch, damit alle gleichmässig drankommen. Der Zähler bleibt pro Gerät
+// gespeichert. Noch fehlende Dateien werden übersprungen.
 function pickFromPool(poolName){
   const pool = SOUND_POOLS[poolName] || [];
   if(!pool.length) return null;
   const available = pool.filter(k => soundAvailability[k] !== false);
-  const source = available.length ? available : pool;
-  return source[Math.floor(Math.random() * source.length)];
+  if(!available.length) return null;
+  let idx = 0;
+  try{ idx = parseInt(localStorage.getItem('wakelogPool-' + poolName) || '0', 10) || 0; } catch(e){}
+  const key = available[idx % available.length];
+  try{ localStorage.setItem('wakelogPool-' + poolName, String((idx + 1) % available.length)); } catch(e){}
+  return key;
 }
 const lastPoolPlay = {};
 function playRandomSound(poolName){
   const now = Date.now();
   if(lastPoolPlay[poolName] && now - lastPoolPlay[poolName] < 900) return;
   lastPoolPlay[poolName] = now;
-  const pool = (SOUND_POOLS[poolName] || []).slice();
-  for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
-  playSoundChain(pool);
+  const pool = SOUND_POOLS[poolName] || [];
+  const available = pool.filter(k => soundAvailability[k] !== false);
+  const source = available.length ? available : pool;
+  const key = pickFromPool(poolName);
+  if(!key) return;
+  const start = Math.max(0, source.indexOf(key));
+  playSoundChain(source.slice(start).concat(source.slice(0, start)));
 }
 // Spielt den ersten verfügbaren Sound der Liste (fehlende Dateien werden übersprungen).
 function playSoundChain(keys){
@@ -3536,14 +3550,8 @@ let suppressErrorSoundUntil = 0;
 function suppressNextErrorSound(){ suppressErrorSoundUntil = Date.now() + 900; }
 // Für "Applaus beim zweiten Anlauf": merken, wann zuletzt eine Fehlermeldung kam
 let lastValidationErrorTs = 0;
-function celebrateIfRecovered(){
-  if(lastValidationErrorTs && Date.now() - lastValidationErrorTs < 5 * 60 * 1000){
-    lastValidationErrorTs = 0;
-    playAppSound('applaus', true);
-    return true;
-  }
-  return false;
-}
+let lastGateErrorTs = 0; // Login-Fehlversuche separat (nur sie lösen den Login-Applaus aus)
+
 const lastSoundPlay = {};
 const pendingSoundKeys = []; // Einträge: { key, ts }
 let soundRetryArmed = false;
@@ -4035,6 +4043,10 @@ function renderChatMessageListInto(list){
 }
 
 function showChatModal(){
+  // Schon offen? Dann nur den Verlauf aktualisieren statt ein zweites Fenster zu stapeln
+  // (Doppel-Overlays konnten auf Android zu einem falsch dargestellten Chatfenster führen).
+  const existingList = document.getElementById('chatMessageList');
+  if(existingList){ renderChatMessageListInto(existingList); return; }
   setChatLastSeen(Date.now());
   setInboxLastSeen(Date.now());
   updateHeaderMeta();
@@ -4044,7 +4056,7 @@ function showChatModal(){
   const otherParties = state.parties.filter(p => p.id !== session.partyId);
   const pushOn = getPushEnabled();
   overlay.innerHTML =
-    '<div class="gate-card" style="max-width:540px; height:100%; max-height:100%; display:flex; flex-direction:column; overflow:hidden; padding:1.1rem 0.9rem 1rem;">' +
+    '<div class="gate-card" style="width:100%; max-width:540px; height:100%; max-height:100%; display:flex; flex-direction:column; overflow:hidden; padding:1.1rem 0.9rem 1rem;">' +
       '<button type="button" class="modal-x" id="chatCloseBtn" title="Schliessen">✕</button>' +
       '<h2 style="margin:0 0 0.4rem;">Posteingang</h2>' +
       '<div class="toggle-row" style="margin:0 0 0.6rem; padding-bottom:0.6rem; border-bottom:1px solid var(--line); justify-content:space-between;">' +
@@ -4070,7 +4082,6 @@ function showChatModal(){
         '<div style="display:grid; grid-template-columns:repeat(8, 1fr); gap:0.05rem; max-height:46vh; overflow-y:auto; overscroll-behavior:contain;">' +
         [{n:"Smileys",e:["😀", "😁", "😂", "😃", "😄", "😅", "😆", "😇", "😈", "😉", "😊", "😋", "😌", "😍", "😎", "😏", "😐", "😑", "😒", "😓", "😔", "😕", "😖", "😗", "😘", "😙", "😚", "😛", "😜", "😝", "😞", "😟", "😠", "😡", "😢", "😣", "😤", "😥", "😦", "😧", "😨", "😩", "😪", "😫", "😬", "😭", "😮", "😯", "😰", "😱", "😲", "😳", "😴", "😵", "😶", "😷", "😸", "😹", "😺", "😻", "😼", "😽", "😾", "😿", "🙀", "🙁", "🙂", "🙃", "🙄", "🙅", "🙆", "🙇", "🙈", "🙉", "🙊", "🙋", "🙌", "🙍", "🙎", "🙏", "🤐", "🤑", "🤒", "🤓", "🤔", "🤕", "🤖", "🤗", "🤘", "🤙", "🤚", "🤛", "🤜", "🤝", "🤞", "🤟", "🤠", "🤡", "🤢", "🤣", "🤤", "🤥", "🤦", "🤧", "🤨", "🤩", "🤪", "🤫", "🤬", "🤭", "🤮", "🤯", "🥰", "🥵", "🥶", "🥳", "🥺", "🧐", "🤠", "🤡", "🤥", "🤫", "🤭", "💀", "👻", "👽", "🤖", "💩"]},{n:"Gesten & Personen",e:["👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳", "💪", "🦾", "👂", "👃", "🧠", "👀", "👁️", "👅", "👄", "👦", "👧", "👨", "👩", "👪", "👫", "👬", "👭", "👮", "👯", "👰", "👱", "👲", "👳", "👴", "👵", "👶", "👷", "👸", "👹", "👺", "👻", "👼", "👽", "👾", "👿", "💀", "💁", "💂", "💃", "💄", "💅", "💆", "💇", "🧑", "🧔", "🧓", "🧕", "🤰", "🤱", "🧙", "🧚", "🧜", "🧑‍✈️", "🧑‍🔧", "🧑‍🍳", "🕵️", "💂", "👮", "👷", "🤴", "👸", "🎅", "🦸", "🦹", "🧟", "💃", "🕺", "🏊", "🚣", "🏄", "🤽", "⛷️", "🏂", "🚴"]},{n:"Boot & See",e:["⚓", "🚤", "⛵", "🛥️", "🛳️", "🚢", "🛶", "⛴️", "🛟", "🧭", "🌊", "🏝️", "🏖️", "⛱️", "🎣", "🐟", "🐠", "🐡", "🦈", "🐬", "🐳", "🐋", "🦀", "🦞", "🦑", "🐙", "🦆", "🦢", "⛽", "🔱", "🪝", "🌅", "🌇", "🌉", "🌁"]},{n:"Tiere & Natur",e:["🐀", "🐁", "🐂", "🐃", "🐄", "🐅", "🐆", "🐇", "🐈", "🐉", "🐊", "🐋", "🐌", "🐍", "🐎", "🐏", "🐐", "🐑", "🐒", "🐓", "🐔", "🐕", "🐖", "🐗", "🐘", "🐙", "🐚", "🐛", "🐜", "🐝", "🐞", "🐟", "🐠", "🐡", "🐢", "🐣", "🐤", "🐥", "🐦", "🐧", "🐨", "🐩", "🐪", "🐫", "🐬", "🐭", "🐮", "🐯", "🐰", "🐱", "🐲", "🐳", "🐴", "🐵", "🐶", "🐷", "🐸", "🐹", "🐺", "🐻", "🐼", "🐽", "🐾", "🐿", "🦁", "🦄", "🦅", "🦉", "🦇", "🦋", "🐝", "🐞", "🦗", "🕷️", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃", "🌷", "🌹", "🌺", "🌸", "🌼", "🌻", "☀️", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️", "❄️", "☃️", "⛄", "🌬️", "💨", "🌪️", "🌫️", "🌈", "☂️", "☔", "⚡", "🔥", "💧", "⭐", "🌟", "✨", "🌙", "🌎", "🪐"]},{n:"Essen & Trinken",e:["🍅", "🍆", "🍇", "🍈", "🍉", "🍊", "🍋", "🍌", "🍍", "🍎", "🍏", "🍐", "🍑", "🍒", "🍓", "🍔", "🍕", "🍖", "🍗", "🍘", "🍙", "🍚", "🍛", "🍜", "🍝", "🍞", "🍟", "🍠", "🍡", "🍢", "🍣", "🍤", "🍥", "🍦", "🍧", "🍨", "🍩", "🍪", "🍫", "🍬", "🍭", "🍮", "🍯", "🍰", "🍱", "🍲", "🍳", "🍴", "🍵", "🍶", "🍷", "🍸", "🍹", "🍺", "🍻", "🍼", "🍽", "🍾", "🍿", "🥐", "🥑", "🥒", "🥓", "🥔", "🥕", "🥖", "🥗", "🥘", "🥙", "🥚", "🥛", "🥜", "🥝", "🥞", "🥟", "🥠", "🥡", "🥢", "🥣", "🥤", "🥥", "🥦", "🥧", "🥨", "🥩", "🥪", "🥫", "🥬", "🥭", "🥮", "🥯", "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🍾", "☕", "🍵", "🧃", "🧉", "🥤", "🧋"]},{n:"Aktivit\u00e4t & Sport",e:["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🏓", "🏸", "🏒", "🥅", "⛳", "🏹", "🥊", "🥋", "🎽", "🛹", "⛸️", "🥌", "🎿", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️", "🎗️", "🎫", "🎪", "🎭", "🎨", "🎬", "🎤", "🎧", "🎼", "🎹", "🥁", "🎷", "🎺", "🎸", "🪕", "🎻", "🎲", "♟️", "🎯", "🎳", "🎮", "🎰", "🧩", "🪁", "🎉", "🎊", "🎂", "🎁", "🎈"]},{n:"Reisen & Orte",e:["🚀", "🚁", "🚂", "🚃", "🚄", "🚅", "🚆", "🚇", "🚈", "🚉", "🚊", "🚋", "🚌", "🚍", "🚎", "🚏", "🚐", "🚑", "🚒", "🚓", "🚔", "🚕", "🚖", "🚗", "🚘", "🚙", "🚚", "🚛", "🚜", "🚝", "🚞", "🚟", "🚠", "🚡", "🚢", "🚣", "🚤", "✈️", "🛩️", "🛫", "🛬", "🪂", "💺", "🚁", "🚀", "🛸", "🗼", "🗽", "🏰", "🏯", "🏟️", "🎡", "🎢", "🎠", "⛲", "⛺", "🏠", "🏡", "🏢", "🏥", "🏦", "🏪", "🏫", "⛪", "🕌", "🗿", "🗺️", "🧳"]},{n:"Objekte",e:["⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "💽", "💾", "💿", "📀", "📷", "📸", "📹", "🎥", "📽️", "📺", "📻", "🎙️", "⏰", "⏱️", "⏳", "🔋", "🔌", "💡", "🔦", "🕯️", "🗑️", "🛢️", "💸", "💵", "💰", "💳", "🪙", "⚖️", "🔧", "🔨", "⚒️", "🛠️", "⛏️", "🔩", "⚙️", "🧰", "🧲", "🔫", "💣", "🔪", "🛡️", "🚬", "⚰️", "🔮", "📿", "💈", "⚗️", "🔭", "🔬", "🕳️", "💊", "💉", "🩹", "🩺", "🌡️", "🧬", "🦠", "🧫", "🧪", "🧹", "🧺", "🧻", "🚽", "🔑", "🗝️", "🚪", "🪑", "🛏️", "🛋️", "🧸", "🖼️", "🛍️", "🎀", "🎏", "🪄", "📦", "📫", "📮", "✏️", "✒️", "🖊️", "🖍️", "📝", "💼", "📁", "📂", "📅", "📆", "📇", "📈", "📉", "📊", "📋", "📌", "📍", "📎", "📏", "📐", "✂️", "🔒", "🔓", "🔏", "🔐"]},{n:"Herzen & Symbole",e:["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓", "🆔", "⚛️", "✅", "☑️", "✔️", "❌", "❎", "➕", "➖", "➗", "✖️", "💯", "🔞", "📵", "🚭", "❗", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "🈯", "💹", "❇️", "✳️", "❎", "🌐", "💠", "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂", "🛃", "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶", "🈁", "🔣", "ℹ️", "🔤", "🔡", "🔠", "🆖", "🆗", "🆙", "🆒", "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]}].map(cat => '<div style="grid-column:1 / -1; font-size:0.7rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; padding:0.45rem 0.1rem 0.15rem;">' + cat.n + '</div>' + cat.e.map(e => '<button type="button" class="chat-emoji-pick" data-emoji="' + e + '" style="border:none; background:transparent; font-size:1.45rem; padding:0.22rem 0.1rem; cursor:pointer; line-height:1;">' + e + '</button>').join('')).join('') +
         '</div>' +
-      '</div>' +
       '</div>' +
       '<div style="display:flex; align-items:center; gap:0.35rem; margin-top:0.1rem;">' +
         '<button type="button" class="btn secondary chat-icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>' +
@@ -5488,7 +5499,7 @@ function setupSettlementPaymentUI(year){
 
   document.getElementById('requestMoneyBtn').addEventListener('click', () => {
     const fb = document.getElementById('err-sp-general');
-    const showFb = (msg, ok) => { fb.style.color = ok ? '#1C9A64' : '#C0392B'; fb.textContent = msg; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4500); };
+    const showFb = (msg, ok) => { fb.style.color = ok ? '#1C9A64' : '#C0392B'; fb.textContent = msg; fb.classList.add('show'); if(ok) setTimeout(() => fb.classList.remove('show'), 4500); };
     const area = document.getElementById('requestMoneyArea');
     if(area.style.display !== 'none'){ area.style.display = 'none'; return; }
     if(!session.partyId){ showFb('Nur Parteien können Geld anfordern.', false); return; }
@@ -5560,13 +5571,11 @@ function setupSettlementPaymentUI(year){
     if(!isAdminUser && session.partyId && from !== session.partyId && to !== session.partyId){
       const fb = document.getElementById('err-sp-general');
       fb.style.color = '#C0392B'; fb.textContent = 'Du kannst nur Zahlungen erfassen, an denen deine eigene Partei beteiligt ist.'; fb.classList.add('show');
-      setTimeout(() => fb.classList.remove('show'), 3500);
       return;
     }
 
     if(hasError) return;
-    celebrateIfRecovered();
-
+  
     const currentYear = parseInt(document.getElementById('adjustmentYear').value);
     if(!state.settlementPayments) state.settlementPayments = {};
     if(!state.settlementPayments[currentYear]) state.settlementPayments[currentYear] = [];
@@ -5769,6 +5778,20 @@ function renderPriorityRuleBody(){
   const wireSharesSave = () => {
     const saveBtn = document.getElementById('savePrioSharesBtn');
     if(!saveBtn) return;
+    // Das letzte Anteils-Feld ergänzt sich automatisch, sodass die Summe 100 % ergibt.
+    const shareInputs = Array.from(document.querySelectorAll('.prioShareInput'));
+    if(shareInputs.length > 1){
+      const lastInp = shareInputs[shareInputs.length - 1];
+      shareInputs.slice(0, -1).forEach(inp => inp.addEventListener('input', () => {
+        let sum = 0;
+        shareInputs.slice(0, -1).forEach(i2 => {
+          const v = parseFloat(String(i2.value).replace(',', '.'));
+          if(isFinite(v) && v > 0) sum += v;
+        });
+        const rest = Math.round((100 - sum) * 10) / 10;
+        lastInp.value = fmtNum(Math.max(0, rest), 1);
+      }));
+    }
     saveBtn.addEventListener('click', async () => {
       const fb = document.getElementById('prioFeedback');
       const errEl = document.getElementById('prioSharesError');
@@ -6212,11 +6235,6 @@ function renderGate(){
       // Meldung vor jeder Prüfung zurücksetzen — so löst JEDER Fehlversuch den
       // Fehlermeldungs-Beobachter (und damit einen Jingle) aus, nicht nur der erste.
       errEl.classList.remove('show');
-      // Bei falschem (nicht leerem) Code: "Restricted Area" statt Fehler-Pool
-      if(code){
-        const codeKnown = (state.settings && state.settings.adminCode === code) || state.parties.some(p => p.code === code);
-        if(!codeKnown && soundAvailability['restricted-area'] !== false){ suppressNextErrorSound(); playAppSound('restricted-area', true); }
-      }
       if(role === 'admin'){
         if(code && state.settings.adminCode === code){
           session = { adminCode: code, partyCode: null, partyId: null };
@@ -6232,13 +6250,13 @@ function renderGate(){
         }
       }
       await saveSession(); evaluateAccess();
-      if(!celebrateIfRecovered()){
-        // Freitags gebührt dem Wochenende die Ehre — sonst zufälliger Login-Gruss
-        const loginKey = (new Date().getDay() === 5) ? 'endlich-freitag' : pickFromPool('login');
-        if(loginKey){
-          playAppSound(loginKey, true);
-          broadcastSound(loginKey);
-        }
+      // Applaus gibt es NUR hier — und nur, wenn zuvor beim Login ein Fehlversuch war.
+      const gateRecovered = lastGateErrorTs && (Date.now() - lastGateErrorTs < 5 * 60 * 1000);
+      lastGateErrorTs = 0;
+      const loginKey = gateRecovered ? 'applaus' : ((new Date().getDay() === 5) ? 'endlich-freitag' : pickFromPool('login'));
+      if(loginKey){
+        playAppSound(loginKey, true);
+        broadcastSound(loginKey);
       }
       saveShared();
       hideGate(); renderAll(); resetInactivityTimer(); requestNotificationPermission(); setTimeout(() => { showPendingDecisionsQueue(); showNewMessagesPopupIfAny(); }, 600);
@@ -6591,7 +6609,6 @@ function renderAdminFeedbackSection(){
     playAppSound('handlungsbedarf', true);
     logAudit(fromName + ' hat Feedback zur App eingereicht');
     await saveShared();
-    celebrateIfRecovered();
     renderAdminFeedbackSection();
     const ok = document.getElementById('feedbackOk');
     if(ok){ ok.textContent = '✅ Danke! Dein Feedback ist eingegangen.'; ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 3500); }
@@ -6602,8 +6619,9 @@ function renderAdminFeedbackSection(){
     if(!f || f.reply) return;
     f.reply = 'Na klar, ich kümmer mich drum!';
     f.replyTs = Date.now();
-    pushDayChatMessage({ type: 'normal', sound: 'kuemmer-mich-drum', fromPartyId: null, fromAdmin: true, toPartyIds: f.fromPartyId ? [f.fromPartyId] : null, text: '✅ Antwort auf dein Feedback («' + f.text.slice(0, 60) + (f.text.length > 60 ? '…' : '') + '»): Na klar, ich kümmer mich drum!' });
-    playAppSound('kuemmer-mich-drum', true);
+    const replyKey = pickFromPool('admin-reply') || 'change-request';
+    pushDayChatMessage({ type: 'normal', sound: replyKey, fromPartyId: null, fromAdmin: true, toPartyIds: f.fromPartyId ? [f.fromPartyId] : null, text: '✅ Antwort auf dein Feedback («' + f.text.slice(0, 60) + (f.text.length > 60 ? '…' : '') + '»): Na klar, ich kümmer mich drum!' });
+    playAppSound(replyKey, true);
     logAudit('Administrator hat auf Feedback geantwortet');
     await saveShared();
     renderAdminFeedbackSection();
@@ -7758,8 +7776,7 @@ function setupAnnualCostUI(){
     }
 
     if(hasError) return;
-    celebrateIfRecovered();
-
+  
     if(!state.annualCosts) state.annualCosts = {};
     if(!state.annualCosts[year]) state.annualCosts[year] = [];
     if(editingAcId){
@@ -8038,13 +8055,19 @@ async function init(){
   }
   probeSoundAvailability();
 
+  // Kehrt die App aus dem Hintergrund zurück, einmalig auffrischen
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden) return;
+    try{ if(typeof accessGranted !== 'undefined' && accessGranted) updateHeaderMeta(); } catch(e){}
+    try{ trySyncPending(); } catch(e){}
+  });
+
   const verFooter = document.getElementById('appVersionFooter');
   if(verFooter){
     verFooter.textContent = 'WakeLog · Version ' + APP_VERSION + ' — antippen für Update-Prüfung';
     verFooter.style.cursor = 'pointer';
     verFooter.title = 'Auf Updates prüfen';
     verFooter.addEventListener('click', () => {
-      playAppSound('change-request', true);
       flashVersionFooter('🔍 Suche nach Updates …');
       checkForUpdate(true);
     });
@@ -8073,8 +8096,18 @@ async function init(){
       if(m.oldValue && m.oldValue.indexOf('show') !== -1) return; // war schon sichtbar
       const c = (el.style.color || '').replace(/\s/g,'').toLowerCase();
       if(c === '#1c9a64' || c === 'rgb(28,154,100)') return; // grüne Erfolgsmeldung
+      if(el.id === 'gateError'){
+        // Login-Fehleingabe: NUR Restricted Area (bei jedem Versuch), nie der Fehler-Pool.
+        // Solange restricted-area.m4a noch fehlt, springt übergangsweise der Pool ein.
+        lastGateErrorTs = Date.now();
+        if(Date.now() - (lastPoolPlay['gate'] || 0) < 700) return; // Doppel-Mutation im selben Versuch
+        lastPoolPlay['gate'] = Date.now();
+        if(soundAvailability['restricted-area'] !== false) playAppSound('restricted-area', true);
+        else playRandomSound('error');
+        return;
+      }
       lastValidationErrorTs = Date.now();
-      if(Date.now() < suppressErrorSoundUntil) return; // z. B. falsches Passwort → Restricted Area
+      if(Date.now() < suppressErrorSoundUntil) return;
       playRandomSound('error');
     });
   });
@@ -8358,7 +8391,7 @@ async function init(){
   setupChatUI();
   setupSeasonUI();
   fetchLiveWeatherWidget();
-  setInterval(fetchLiveWeatherWidget, 15 * 60 * 1000);
+  setInterval(() => { if(!document.hidden) fetchLiveWeatherWidget(); }, 15 * 60 * 1000);
   const adminStripEl = document.getElementById('adminStrip');
   setupAmountInputFormatting();
   if(adminStripEl) adminStripEl.addEventListener('click', handleAdminStripClick);
@@ -8402,7 +8435,7 @@ function setupSeasonUI(){
   const haulBtn = document.getElementById('seasonHaulBtn');
   if(!launchBtn) return;
   checkWindWarning();
-  setInterval(checkWindWarning, 30 * 60 * 1000);
+  setInterval(() => { if(!document.hidden) checkWindWarning(); }, 30 * 60 * 1000);
   renderSeasonEventsList();
   updateSeasonButtonsState();
 

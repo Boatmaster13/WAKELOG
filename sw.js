@@ -40,6 +40,7 @@ const PRECACHE_FILES = [
   './sounds/nein-nein-nein.m4a', './sounds/negativ.m4a', './sounds/schoen-aber-nein.m4a', './sounds/och-nee.m4a',
   './sounds/mhhh-noe.m4a', './sounds/scheissegal.m4a', './sounds/zuviel-geld.m4a',
   './sounds/nicht-meine-kostenstelle.m4a', './sounds/kuemmer-mich-drum.m4a',
+  './sounds/verdammt.m4a', './sounds/verflixt.m4a',
   './sounds/no-1.m4a', './sounds/no-2.m4a', './sounds/no-3.m4a', './sounds/no-4.m4a', './sounds/no-5.m4a',
   './sounds/no-6.m4a', './sounds/no-7.m4a', './sounds/no-8.m4a', './sounds/no-9.m4a', './sounds/no-10.m4a',
   './sounds/yes-1.m4a', './sounds/yes-2.m4a', './sounds/yes-3.m4a', './sounds/yes-4.m4a', './sounds/yes-5.m4a',
