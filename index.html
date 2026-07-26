@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-44';
+const APP_VERSION = '2026-07-25-45';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1696,10 +1696,17 @@ const SAILOR_QUOTES = [
   'Chuck Norris ankert nicht. Das Ufer hält still.',
   'Chuck Norris tankt nie. Das Benzin bittet um Mitfahrt.'
 ];
+// Der Spruch wechselt bei jeder Anmeldung (jedem App-Start) der Reihe nach —
+// der Zähler bleibt pro Gerät gespeichert, innerhalb einer Sitzung bleibt der Spruch stabil.
+let sessionQuote = null;
 function sailorQuoteOfTheDay(){
-  const d = new Date();
-  const idx = (d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % SAILOR_QUOTES.length;
-  return SAILOR_QUOTES[idx];
+  if(sessionQuote) return sessionQuote;
+  let idx = 0;
+  try{ idx = parseInt(localStorage.getItem('wakelogQuoteIdx') || '-1', 10) + 1; } catch(e){ idx = Math.floor(Math.random() * SAILOR_QUOTES.length); }
+  idx = ((idx % SAILOR_QUOTES.length) + SAILOR_QUOTES.length) % SAILOR_QUOTES.length;
+  try{ localStorage.setItem('wakelogQuoteIdx', String(idx)); } catch(e){}
+  sessionQuote = SAILOR_QUOTES[idx];
+  return sessionQuote;
 }
 
 // Kapitäns-Rang je nach gefahrenen Motorstunden der Partei (über alle Jahre)
