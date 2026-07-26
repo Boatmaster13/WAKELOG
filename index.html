@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-41';
+const APP_VERSION = '2026-07-25-42';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3659,6 +3659,18 @@ function broadcastSound(key){
 // dieses Geraets dazukam (loest das Problem, dass Empfaenger beim spaeteren
 // Anmelden sonst nichts hoeren, weil sie beim Ereignis offline waren).
 const SND_CATCHUP_KEY = 'wakelogSndCatchupTs';
+// Jede Jingle-Nachricht spielt pro Gerät nur EINMAL — auch nach Browser-Zurück,
+// Neuladen oder App-Neustart (gespielte IDs bleiben in localStorage gemerkt).
+const PLAYED_MSG_KEY = 'wakelogPlayedMsgIds';
+const playedMsgIds = (() => {
+  try{ return new Set(JSON.parse(localStorage.getItem(PLAYED_MSG_KEY) || '[]')); }
+  catch(e){ return new Set(); }
+})();
+function markMsgSoundPlayed(id){
+  if(!id) return;
+  playedMsgIds.add(id);
+  try{ localStorage.setItem(PLAYED_MSG_KEY, JSON.stringify(Array.from(playedMsgIds).slice(-80))); } catch(e){}
+}
 let msgSoundInitialized = false;
 let nextMsgSoundAt = 0;
 function queueMsgSound(key){
@@ -3685,13 +3697,16 @@ function checkNewSoundMessages(oldMsgs, newMsgs){
       let last = 0;
       try{ last = parseInt(localStorage.getItem(SND_CATCHUP_KEY) || '0', 10) || 0; } catch(e){}
       const cutoff = Math.max(last, Date.now() - 7 * 24 * 3600 * 1000);
-      (newMsgs || []).filter(m => msgSoundRelevantForMe(m) && (m.ts || 0) > cutoff)
+      (newMsgs || []).filter(m => msgSoundRelevantForMe(m) && (m.ts || 0) > cutoff && m.id && !playedMsgIds.has(m.id))
         .slice(-2) // hoechstens die 2 neuesten nachspielen (iPhone: keine Jingle-Salve)
-        .forEach(m => queueMsgSound(m.sound));
+        .forEach(m => { markMsgSoundPlayed(m.id); queueMsgSound(m.sound); });
     } else {
       const oldIds = new Set((oldMsgs || []).map(m => m && m.id));
       (newMsgs || []).forEach(m => {
-        if(m && m.id && !oldIds.has(m.id) && msgSoundRelevantForMe(m)) queueMsgSound(m.sound);
+        if(m && m.id && !oldIds.has(m.id) && !playedMsgIds.has(m.id) && msgSoundRelevantForMe(m)){
+          markMsgSoundPlayed(m.id);
+          queueMsgSound(m.sound);
+        }
       });
     }
     try{ localStorage.setItem(SND_CATCHUP_KEY, String(Date.now())); } catch(e){}
