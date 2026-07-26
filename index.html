@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-36';
+const APP_VERSION = '2026-07-25-40';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1649,35 +1649,52 @@ function evaluateAccess(){
 }
 
 const SAILOR_QUOTES = [
-  // Surf- & Wakeboard-Weisheiten statt Segler-Sprüche
+  // Wake, Boot & Ankerdöschen
   'Nach der Fahrt ist vor dem Ankerdöschen.',
-  'Die beste Welle ist immer die, die du gefahren bist.',
   'Wakeboarden: die einzige Sportart, bei der Abgang und Applaus gleich klingen.',
-  'Erst denken, dann lenken — ausser beim Wellenspringen.',
-  'Glatte See am Morgen macht dem Wakeboarder keine Sorgen.',
-  'Wer nicht stürzt, hat es nicht probiert.',
-  'Salz... äh, Seewasser im Haar, Sonne im Herzen.',
   'Ein Tag auf dem Wasser ersetzt drei beim Therapeuten.',
-  'Die Leine ist gespannt, der Rest ist Haltung.',
-  'Balance ist keine Frage des Alters — nur der Landung.',
-  'Sprit im Tank, Grinsen im Gesicht.',
-  'Das Brett vergisst nie, wer zu spät aufgestanden ist.',
-  'Flat water, full send.',
-  'Wellen macht man sich am besten selbst.',
-  'Erst die Leinen los, dann das Abenteuer.',
-  'Kleines Boot, grosse Freiheit.',
-  'Wer das Wasser liebt, dem gehört der See.',
-  'Ein nasser Neopren ist der Beweis für einen guten Tag.',
-  'Aufstehen ist Pflicht — auf dem Brett wie im Leben.',
-  'Der See ruft. Wer bin ich, dass ich widerspreche?',
-  'Kaffee an Land, Adrenalin auf dem Wasser.',
-  'Man verliert nie — entweder man steht auf oder man taucht ab.',
   'Die Frisur hält. Bis zum ersten Sprung.',
-  'Motorstunden zählen nicht, wenn man dabei lacht.',
+  'Das Brett vergisst nie, wer zu spät aufgestanden ist.',
   'Wer zuletzt fährt, macht das Deck sauber.',
+  'Sonnencreme vergessen merkt man erst beim Ankerdöschen.',
   'Physik ist, wenn es trotzdem carvt.',
-  'Heute schon geflogen? Frag das Wakeboard.',
-  'Sonnencreme vergessen merkt man erst beim Ankerdöschen.'
+  'Motorstunden zählen nicht, wenn man dabei lacht.',
+  'Wellen macht man sich am besten selbst.',
+  'Flat water, full send.',
+  // Made-my-day-Style: kurz, frech, gemein-ehrlich
+  'Wer zuletzt lacht, denkt am langsamsten.',
+  'Wer früher stirbt, ist länger tot.',
+  'Morgenstund hat Gold im Mund — wer verschläft, bleibt gesund.',
+  'Reden ist Silber, Schweigen ist verdächtig.',
+  'Wer andern eine Grube gräbt, hat ein Bagger-Diplom.',
+  'Wer Ordnung hält, ist nur zu faul zum Suchen.',
+  'Lieber arm dran als Arm ab.',
+  'Ich bin nicht faul, ich bin im Energiesparmodus.',
+  'Ich höre auf meinen Körper. Er sagt: Snacks.',
+  'Ich rege mich nicht auf. Ich dokumentiere für später.',
+  'Plan B ist auch nur Plan A mit Panik.',
+  'Mein Kontostand und ich schweigen uns an.',
+  'Ich bin nicht dick. Ich bin schwer zu entführen.',
+  'Erwachsen sein heisst: müde. Einfach immer müde.',
+  'Chaos ist auch nur ein System — meins.',
+  'Was du heute kannst besorgen, verschieb getrost auf übermorgen.',
+  'Erst wenn der letzte Akku leer ist, merkt ihr: Reden geht auch.',
+  'Frühsport? Ich stolpere morgens schon genug.',
+  'Montage sollten optional sein.',
+  '«Und irgendwann kommt Carmen und haut dir auf die Fresse.» — «Du meinst Karma?» — «Mir egal, wie die Alte heisst. Hauptsache, du bekommst auf die Fresse!»',
+  // Chuck-Norris-Weisheiten
+  'Chuck Norris zählt bis unendlich. Zweimal.',
+  'Chuck Norris schläft nicht. Er wartet.',
+  'Chuck Norris kann Zwiebeln zum Weinen bringen.',
+  'Chuck Norris kennt die letzte Ziffer von Pi.',
+  'Chuck Norris trinkt kein Wasser. Er kaut es.',
+  'Chuck Norris kann Feuer machen. Mit einer Lupe. Nachts.',
+  'Chuck Norris wurde nicht geboren. Er hat sich entschieden.',
+  'Wenn Chuck Norris ins Wasser fällt, wird nicht Chuck nass — das Wasser wird Chuck.',
+  'Chuck Norris braucht kein Boot. Der See trägt ihn freiwillig.',
+  'Chuck Norris wakeboardet ohne Leine. Das Boot hält sich an ihm fest.',
+  'Chuck Norris ankert nicht. Das Ufer hält still.',
+  'Chuck Norris tankt nie. Das Benzin bittet um Mitfahrt.'
 ];
 function sailorQuoteOfTheDay(){
   const d = new Date();
