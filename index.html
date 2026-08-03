@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-47';
+const APP_VERSION = '2026-07-25-48';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -3723,10 +3723,13 @@ function checkNewSoundMessages(oldMsgs, newMsgs){
       msgSoundInitialized = true;
       let last = 0;
       try{ last = parseInt(localStorage.getItem(SND_CATCHUP_KEY) || '0', 10) || 0; } catch(e){}
-      const cutoff = Math.max(last, Date.now() - 7 * 24 * 3600 * 1000);
-      (newMsgs || []).filter(m => msgSoundRelevantForMe(m) && (m.ts || 0) > cutoff && m.id && !playedMsgIds.has(m.id))
-        .slice(-2) // hoechstens die 2 neuesten nachspielen (iPhone: keine Jingle-Salve)
-        .forEach(m => { markMsgSoundPlayed(m.id); queueMsgSound(m.sound); });
+      // Beim App-Start werden verpasste Jingles NICHT mehr nachgespielt — beim
+      // Einloggen erklingt nur noch der Begrüssungsjingle bzw. der Applaus.
+      // Alles Bisherige gilt als gehört; nachhören geht jederzeit über den
+      // ▶️-Knopf an der Nachricht im Posteingang.
+      (newMsgs || []).forEach(m => {
+        if(m && m.id && m.sound && msgSoundRelevantForMe(m)) markMsgSoundPlayed(m.id);
+      });
     } else {
       const oldIds = new Set((oldMsgs || []).map(m => m && m.id));
       (newMsgs || []).forEach(m => {
@@ -4102,7 +4105,7 @@ function renderChatMessageListInto(list){
       renderCalendarTab(); renderInstruments();
       renderChatMessageListInto(list);
     };
-    list.querySelectorAll('[data-play-sound]').forEach(el => el.addEventListener('click', () => playAppSound(el.dataset.playSound, true)));
+
     list.querySelectorAll('[data-cal-jump]').forEach(el => el.addEventListener('click', (ev) => {
       if(ev.target.closest('button')) return; // Buttons in der Nachricht nicht als Sprung werten
       jumpToCalendarDates(el.dataset.calJump.split(','), el.dataset.calSound || null);
@@ -4775,6 +4778,12 @@ function renderEntriesTable(){
 document.addEventListener('click', (ev) => {
   const img = ev.target.closest ? ev.target.closest('[data-lightbox-src]') : null;
   if(img && img.src) openPhotoLightbox(img.src);
+});
+// ▶️-Jingle-Knöpfe app-weit per Delegation: überlebt jedes Neu-Rendern des
+// Chatverlaufs und reagiert auf Klick wie Tipp (PC und Handy gleichermassen)
+document.addEventListener('click', (ev) => {
+  const playBtn = ev.target.closest ? ev.target.closest('[data-play-sound]') : null;
+  if(playBtn) playAppSound(playBtn.dataset.playSound, true);
 });
 
 function openPhotoLightbox(src){
