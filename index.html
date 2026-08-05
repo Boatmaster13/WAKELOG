@@ -1341,7 +1341,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-54';
+const APP_VERSION = '2026-07-25-55';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -7876,7 +7876,7 @@ function renderPartyCodeList(){
         // mit dem Link ohne Passwort einsteigen). Der Code steht als letzte Zeile:
         // Nachricht komplett kopieren und in der App auf 📋 tippen — der Code
         // wird automatisch herausgelesen.
-        const msg = 'Hallo! Ich lade dich zu WakeLog ein — dem Cockpit unserer Bootsgemeinschaft. 🚤\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDein persönlicher Zugangscode steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + p.code;
+        const msg = 'Hallo! Ich lade dich zu WakeLog ein — dem Cockpit unserer Bootsgemeinschaft. 🚤\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDein persönlicher Zugangscode für die Partei «' + p.name + '» steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + p.code;
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
         if(!(await appConfirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.'))) return;
