@@ -1331,7 +1331,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-48';
+const APP_VERSION = '2026-07-25-49';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1386,6 +1386,22 @@ async function verifyTotp(hexSecret, enteredCode){
   }
   return false;
 }
+
+// Einzeln zurücksetzbare Bereiche (Mehrfachauswahl in Verwaltung > Einstellungen > Zurücksetzen)
+const RESET_SCOPES = [
+  { key: 'chat',     label: '💬 Chat & Posteingang', apply: s => { s.chatMessages = []; s.chatSeen = {}; s.soundEvents = []; s.notifications = []; } },
+  { key: 'log',      label: '📜 Protokoll', apply: s => { s.auditLog = []; } },
+  { key: 'calendar', label: '📅 Kalender & Vorrechte (Regeln, Abgaben, Fahrten)', apply: s => { s.priorityRules = {}; s.priorityOverrides = {}; s.priorityRequests = {}; s.reservations = {}; s.seasonEvents = []; } },
+  { key: 'logbook',  label: '🛥️ Logbuch (Fahrten & Tanken)', apply: s => { s.entries = []; } },
+  { key: 'billing',  label: '💰 Abrechnung (Fixkosten, Ausgleich, Jahres-Sicherungen)', apply: s => { s.annualCosts = {}; s.settlementPayments = {}; s.yearResetBackups = {}; } },
+  { key: 'docs',     label: '📄 Dokumente, Checklisten & Fotos', apply: s => { s.documents = []; s.knotPhotos = {}; s.checklists = null; s.maneuvers = null; } },
+  { key: 'feedback', label: '🙋 Feedback', apply: s => { s.feedback = []; } },
+  { key: 'settings', label: '⚙️ Einstellungen (Regeln, Boot & Wetter — Zugangscodes bleiben)', apply: s => {
+      const keep = {};
+      ['adminCode', 'recoveryHash'].forEach(k => { if(s.settings && s.settings[k] !== undefined) keep[k] = s.settings[k]; });
+      s.settings = keep;
+    } }
+];
 
 function defaultData(){
   return { parties: [ { id: 'a', name: 'Partei A', code: randomCode(6) }, { id: 'b', name: 'Partei B', code: randomCode(6) } ], entries: [], settings: null, priorityRules: {}, annualCosts: {}, settlementPayments: {}, auditLog: [], priorityOverrides: {}, yearResetBackups: {}, priorityRequests: {}, partyQrCodes: {}, notifications: [], chatMessages: [], soundEvents: [], feedback: [], seasonEvents: [], serviceReminder: null };
@@ -7463,7 +7479,7 @@ function renderAdminGeneralSection(){
       '<div class="gate-error" id="weatherLocationFeedback" style="color:#1C9A64;"></div>' +
     '</div>' +
     '</div></details>' +
-    '<details class="settings-group" data-group="reset"' + (og.has('reset') ? ' open' : '') + '><summary>🗑️ Jahr zurücksetzen</summary><div class="settings-group-body">' +
+    '<details class="settings-group" data-group="reset"' + (og.has('reset') ? ' open' : '') + '><summary>🗑️ Zurücksetzen</summary><div class="settings-group-body">' +
     '<div class="admin-box">' +
       '<label>Jahr zurücksetzen</label>' +
       '<div class="hint" style="margin-bottom:0.9rem;">Löscht sämtliche Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben eines gewählten Jahres unwiderruflich aus der laufenden Ansicht. Vor dem Löschen wird automatisch eine Sicherung angelegt, die du danach jederzeit wiederherstellen kannst — bis zum nächsten Zurücksetzen desselben Jahres.</div>' +
@@ -7471,6 +7487,19 @@ function renderAdminGeneralSection(){
       '<button class="btn secondary" id="resetYearBtn" style="border-color:#C0392B; color:#C0392B;">🗑️ Jahr zurücksetzen</button>' +
       '<div id="resetYearRestoreArea" style="margin-top:0.9rem;"></div>' +
       '<div class="gate-error" id="resetYearFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box" style="margin-top:0.9rem;">' +
+      '<label>Bereiche zurücksetzen</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Wähle einen oder mehrere Bereiche und leere sie unwiderruflich — unabhängig vom Jahr. Alles andere bleibt unangetastet. Tipp: vorher im Protokoll-Reiter eine Datensicherung herunterladen.</div>' +
+      RESET_SCOPES.map(s => '<label style="display:flex; align-items:center; gap:0.55rem; padding:0.28rem 0; cursor:pointer; font-weight:400;"><input type="checkbox" class="resetScopeCb" value="' + s.key + '" style="width:17px; height:17px;"> ' + s.label + '</label>').join('') +
+      '<button class="btn secondary" id="resetScopesBtn" style="border-color:#C0392B; color:#C0392B; margin-top:0.7rem;">🗑️ Ausgewählte Bereiche zurücksetzen</button>' +
+      '<div class="gate-error" id="resetScopesFeedback" style="color:#1C9A64;"></div>' +
+    '</div>' +
+    '<div class="admin-box" style="margin-top:0.9rem; border-color:#C0392B;">' +
+      '<label style="color:#C0392B;">Auf Werkeinstellungen zurücksetzen</label>' +
+      '<div class="hint" style="margin-bottom:0.7rem;">Löscht ALLES: Logbuch, Abrechnung, Kalender, Chat, Protokoll, Dokumente, Feedback, Einstellungen — und auch alle Parteien samt Zugangscodes und den Administrator-Code. Die App startet danach wie am ersten Tag mit der Ersteinrichtung; alle Geräte werden abgemeldet. Nur der Bootsschlüssel bleibt bestehen. Ohne vorherige Datensicherung ist nichts wiederherstellbar.</div>' +
+      '<button class="btn secondary" id="factoryResetBtn" style="border-color:#C0392B; color:#C0392B;">🏭 Auf Werkeinstellungen zurücksetzen</button>' +
+      '<div class="gate-error" id="factoryResetFeedback"></div>' +
     '</div>' +
     '</div></details>';
 
@@ -7548,6 +7577,56 @@ function renderAdminGeneralSection(){
     await saveShared();
     fb.style.color = '#1C9A64'; fb.textContent = 'Jahr ' + year + ' wurde zurückgesetzt.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3000);
     renderAdminGeneralSection(); renderEntriesTable(); renderSettlement(); renderCalendarTab(); renderYearFilters();
+  });
+
+  // Bereiche zurücksetzen (Mehrfachauswahl)
+  document.getElementById('resetScopesBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('resetScopesFeedback');
+    const chosen = Array.from(document.querySelectorAll('.resetScopeCb:checked')).map(cb => cb.value);
+    if(!chosen.length){
+      fb.style.color = '#C0392B'; fb.textContent = 'Bitte zuerst mindestens einen Bereich anwählen.'; fb.classList.add('show');
+      return;
+    }
+    const scopes = RESET_SCOPES.filter(s => chosen.includes(s.key));
+    const names = scopes.map(s => s.label.replace(/^[^ ]+ /, '')).join(', ');
+    if(!confirm('Folgende Bereiche unwiderruflich leeren?\n\n' + names + '\n\nEs wird KEINE Sicherung angelegt.')) return;
+    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben.');
+    if(codeInput === null) return;
+    if(codeInput !== state.settings.adminCode){
+      fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show');
+      return;
+    }
+    scopes.forEach(s => s.apply(state));
+    if(!chosen.includes('log')) logAudit('Bereiche zurückgesetzt: ' + names);
+    await saveShared();
+    fb.style.color = '#1C9A64'; fb.textContent = 'Zurückgesetzt: ' + names; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 4000);
+    renderAll();
+  });
+
+  // Werkeinstellungen: kompletter Neustart wie am ersten Tag
+  document.getElementById('factoryResetBtn').addEventListener('click', async () => {
+    const fb = document.getElementById('factoryResetFeedback');
+    if(!confirm('WIRKLICH die ganze App auf Werkeinstellungen zurücksetzen?\n\nALLE Daten werden gelöscht: Logbuch, Abrechnung, Kalender, Chat, Protokoll, Dokumente, Einstellungen, alle Parteien samt Zugangscodes und der Administrator-Code. Es gibt KEINE Sicherung.')) return;
+    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben.');
+    if(codeInput === null) return;
+    if(codeInput !== state.settings.adminCode){
+      fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show');
+      return;
+    }
+    if(!confirm('Letzte Warnung: Danach startet die App mit der Ersteinrichtung und alle Geräte sind abgemeldet. Fortfahren?')) return;
+    try{
+      await remove(dataRef);
+      // Lokale Spuren dieses Geräts entfernen (der Bootsschlüssel bleibt gespeichert)
+      try{
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(PENDING_SYNC_KEY);
+        localStorage.removeItem(OFFLINE_STATE_KEY);
+        Object.keys(localStorage).filter(k => k.indexOf('wakelogPool-') === 0 || k === 'wakelogPlayedMsgIds' || k === 'wakelogSndCatchupTs' || k === 'wakelogQuoteIdx').forEach(k => localStorage.removeItem(k));
+      } catch(e){}
+      location.reload();
+    } catch(e){
+      fb.style.color = '#C0392B'; fb.textContent = 'Zurücksetzen fehlgeschlagen (keine Verbindung?). Bitte erneut versuchen.'; fb.classList.add('show');
+    }
   });
 
   content.querySelectorAll('[data-calc-rule]').forEach(cb => cb.addEventListener('change', async () => {
