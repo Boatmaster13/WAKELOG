@@ -1022,6 +1022,16 @@ function appShareUrl(param, value){
   } catch(e){}
   return base + (base.indexOf('?') === -1 ? '?' : '&') + param + '=' + encodeURIComponent(value);
 }
+// Bootsschlüssel-Felder formatieren sich beim Tippen selbst: nach je 4 Zeichen
+// wird automatisch ein Bindestrich eingefügt (BOOT-XXXX-XXXX). Per Delegation
+// wirkt das in allen Schlüssel-Feldern, wann immer sie erzeugt werden.
+document.addEventListener('input', (ev) => {
+  const el = ev.target;
+  if(!el || (el.id !== 'bootKeyInput' && el.id !== 'bootKeyLostNewKey')) return;
+  const raw = (el.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  const formatted = (raw.match(/.{1,4}/g) || []).join('-');
+  if(el.value !== formatted) el.value = formatted;
+});
 // Holt einen Code aus der Zwischenablage und erkennt dabei, um WELCHEN Code es
 // sich handelt: Bootsschlüssel (?bootkey=…, BOOT-XXXX-XXXX, XXXX-XXXX-XXXX)
 // oder Zugangscode (?code=…, GROSS geschriebener 6-10-Zeichen-Block). Landet
@@ -1331,7 +1341,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-49';
+const APP_VERSION = '2026-07-25-51';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1387,6 +1397,37 @@ async function verifyTotp(hexSecret, enteredCode){
   return false;
 }
 
+// In-App-Dialoge statt confirm()/prompt(): ohne die Browser-Kopfzeile
+// "Auf boatmaster13.github.io wird Folgendes angezeigt"
+function appDialog(message, opts){
+  return new Promise(resolve => {
+    const o = document.createElement('div');
+    o.className = 'gate-overlay';
+    o.style.display = 'flex';
+    o.style.zIndex = '10050';
+    const okLabel = (opts && opts.okLabel) || 'OK';
+    const danger = opts && opts.danger;
+    o.innerHTML =
+      '<div class="gate-card" style="max-width:420px; width:100%;">' +
+        '<div style="white-space:pre-line; font-size:0.92rem; line-height:1.45; margin-bottom:1rem;">' + escapeHtml(message) + '</div>' +
+        (opts && opts.input ? '<input type="text" id="appDialogInput" autocomplete="off" style="width:100%; box-sizing:border-box; margin-bottom:1rem;" placeholder="' + escapeHtml(opts.placeholder || '') + '">' : '') +
+        '<div style="display:flex; gap:0.6rem; justify-content:flex-end;">' +
+          '<button class="btn secondary" id="appDialogCancel">Abbrechen</button>' +
+          '<button class="btn" id="appDialogOk"' + (danger ? ' style="background:#C0392B; border-color:#C0392B;"' : '') + '>' + escapeHtml(okLabel) + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(o);
+    const input = o.querySelector('#appDialogInput');
+    if(input) setTimeout(() => input.focus(), 50);
+    const finish = (val) => { o.remove(); resolve(val); };
+    o.querySelector('#appDialogCancel').addEventListener('click', () => finish(opts && opts.input ? null : false));
+    o.querySelector('#appDialogOk').addEventListener('click', () => finish(opts && opts.input ? (input ? input.value : '') : true));
+    if(input) input.addEventListener('keydown', (e) => { if(e.key === 'Enter') finish(input.value); });
+  });
+}
+function appConfirm(message, opts){ return appDialog(message, Object.assign({ okLabel: 'Ja, fortfahren' }, opts || {})); }
+function appPrompt(message, placeholder){ return appDialog(message, { input: true, placeholder: placeholder || '' }); }
+
 // Einzeln zurücksetzbare Bereiche (Mehrfachauswahl in Verwaltung > Einstellungen > Zurücksetzen)
 const RESET_SCOPES = [
   { key: 'chat',     label: '💬 Chat & Posteingang', apply: s => { s.chatMessages = []; s.chatSeen = {}; s.soundEvents = []; s.notifications = []; } },
@@ -1394,7 +1435,14 @@ const RESET_SCOPES = [
   { key: 'calendar', label: '📅 Kalender & Vorrechte (Regeln, Abgaben, Fahrten)', apply: s => { s.priorityRules = {}; s.priorityOverrides = {}; s.priorityRequests = {}; s.reservations = {}; s.seasonEvents = []; } },
   { key: 'logbook',  label: '🛥️ Logbuch (Fahrten & Tanken)', apply: s => { s.entries = []; } },
   { key: 'billing',  label: '💰 Abrechnung (Fixkosten, Ausgleich, Jahres-Sicherungen)', apply: s => { s.annualCosts = {}; s.settlementPayments = {}; s.yearResetBackups = {}; } },
-  { key: 'docs',     label: '📄 Dokumente, Checklisten & Fotos', apply: s => { s.documents = []; s.knotPhotos = {}; s.checklists = null; s.maneuvers = null; } },
+  { key: 'docs',     label: '📄 Dokumente & Papiere', apply: s => { s.documents = []; } },
+  { key: 'photos',   label: '📷 Fotos (Knoten, Logbuch, Chat, Belege)', apply: s => {
+      s.knotPhotos = {};
+      (s.entries || []).forEach(e => { delete e.photo; });
+      (s.chatMessages || []).forEach(m => { delete m.photo; });
+      Object.keys(s.annualCosts || {}).forEach(y => (s.annualCosts[y] || []).forEach(c => { delete c.photo; }));
+    } },
+  { key: 'guides',   label: '📋 Checklisten & Manöver (eigene Anpassungen)', apply: s => { s.checklists = null; s.maneuvers = null; } },
   { key: 'feedback', label: '🙋 Feedback', apply: s => { s.feedback = []; } },
   { key: 'settings', label: '⚙️ Einstellungen (Regeln, Boot & Wetter — Zugangscodes bleiben)', apply: s => {
       const keep = {};
@@ -1665,48 +1713,39 @@ function evaluateAccess(){
 }
 
 const SAILOR_QUOTES = [
-  // Wake, Boot & Ankerdöschen
+  // Etablierte Sprüche und echte Zitate — nichts Selbsterfundenes
   'Nach der Fahrt ist vor dem Ankerdöschen.',
-  'Wakeboarden: die einzige Sportart, bei der Abgang und Applaus gleich klingen.',
-  'Ein Tag auf dem Wasser ersetzt drei beim Therapeuten.',
-  'Die Frisur hält. Bis zum ersten Sprung.',
-  'Das Brett vergisst nie, wer zu spät aufgestanden ist.',
-  'Wer zuletzt fährt, macht das Deck sauber.',
-  'Sonnencreme vergessen merkt man erst beim Ankerdöschen.',
-  'Physik ist, wenn es trotzdem carvt.',
-  'Motorstunden zählen nicht, wenn man dabei lacht.',
-  'Wellen macht man sich am besten selbst.',
-  'Flat water, full send.',
-  // Made-my-day-Style: kurz, frech, gemein-ehrlich
+  '«Und irgendwann kommt Carmen und haut dir auf die Fresse.» — «Du meinst Karma?» — «Mir egal, wie die Alte heisst. Hauptsache, du bekommst auf die Fresse!»',
+  'Ein Schiff im Hafen ist sicher — aber dafür werden Schiffe nicht gebaut. (John A. Shedd)',
+  'Wasser hat keine Balken.',
+  'Alkohol ist keine Lösung — chemisch gesehen schon.',
   'Wer zuletzt lacht, denkt am langsamsten.',
   'Wer früher stirbt, ist länger tot.',
   'Morgenstund hat Gold im Mund — wer verschläft, bleibt gesund.',
-  'Reden ist Silber, Schweigen ist verdächtig.',
-  'Wer andern eine Grube gräbt, hat ein Bagger-Diplom.',
+  'Wer andern eine Grube gräbt, hat ein Grubengrabgerät.',
+  'Was du heute kannst besorgen, das verschiebe stets auf morgen.',
+  'Ordnung ist das halbe Leben — ich lebe in der anderen Hälfte.',
   'Wer Ordnung hält, ist nur zu faul zum Suchen.',
-  'Lieber arm dran als Arm ab.',
   'Ich bin nicht faul, ich bin im Energiesparmodus.',
-  'Ich höre auf meinen Körper. Er sagt: Snacks.',
-  'Ich rege mich nicht auf. Ich dokumentiere für später.',
-  'Plan B ist auch nur Plan A mit Panik.',
-  'Mein Kontostand und ich schweigen uns an.',
-  'Ich bin nicht dick. Ich bin schwer zu entführen.',
-  'Erwachsen sein heisst: müde. Einfach immer müde.',
-  'Chaos ist auch nur ein System — meins.',
-  'Was du heute kannst besorgen, verschieb getrost auf übermorgen.',
-  'Erst wenn der letzte Akku leer ist, merkt ihr: Reden geht auch.',
-  'Frühsport? Ich stolpere morgens schon genug.',
-  'Montage sollten optional sein.',
-  '«Und irgendwann kommt Carmen und haut dir auf die Fresse.» — «Du meinst Karma?» — «Mir egal, wie die Alte heisst. Hauptsache, du bekommst auf die Fresse!»',
-  // Chuck-Norris-Weisheiten
+  'Ich bin nicht dick, ich bin schwer zu entführen.',
+  'Lieber arm dran als Arm ab.',
+  'Wer schläft, sündigt nicht.',
+  'Geld allein macht nicht glücklich — aber es beruhigt.',
+  'Ich kann allem widerstehen, nur der Versuchung nicht. (Oscar Wilde)',
+  'Zwei Dinge sind unendlich: das Universum und die menschliche Dummheit. Beim Universum bin ich mir noch nicht ganz sicher. (Albert Einstein zugeschrieben)',
+  'Ein Leben ohne Mops ist möglich, aber sinnlos. (Loriot)',
+  'Es ist schon alles gesagt, nur noch nicht von allen. (Karl Valentin)',
+  'Mögen hätt ich schon wollen, aber dürfen hab ich mich nicht getraut. (Karl Valentin)',
+  'Ist der Ruf erst ruiniert, lebt es sich ganz ungeniert. (Wilhelm Busch)',
+  'Wer nichts weiss, muss alles glauben. (Marie von Ebner-Eschenbach)',
   'Chuck Norris zählt bis unendlich. Zweimal.',
   'Chuck Norris schläft nicht. Er wartet.',
   'Chuck Norris kann Zwiebeln zum Weinen bringen.',
   'Chuck Norris kennt die letzte Ziffer von Pi.',
-  'Chuck Norris trinkt kein Wasser. Er kaut es.',
-  'Chuck Norris kann Feuer machen. Mit einer Lupe. Nachts.',
+  'Wenn Chuck Norris ins Wasser fällt, wird nicht Chuck Norris nass — das Wasser wird Chuck Norris.',
+  'Chuck Norris kann Feuer mit einer Lupe machen. Nachts.',
   'Chuck Norris wurde nicht geboren. Er hat sich entschieden.',
-  'Wenn Chuck Norris ins Wasser fällt, wird nicht Chuck nass — das Wasser wird Chuck.',
+  'Chuck Norris trinkt kein Wasser. Er kaut es.',
   'Chuck Norris braucht kein Boot. Der See trägt ihn freiwillig.',
   'Chuck Norris wakeboardet ohne Leine. Das Boot hält sich an ihm fest.',
   'Chuck Norris ankert nicht. Das Ufer hält still.',
@@ -1900,13 +1939,18 @@ async function checkForUpdate(manual){
     const res = await fetch(location.href.split('?')[0] + '?_check=' + Date.now() + Math.random(), { cache: 'reload', credentials: 'omit' });
     const text = await res.text();
     const match = text.match(/const APP_VERSION = '([^']+)'/);
-    if(match && match[1] !== APP_VERSION){
+    if(!match){
+      // Server lieferte keine lesbare App-Datei (z. B. Fehlerseite bei kaputtem Deploy)
+      if(manual) flashVersionFooter('⚠️ Keine lesbare Antwort vom Server.');
+      return;
+    }
+    if(match[1] !== APP_VERSION){
       showUpdateBanner();
-      if(manual) flashVersionFooter('🔄 Neue Version gefunden!');
+      if(manual) flashVersionFooter('🔄 Neue Version gefunden: ' + match[1]);
     } else if(manual){
-      // Hinweis: GitHub braucht nach dem Hochladen 1–10 Minuten (Build + CDN-Cache),
-      // bis die neue Datei ausgeliefert wird — so lange meldet die Prüfung "aktuell".
-      flashVersionFooter('✅ Du hast die aktuellste verfügbare Version.');
+      // Die Prüfung zeigt, was der Server WIRKLICH ausliefert: frisch Hochgeladenes
+      // erscheint dort erst nach dem GitHub-Build (1–10 Min CDN).
+      flashVersionFooter('✅ App & Server: Version ' + match[1] + ' — kein Update auf dem Server.');
     }
   } catch(e){ if(manual) flashVersionFooter('⚠️ Prüfung fehlgeschlagen — bist du online?'); }
 }
@@ -3953,7 +3997,7 @@ async function deleteChatMessage(msgId){
   const mine = m.fromAdmin ? isAdminUser : (m.fromPartyId === session.partyId);
   if(!mine && !isAdminUser) return;
   const what = m.voice ? 'Diese Sprachnachricht' : (m.type === 'beer' ? 'Diesen Ankerdöschen-Ruf' : 'Diese Nachricht');
-  if(!confirm(what + ' für alle löschen?')) return;
+  if(!(await appConfirm(what + ' für alle löschen?'))) return;
   state.chatMessages = (state.chatMessages || []).filter(x => x.id !== msgId);
   logAudit('Chat-Nachricht gelöscht');
   await saveShared();
@@ -4317,7 +4361,7 @@ function showChatModal(){
   const chatClearBtn = document.getElementById('chatClearBtn');
   if(chatClearBtn) chatClearBtn.addEventListener('click', async () => {
     if(!isAdminUser) return;
-    if(!confirm('Wirklich den GESAMTEN Verlauf (Nachrichten UND automatische Mitteilungen) für alle Parteien unwiderruflich löschen?')) return;
+    if(!(await appConfirm('Wirklich den GESAMTEN Verlauf (Nachrichten UND automatische Mitteilungen) für alle Parteien unwiderruflich löschen?'))) return;
     state.chatMessages = [];
     state.notifications = [];
     logAudit('Posteingang vollständig geleert (Nachrichten und Mitteilungen)');
@@ -5272,7 +5316,7 @@ function setupQrCodeUI(){
   document.getElementById('qrRemoveBtn').addEventListener('click', async () => {
     const pid = targetPartyId();
     if(!pid || !state.partyQrCodes) return;
-    if(!confirm('QR-Code wirklich entfernen?')) return;
+    if(!(await appConfirm('QR-Code wirklich entfernen?'))) return;
     delete state.partyQrCodes[pid];
     logAudit('TWINT-QR-Code für ' + partyName(pid) + ' entfernt');
     await saveShared();
@@ -5755,7 +5799,7 @@ function renderParties(){
         return usage.ids.includes(p.id) || paid.ids.includes(p.id);
       }).length;
       const extra = entryCount > 0 ? ' Es gibt ' + entryCount + ' Eintrag/Einträge, die diese Partei betreffen — diese bleiben erhalten, zeigen die Partei aber künftig als "(unbekannt)" an.' : '';
-      if(!confirm('Partei "' + p.name + '" wirklich löschen? Ihr Zugangscode wird ungültig, sie kann sich danach nicht mehr einloggen.' + extra)) return;
+      if(!(await appConfirm('Partei "' + p.name + '" wirklich löschen? Ihr Zugangscode wird ungültig, sie kann sich danach nicht mehr einloggen.' + extra))) return;
       state.parties = state.parties.filter(x => x.id !== p.id);
       logAudit('Partei gelöscht: "' + p.name + '"');
       await saveShared();
@@ -6495,7 +6539,7 @@ function wireBackupButtons(){
           alert('Diese Datei ist kein gültiges WakeLog-Backup.');
           return;
         }
-        if(!confirm('ACHTUNG: Der aktuelle Datenbestand wird für ALLE Parteien vollständig durch das Backup ersetzt. Fortfahren?')) return;
+        if(!(await appConfirm('ACHTUNG: Der aktuelle Datenbestand wird für ALLE Parteien vollständig durch das Backup ersetzt. Fortfahren?'))) return;
         state = data;
         if(!state.auditLog) state.auditLog = [];
         state.auditLog.unshift({ id: uid(), ts: Date.now(), actor: 'Administrator', action: 'Backup wiederhergestellt (' + file.name + ')' });
@@ -6621,17 +6665,17 @@ function wireBootKeyBox(){
     document.getElementById('bootKeyShareAdminBtn').addEventListener('click', () => {
       const key = getStoredBootKey();
       if(!key) return;
-      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', key) + '\n\nFalls du ihn manuell brauchst: ' + key), '_blank');
+      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', key) + '\n\nSchlüssel zum Kopieren:\n```' + key + '```'), '_blank');
     });
-    document.getElementById('bootKeyReenterBtn').addEventListener('click', () => {
-      if(!confirm('Der auf diesem Gerät gespeicherte Bootsschlüssel wird entfernt und beim nächsten Start neu abgefragt. Fortfahren?')) return;
+    document.getElementById('bootKeyReenterBtn').addEventListener('click', async () => {
+      if(!(await appConfirm('Der auf diesem Gerät gespeicherte Bootsschlüssel wird entfernt und beim nächsten Start neu abgefragt. Fortfahren?'))) return;
       try{ localStorage.removeItem(BOOTKEY_STORAGE); } catch(e){}
       location.reload();
     });
     const rotateBtn = document.getElementById('bootKeyRotateBtn');
     if(rotateBtn) rotateBtn.addEventListener('click', async () => {
       if(!isAdminUser) return;
-      if(!confirm('Neuen Bootsschlüssel erzeugen? Alle Daten werden auf einen neuen geheimen Pfad verschoben. Der alte Schlüssel wird ungültig — ALLE anderen Geräte müssen danach den neuen Schlüssel einmalig eingeben.')) return;
+      if(!(await appConfirm('Neuen Bootsschlüssel erzeugen? Alle Daten werden auf einen neuen geheimen Pfad verschoben. Der alte Schlüssel wird ungültig — ALLE anderen Geräte müssen danach den neuen Schlüssel einmalig eingeben.'))) return;
       rotateBtn.disabled = true;
       try{
         const snap = await get(dataRef);
@@ -7212,7 +7256,7 @@ function renderDocsTab(){
     }));
     content.querySelectorAll('[data-knot-photo-del]').forEach(el => el.addEventListener('click', async () => {
       const name = decodeURIComponent(el.dataset.knotPhotoDel);
-      if(!confirm('Foto zu "' + name + '" entfernen?')) return;
+      if(!(await appConfirm('Foto zu "' + name + '" entfernen?'))) return;
       if(state.knotPhotos) delete state.knotPhotos[name];
       logAudit('Knoten-Foto entfernt: ' + name);
       await saveShared();
@@ -7284,7 +7328,7 @@ function renderDocFilesSection(content, category){
     listEl.querySelectorAll('[data-doc-del]').forEach(btn => btn.addEventListener('click', async () => {
       const d = (state.documents || []).find(x => x.id === btn.dataset.docDel);
       if(!d) return;
-      if(!confirm('Dokument "' + d.name + '" für alle löschen?')) return;
+      if(!(await appConfirm('Dokument "' + d.name + '" für alle löschen?'))) return;
       state.documents = (state.documents || []).filter(x => x.id !== d.id);
       logAudit('Dokument gelöscht: ' + d.name);
       await saveShared();
@@ -7524,7 +7568,7 @@ function renderAdminGeneralSection(){
       '<button class="btn secondary" id="restoreYearBtn">↩️ Sicherung von ' + year + ' wiederherstellen</button>';
     document.getElementById('restoreYearBtn').addEventListener('click', async () => {
       const fb = document.getElementById('resetYearFeedback');
-      const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' wiederherzustellen.');
+      const codeInput = await appPrompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' wiederherzustellen.');
       if(codeInput === null) return;
       if(codeInput !== state.settings.adminCode){
         fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Wiederherstellung abgebrochen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
@@ -7547,8 +7591,8 @@ function renderAdminGeneralSection(){
   document.getElementById('resetYearBtn').addEventListener('click', async () => {
     const fb = document.getElementById('resetYearFeedback');
     const year = resetYearSelect.value;
-    if(!confirm('Wirklich ALLE Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben für ' + year + ' löschen? Eine Sicherung wird angelegt, ist aber nur bis zum nächsten Zurücksetzen desselben Jahres wiederherstellbar.')) return;
-    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' zurückzusetzen.');
+    if(!await appConfirm('Wirklich ALLE Einträge, Fixkosten, Ausgleichszahlungen und Vorrecht-Abgaben für ' + year + ' löschen?\n\nEine Sicherung wird angelegt, ist aber nur bis zum nächsten Zurücksetzen desselben Jahres wiederherstellbar.', { danger: true })) return;
+    const codeInput = await appPrompt('Zur Bestätigung: Administrator-Code eingeben, um ' + year + ' zurückzusetzen.', 'Administrator-Code');
     if(codeInput === null) return;
     if(codeInput !== state.settings.adminCode){
       fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 3500);
@@ -7589,8 +7633,8 @@ function renderAdminGeneralSection(){
     }
     const scopes = RESET_SCOPES.filter(s => chosen.includes(s.key));
     const names = scopes.map(s => s.label.replace(/^[^ ]+ /, '')).join(', ');
-    if(!confirm('Folgende Bereiche unwiderruflich leeren?\n\n' + names + '\n\nEs wird KEINE Sicherung angelegt.')) return;
-    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben.');
+    if(!await appConfirm('Folgende Bereiche unwiderruflich leeren?\n\n' + names + '\n\nEs wird KEINE Sicherung angelegt.', { danger: true })) return;
+    const codeInput = await appPrompt('Zur Bestätigung: Administrator-Code eingeben.', 'Administrator-Code');
     if(codeInput === null) return;
     if(codeInput !== state.settings.adminCode){
       fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show');
@@ -7606,14 +7650,14 @@ function renderAdminGeneralSection(){
   // Werkeinstellungen: kompletter Neustart wie am ersten Tag
   document.getElementById('factoryResetBtn').addEventListener('click', async () => {
     const fb = document.getElementById('factoryResetFeedback');
-    if(!confirm('WIRKLICH die ganze App auf Werkeinstellungen zurücksetzen?\n\nALLE Daten werden gelöscht: Logbuch, Abrechnung, Kalender, Chat, Protokoll, Dokumente, Einstellungen, alle Parteien samt Zugangscodes und der Administrator-Code. Es gibt KEINE Sicherung.')) return;
-    const codeInput = prompt('Zur Bestätigung: Administrator-Code eingeben.');
+    if(!await appConfirm('WIRKLICH die ganze App auf Werkeinstellungen zurücksetzen?\n\nALLE Daten werden gelöscht: Logbuch, Abrechnung, Kalender, Chat, Protokoll, Dokumente, Einstellungen, alle Parteien samt Zugangscodes und der Administrator-Code. Es gibt KEINE Sicherung.', { danger: true })) return;
+    const codeInput = await appPrompt('Zur Bestätigung: Administrator-Code eingeben.', 'Administrator-Code');
     if(codeInput === null) return;
     if(codeInput !== state.settings.adminCode){
       fb.style.color = '#C0392B'; fb.textContent = 'Administrator-Code falsch — Zurücksetzen abgebrochen.'; fb.classList.add('show');
       return;
     }
-    if(!confirm('Letzte Warnung: Danach startet die App mit der Ersteinrichtung und alle Geräte sind abgemeldet. Fortfahren?')) return;
+    if(!await appConfirm('Letzte Warnung: Danach startet die App mit der Ersteinrichtung und alle Geräte sind abgemeldet. Fortfahren?', { danger: true, okLabel: 'Ja, alles löschen' })) return;
     try{
       await remove(dataRef);
       // Lokale Spuren dieses Geräts entfernen (der Bootsschlüssel bleibt gespeichert)
@@ -7817,16 +7861,13 @@ function renderPartyCodeList(){
         fb.style.color = '#1C9A64'; fb.textContent = 'Code kopiert.'; fb.classList.add('show');
         setTimeout(() => fb.classList.remove('show'), 2500);
       } else if(btn.dataset.action === 'whatsapp'){
-        const link = (state.settings.shareLink || '').trim();
-        if(!link){
-          fb.style.color = '#C0392B'; fb.textContent = 'Bitte zuerst oben den Freigabe-Link eintragen und speichern.'; fb.classList.add('show');
-          setTimeout(() => fb.classList.remove('show'), 3000);
-          return;
-        }
-        const msg = 'Dein Zugang zu WakeLog — einfach diesen Link antippen, der Code wird automatisch übernommen:\n' + appShareUrl('code', p.code) + '\n\nFalls du den Code manuell brauchst: ' + p.code;
+        // Link kommt automatisch von der App-Adresse (Freigabe-Link nur optionales Override)
+        // Code steht allein auf der letzten Zeile in Monospace — so lässt er
+        // sich in WhatsApp sauber isoliert markieren und kopieren.
+        const msg = 'Dein Zugang zu WakeLog — einfach diesen Link antippen, der Code wird automatisch übernommen:\n' + appShareUrl('code', p.code) + '\n\nCode zum Kopieren:\n```' + p.code + '```';
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
-        if(!confirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.')) return;
+        if(!(await appConfirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.'))) return;
         p.code = randomCode(6);
         logAudit('Neuer Zugangscode erzeugt für Partei "' + p.name + '" (alter Zugriff widerrufen)');
         await saveShared();
