@@ -1307,8 +1307,8 @@ async function resolveDataRef(){
           '</div>';
         document.body.appendChild(keyOverlay);
         keyOverlay.querySelector('#bootKeyShareBtn').addEventListener('click', () => {
-          const text = 'WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', newKey) + '\n\nFalls du ihn manuell brauchst: ' + newKey;
-          window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+          const nkMsg = 'WakeLog — unser NEUER Bootsschlüssel (der alte ist ungültig). 🔑\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDer Schlüssel steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + newKey;
+          window.open('https://wa.me/?text=' + encodeURIComponent(nkMsg), '_blank');
         });
         keyOverlay.querySelector('#bootKeyCopyBtn').addEventListener('click', () => {
           try{ navigator.clipboard.writeText(newKey); } catch(e){}
@@ -1341,7 +1341,7 @@ let pendingPhotoDataUrl = null;
 let existingPhotoDataUrl = null;
 const STORAGE_KEY = 'boot-logbuch-data';
 const SESSION_KEY = 'boot-logbuch-session';
-const APP_VERSION = '2026-07-25-51';
+const APP_VERSION = '2026-07-25-54';
 const LOCK_MS = 24 * 60 * 60 * 1000;
 
 function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
@@ -1713,39 +1713,47 @@ function evaluateAccess(){
 }
 
 const SAILOR_QUOTES = [
-  // Etablierte Sprüche und echte Zitate — nichts Selbsterfundenes
-  'Nach der Fahrt ist vor dem Ankerdöschen.',
-  '«Und irgendwann kommt Carmen und haut dir auf die Fresse.» — «Du meinst Karma?» — «Mir egal, wie die Alte heisst. Hauptsache, du bekommst auf die Fresse!»',
-  'Ein Schiff im Hafen ist sicher — aber dafür werden Schiffe nicht gebaut. (John A. Shedd)',
-  'Wasser hat keine Balken.',
-  'Alkohol ist keine Lösung — chemisch gesehen schon.',
-  'Wer zuletzt lacht, denkt am langsamsten.',
-  'Wer früher stirbt, ist länger tot.',
-  'Morgenstund hat Gold im Mund — wer verschläft, bleibt gesund.',
-  'Wer andern eine Grube gräbt, hat ein Grubengrabgerät.',
-  'Was du heute kannst besorgen, das verschiebe stets auf morgen.',
-  'Ordnung ist das halbe Leben — ich lebe in der anderen Hälfte.',
-  'Wer Ordnung hält, ist nur zu faul zum Suchen.',
-  'Ich bin nicht faul, ich bin im Energiesparmodus.',
-  'Ich bin nicht dick, ich bin schwer zu entführen.',
-  'Lieber arm dran als Arm ab.',
-  'Wer schläft, sündigt nicht.',
-  'Geld allein macht nicht glücklich — aber es beruhigt.',
-  'Ich kann allem widerstehen, nur der Versuchung nicht. (Oscar Wilde)',
-  'Zwei Dinge sind unendlich: das Universum und die menschliche Dummheit. Beim Universum bin ich mir noch nicht ganz sicher. (Albert Einstein zugeschrieben)',
-  'Ein Leben ohne Mops ist möglich, aber sinnlos. (Loriot)',
-  'Es ist schon alles gesagt, nur noch nicht von allen. (Karl Valentin)',
-  'Mögen hätt ich schon wollen, aber dürfen hab ich mich nicht getraut. (Karl Valentin)',
-  'Ist der Ruf erst ruiniert, lebt es sich ganz ungeniert. (Wilhelm Busch)',
-  'Wer nichts weiss, muss alles glauben. (Marie von Ebner-Eschenbach)',
+  // Ausschliesslich Chuck-Norris-Weisheiten: etablierte Klassiker + die Boots-Reihe
   'Chuck Norris zählt bis unendlich. Zweimal.',
   'Chuck Norris schläft nicht. Er wartet.',
   'Chuck Norris kann Zwiebeln zum Weinen bringen.',
   'Chuck Norris kennt die letzte Ziffer von Pi.',
+  'Chuck Norris kann durch null teilen.',
   'Wenn Chuck Norris ins Wasser fällt, wird nicht Chuck Norris nass — das Wasser wird Chuck Norris.',
   'Chuck Norris kann Feuer mit einer Lupe machen. Nachts.',
+  'Chuck Norris kann ein Feuer mit zwei Eiswürfeln entzünden.',
+  'Chuck Norris kann unter Wasser ein Feuer entfachen.',
   'Chuck Norris wurde nicht geboren. Er hat sich entschieden.',
   'Chuck Norris trinkt kein Wasser. Er kaut es.',
+  'Wenn Chuck Norris Liegestütze macht, drückt er die Erde nach unten.',
+  'Unter Chuck Norris\' Bart ist kein Kinn — nur eine weitere Faust.',
+  'Chuck Norris bekommt bei McDonald\'s einen Burger King.',
+  'Chuck Norris isst keinen Honig. Er kaut Bienen.',
+  'Chuck Norris kann Drehtüren zuschlagen.',
+  'Chuck Norris räumt beim Bowling mit einem Wurf alle Kegel ab. Auf zwei Bahnen.',
+  'Chuck Norris\' Tränen heilen Krebs. Schade nur, dass er nie weint.',
+  'Chuck Norris wurde einmal von einer Kobra gebissen. Nach drei Tagen qualvoller Schmerzen starb die Kobra.',
+  'Chuck Norris hat noch nie einen Fehler gemacht. Einmal dachte er es — aber er hatte sich geirrt.',
+  'Der Schwarze Mann schaut nachts unter seinem Bett nach, ob dort Chuck Norris liegt.',
+  'Chuck Norris kennt Victoria\'s Secret.',
+  'Chuck Norris darf in der Bibliothek laut reden.',
+  'Chuck Norris\' Kalender springt vom 31. März direkt auf den 2. April. Niemand legt Chuck Norris rein.',
+  'Superman trägt Chuck-Norris-Pyjamas.',
+  'Chuck Norris googelt nicht. Google fragt Chuck Norris.',
+  'Chuck Norris\' Spiegelbild blinzelt zuerst.',
+  'Chuck Norris kann einen Kreis mit drei Ecken zeichnen.',
+  'Chuck Norris zählt keine Schafe. Die Schafe zählen Chuck Norris.',
+  'Chuck Norris presst Kohle mit blosser Hand zu Diamanten.',
+  'Chuck Norris wartet nicht auf den Bus. Der Bus wartet auf Chuck Norris.',
+  'Blitz und Donner entstehen, wenn Chuck Norris einen Roundhouse-Kick macht.',
+  'Es gibt keine Evolution — nur eine Liste von Tieren, denen Chuck Norris erlaubt zu leben.',
+  'Chuck Norris\' Hand schlägt Schere, Stein und Papier. Gleichzeitig.',
+  'Geister sitzen am Lagerfeuer und erzählen sich Chuck-Norris-Geschichten.',
+  'Der Tod hatte einmal ein Nahtod-Erlebnis: Er ist Chuck Norris begegnet.',
+  'Für Chuck Norris springt jede Ampel auf Grün.',
+  'Chuck Norris hat auch im Funkloch vollen Empfang.',
+  'Chuck Norris kann PDF-Dateien bearbeiten.',
+  'Wenn Chuck Norris ins Fitnessstudio geht, wird das Fitnessstudio stärker.',
   'Chuck Norris braucht kein Boot. Der See trägt ihn freiwillig.',
   'Chuck Norris wakeboardet ohne Leine. Das Boot hält sich an ihm fest.',
   'Chuck Norris ankert nicht. Das Ufer hält still.',
@@ -6665,7 +6673,8 @@ function wireBootKeyBox(){
     document.getElementById('bootKeyShareAdminBtn').addEventListener('click', () => {
       const key = getStoredBootKey();
       if(!key) return;
-      window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', key) + '\n\nSchlüssel zum Kopieren:\n```' + key + '```'), '_blank');
+      const keyMsg = 'WakeLog — unser gemeinsamer Bootsschlüssel. 🔑\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDer Schlüssel steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + key;
+      window.open('https://wa.me/?text=' + encodeURIComponent(keyMsg), '_blank');
     });
     document.getElementById('bootKeyReenterBtn').addEventListener('click', async () => {
       if(!(await appConfirm('Der auf diesem Gerät gespeicherte Bootsschlüssel wird entfernt und beim nächsten Start neu abgefragt. Fortfahren?'))) return;
@@ -6707,7 +6716,8 @@ function wireBootKeyBox(){
           '</div>';
         document.body.appendChild(keyOverlay);
         keyOverlay.querySelector('#rotateShareBtn').addEventListener('click', () => {
-          window.open('https://wa.me/?text=' + encodeURIComponent('WakeLog: Neuer Bootsschlüssel — einfach diesen Link antippen, der Schlüssel wird automatisch übernommen:\n' + appShareUrl('bootkey', newKey) + '\n\nFalls du ihn manuell brauchst: ' + newKey), '_blank');
+          const nkMsg = 'WakeLog — unser NEUER Bootsschlüssel (der alte ist ungültig). 🔑\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDer Schlüssel steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + newKey;
+          window.open('https://wa.me/?text=' + encodeURIComponent(nkMsg), '_blank');
         });
         keyOverlay.querySelector('#rotateCopyBtn').addEventListener('click', () => {
           try{ navigator.clipboard.writeText(newKey); } catch(e){}
@@ -7384,7 +7394,7 @@ function renderAdminCostsSection(){
       '<div class="field"><label for="annualCostYear">Jahr</label><select id="annualCostYear"></select></div>' +
       '<div class="row" style="margin-top:0.9rem;">' +
         '<div class="field"><label for="acType">Kostenart&nbsp;*</label><select id="acType">' +
-          '<option>Anschaffung Neuboot</option><option>Bootsequipment</option><option>Rückstellung / Abschreibung</option><option>Service</option><option>Verkehrssteuer</option><option>Versicherung</option><option>Winterlager</option><option>Sonstiges</option>' +
+          '<option>Anschaffung Neuboot</option><option>Bootsequipment</option><option>Getränke / Essensaufstockung</option><option>Rückstellung / Abschreibung</option><option>Service</option><option>Verkehrssteuer</option><option>Versicherung</option><option>Winterlager</option><option>Sonstiges</option>' +
         '</select></div>' +
         '<div class="field" id="acCustomTypeField" style="display:none;"><label for="acCustomType">Kostenart benennen&nbsp;*</label><input id="acCustomType" type="text" placeholder="z. B. Reparatur Steg"><div class="gate-error" id="err-ac-customtype">Bitte einen Titel für die Kostenart angeben.</div></div>' +
         '<div class="field"><label for="acDesc">Beschreibung&nbsp;*</label><input id="acDesc" type="text" placeholder="z. B. Rechnung Werft Nr. 4471"><div class="gate-error" id="err-ac-desc">Bitte eine Beschreibung angeben.</div></div>' +
@@ -7862,9 +7872,11 @@ function renderPartyCodeList(){
         setTimeout(() => fb.classList.remove('show'), 2500);
       } else if(btn.dataset.action === 'whatsapp'){
         // Link kommt automatisch von der App-Adresse (Freigabe-Link nur optionales Override)
-        // Code steht allein auf der letzten Zeile in Monospace — so lässt er
-        // sich in WhatsApp sauber isoliert markieren und kopieren.
-        const msg = 'Dein Zugang zu WakeLog — einfach diesen Link antippen, der Code wird automatisch übernommen:\n' + appShareUrl('code', p.code) + '\n\nCode zum Kopieren:\n```' + p.code + '```';
+        // Einladung mit App-Link (bewusst OHNE Code im Link — sonst könnte jeder
+        // mit dem Link ohne Passwort einsteigen). Der Code steht als letzte Zeile:
+        // Nachricht komplett kopieren und in der App auf 📋 tippen — der Code
+        // wird automatisch herausgelesen.
+        const msg = 'Hallo! Ich lade dich zu WakeLog ein — dem Cockpit unserer Bootsgemeinschaft. 🚤\n\nApp öffnen:\n' + appBaseUrl() + '\n\nDein persönlicher Zugangscode steht in der nächsten Zeile — kopiere einfach diese ganze Nachricht und tippe in der App auf 📋, dann wird er automatisch übernommen:\n' + p.code;
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       } else if(btn.dataset.action === 'kick'){
         if(!(await appConfirm('Wirklich einen neuen Code für "' + p.name + '" erzeugen? Der bisherige Code funktioniert danach sofort nicht mehr.'))) return;
